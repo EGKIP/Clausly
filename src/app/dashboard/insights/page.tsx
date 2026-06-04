@@ -12,10 +12,11 @@ import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { RiskPill } from "@/components/ui/risk-pill";
-import { documents } from "@/lib/mock-data";
-import { reminders } from "@/lib/mock-reminders";
+import { listDocuments } from "@/lib/db/documents";
+import { listReminders } from "@/lib/db/reminders";
 
-export default function InsightsPage() {
+export default async function InsightsPage() {
+  const [documents, reminders] = await Promise.all([listDocuments(), listReminders()]);
   const monthlySpend = 2054;
   const renewalsSoon = documents.filter((d) => d.tags.includes("Auto-renew")).length;
   const flagged = documents.filter((d) => d.risk === "High" || d.risk === "Needs Review");

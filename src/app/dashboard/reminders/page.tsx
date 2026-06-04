@@ -17,7 +17,8 @@ import {
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
-import { reminders as allReminders, type ReminderStatus } from "@/lib/mock-reminders";
+import { useReminders } from "@/lib/hooks/use-reminders";
+import type { ReminderStatus } from "@/lib/mock-reminders";
 import { cn } from "@/lib/utils";
 
 const tabs: { id: ReminderStatus; label: string; description: string }[] = [
@@ -31,6 +32,7 @@ const iconFor = (t: string) =>
 
 export default function RemindersPage() {
   const [tab, setTab] = React.useState<ReminderStatus>("suggested");
+  const { reminders: allReminders, isLoading, error } = useReminders();
   const list = allReminders.filter((r) => r.status === tab);
   const counts: Record<ReminderStatus, number> = {
     suggested: allReminders.filter((r) => r.status === "suggested").length,
@@ -89,8 +91,10 @@ export default function RemindersPage() {
       <p className="mt-4 text-[13px] text-[var(--muted)]">{tabs.find((t) => t.id === tab)?.description}</p>
 
       <div className="mt-6 space-y-2.5">
-        {list.length === 0 && <EmptyState status={tab} />}
-        {list.map((r) => {
+        {isLoading && <LoadingState />}
+        {error && <EmptyState status={tab} message={error} />}
+        {!isLoading && !error && list.length === 0 && <EmptyState status={tab} />}
+        {!isLoading && !error && list.map((r) => {
           const Icon = iconFor(r.type);
           const urgent = r.daysAway > 0 && r.daysAway < 14;
           return (
@@ -172,8 +176,22 @@ export default function RemindersPage() {
   );
 }
 
-function EmptyState({ status }: { status: ReminderStatus }) {
+function LoadingState() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-[120px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] animate-pulse"
+        />
+      ))}
+    </>
+  );
+}
+
+function EmptyState({ status, message }: { status: ReminderStatus; message?: string }) {
   const copy =
+    message ??
     status === "suggested"
       ? "No suggestions right now — Clausly's caught up."
       : status === "approved"

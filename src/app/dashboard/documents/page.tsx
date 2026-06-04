@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
-import { documents, type DocType } from "@/lib/mock-data";
+import type { DocType } from "@/lib/mock-data";
+import { useDocuments } from "@/lib/hooks/use-documents";
 import { DocumentCard, DocumentRow } from "@/components/dashboard/document-card";
 import type { RiskLevel } from "@/components/ui/risk-pill";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,7 @@ export default function DocumentsPage() {
   const [risk, setRisk] = React.useState<(typeof riskLevels)[number]>("All risk");
   const [view, setView] = React.useState<"grid" | "list">("grid");
   const [sort, setSort] = React.useState<"recent" | "ends" | "risk">("recent");
+  const { documents, isLoading, error } = useDocuments();
 
   const filtered = React.useMemo(() => {
     const r = documents.filter((d) => {
@@ -57,7 +59,7 @@ export default function DocumentsPage() {
       r.sort((a, b) => order[a.risk] - order[b.risk]);
     }
     return r;
-  }, [q, type, risk, sort]);
+  }, [documents, q, type, risk, sort]);
 
   const hasFilters = q !== "" || type !== "All" || risk !== "All risk";
 
@@ -147,7 +149,11 @@ export default function DocumentsPage() {
       </p>
 
       {/* Body */}
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <LoadingState />
+      ) : error ? (
+        <ErrorState message={error} />
+      ) : filtered.length === 0 ? (
         <EmptyState onClear={() => { setQ(""); setType("All"); setRisk("All risk"); }} />
       ) : view === "grid" ? (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -171,6 +177,30 @@ export default function DocumentsPage() {
         </div>
       )}
     </PageBody>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-[230px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] animate-pulse"
+        />
+      ))}
+    </div>
+  );
+}
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div className="mt-10 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-12 text-center">
+      <p className="font-serif text-[22px] leading-tight tracking-[-0.01em]">
+        Documents could not load.
+      </p>
+      <p className="mt-2 text-[13px] text-[var(--muted)]">{message}</p>
+    </div>
   );
 }
 

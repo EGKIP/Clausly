@@ -9,14 +9,15 @@ import {
   Plus,
 } from "lucide-react";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
-import { documents } from "@/lib/mock-data";
-import { reminders } from "@/lib/mock-reminders";
+import { listDocuments } from "@/lib/db/documents";
+import { listReminders } from "@/lib/db/reminders";
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { DocumentCard } from "@/components/dashboard/document-card";
 import { cn } from "@/lib/utils";
 
-export default function DashboardHomePage() {
+export default async function DashboardHomePage() {
+  const [documents, reminders] = await Promise.all([listDocuments(), listReminders()]);
   const upcoming = [...reminders]
     .filter((r) => r.status !== "sent")
     .sort((a, b) => a.daysAway - b.daysAway)

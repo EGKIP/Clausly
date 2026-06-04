@@ -1,0 +1,202 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Clausly Design System
+   Tokens: warm parchment ground, deep ink text, sage-emerald "clause" accent,
+   amber "attention" accent, coral risk. All colors authored in oklch for
+   perceptual consistency across light + dark.
+   ─────────────────────────────────────────────────────────────────────── */
+
+@theme {
+  /* Typography */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-serif: var(--font-instrument-serif), ui-serif, Georgia, "Times New Roman",
+    serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo,
+    Monaco, Consolas, monospace;
+
+  /* Color palette — semantic tokens */
+  --color-parchment: oklch(98.2% 0.012 85);
+  --color-parchment-50: oklch(99% 0.008 85);
+  --color-parchment-100: oklch(96.5% 0.014 85);
+  --color-parchment-200: oklch(93% 0.018 85);
+
+  --color-ink: oklch(18% 0.022 260);
+  --color-ink-soft: oklch(28% 0.02 260);
+  --color-ink-muted: oklch(48% 0.014 260);
+  --color-ink-faint: oklch(68% 0.01 260);
+  --color-ink-line: oklch(90% 0.008 85);
+
+  --color-clause: oklch(54% 0.11 175);
+  --color-clause-soft: oklch(94% 0.04 175);
+  --color-clause-ink: oklch(28% 0.07 175);
+
+  --color-ember: oklch(74% 0.14 65);
+  --color-ember-soft: oklch(95% 0.05 75);
+  --color-ember-ink: oklch(40% 0.11 60);
+
+  --color-coral: oklch(62% 0.17 25);
+  --color-coral-soft: oklch(95% 0.04 25);
+  --color-coral-ink: oklch(38% 0.13 25);
+
+  --color-iris: oklch(58% 0.15 280);
+  --color-iris-soft: oklch(95% 0.04 280);
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 40px;
+
+  /* Motion */
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --ease-in-out-quart: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Container */
+  --breakpoint-3xl: 1920px;
+}
+
+/* Semantic role mapping (light mode default) */
+:root {
+  --background: var(--color-parchment);
+  --foreground: var(--color-ink);
+  --surface: oklch(99.5% 0.004 85);
+  --surface-2: var(--color-parchment-100);
+  --surface-3: var(--color-parchment-200);
+  --border: var(--color-ink-line);
+  --border-strong: oklch(82% 0.01 85);
+  --muted: var(--color-ink-muted);
+  --faint: var(--color-ink-faint);
+  --accent: var(--color-clause);
+  --accent-soft: var(--color-clause-soft);
+  --accent-ink: var(--color-clause-ink);
+  --ring: color-mix(in oklch, var(--color-clause) 50%, transparent);
+  --shadow-card: 0 1px 0 0 oklch(0% 0 0 / 0.04),
+    0 8px 24px -12px oklch(20% 0.03 260 / 0.12);
+  --shadow-float: 0 1px 0 0 oklch(0% 0 0 / 0.04),
+    0 24px 60px -24px oklch(20% 0.03 260 / 0.22);
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(15% 0.022 260);
+  --foreground: oklch(96% 0.012 85);
+  --surface: oklch(19% 0.024 260);
+  --surface-2: oklch(22% 0.025 260);
+  --surface-3: oklch(26% 0.026 260);
+  --border: oklch(28% 0.022 260);
+  --border-strong: oklch(36% 0.024 260);
+  --muted: oklch(70% 0.014 85);
+  --faint: oklch(54% 0.01 85);
+  --accent: oklch(72% 0.13 175);
+  --accent-soft: oklch(28% 0.06 175);
+  --accent-ink: oklch(88% 0.08 175);
+  --ring: color-mix(in oklch, oklch(72% 0.13 175) 60%, transparent);
+  --shadow-card: 0 1px 0 0 oklch(100% 0 0 / 0.03),
+    0 8px 24px -12px oklch(0% 0 0 / 0.5);
+  --shadow-float: 0 1px 0 0 oklch(100% 0 0 / 0.04),
+    0 24px 60px -24px oklch(0% 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--accent) 25%, transparent);
+    color: var(--foreground);
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+/* ── Atmospheric grid + noise utilities ─────────────────────────────── */
+@layer utilities {
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 5%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .bg-grid-fine {
+    background-image:
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 4%, transparent) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .mask-radial-fade {
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 100%);
+  }
+  .mask-bottom-fade {
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  }
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  .scrollbar-none { scrollbar-width: none; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
+.animate-pulse-soft { animation: pulse-soft 3s ease-in-out infinite; }
+.animate-marquee { animation: marquee 40s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

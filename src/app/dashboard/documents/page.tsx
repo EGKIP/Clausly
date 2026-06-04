@@ -1,0 +1,258 @@
+"use client";
+
+import * as React from "react";
+import {
+  Search,
+  LayoutGrid,
+  List,
+  SlidersHorizontal,
+  Upload,
+  X,
+  ChevronDown,
+} from "lucide-react";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { Button } from "@/components/ui/button";
+import { documents, type DocType } from "@/lib/mock-data";
+import { DocumentCard, DocumentRow } from "@/components/dashboard/document-card";
+import type { RiskLevel } from "@/components/ui/risk-pill";
+import { cn } from "@/lib/utils";
+
+const docTypes: ("All" | DocType)[] = [
+  "All",
+  "Lease",
+  "Insurance",
+  "Employment",
+  "Service",
+  "Subscription",
+  "Loan",
+  "NDA",
+];
+const riskLevels: ("All risk" | RiskLevel)[] = [
+  "All risk",
+  "Low",
+  "Medium",
+  "High",
+  "Needs Review",
+];
+
+export default function DocumentsPage() {
+  const [q, setQ] = React.useState("");
+  const [type, setType] = React.useState<(typeof docTypes)[number]>("All");
+  const [risk, setRisk] = React.useState<(typeof riskLevels)[number]>("All risk");
+  const [view, setView] = React.useState<"grid" | "list">("grid");
+  const [sort, setSort] = React.useState<"recent" | "ends" | "risk">("recent");
+
+  const filtered = React.useMemo(() => {
+    const r = documents.filter((d) => {
+      const q1 = q.trim().toLowerCase();
+      const matchQ = !q1 || (d.title + " " + d.party + " " + d.tags.join(" ")).toLowerCase().includes(q1);
+      const matchT = type === "All" || d.type === type;
+      const matchR = risk === "All risk" || d.risk === risk;
+      return matchQ && matchT && matchR;
+    });
+    if (sort === "recent") r.sort((a, b) => a.uploadedDaysAgo - b.uploadedDaysAgo);
+    if (sort === "ends") r.sort((a, b) => +new Date(a.ends || 0) - +new Date(b.ends || 0));
+    if (sort === "risk") {
+      const order: Record<RiskLevel, number> = { High: 0, "Needs Review": 1, Medium: 2, Low: 3 };
+      r.sort((a, b) => order[a.risk] - order[b.risk]);
+    }
+    return r;
+  }, [q, type, risk, sort]);
+
+  const hasFilters = q !== "" || type !== "All" || risk !== "All risk";
+
+  return (
+    <PageBody>
+      <PageHeader
+        eyebrow="Your portfolio"
+        title="Documents"
+        description="Everything you've uploaded. Filter by type or risk, search by party or clause."
+        actions={
+          <Button variant="primary" size="md">
+            <Upload className="size-3.5" /> Upload
+          </Button>
+        }
+      />
+
+      {/* Toolbar */}
+      <div className="mt-8 flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[200px] max-w-[420px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--faint)]" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search title, party, tag…"
+            className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13.5px] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--border-strong)]"
+          />
+        </div>
+
+        <FilterChip
+          label={type === "All" ? "All types" : type}
+          options={[...docTypes]}
+          value={type}
+          onChange={(v) => setType(v as typeof type)}
+        />
+        <FilterChip
+          label={risk}
+          options={[...riskLevels]}
+          value={risk}
+          onChange={(v) => setRisk(v as typeof risk)}
+        />
+        <FilterChip
+          label={`Sort: ${sort === "recent" ? "Recent" : sort === "ends" ? "Ends soonest" : "Highest risk"}`}
+          icon={SlidersHorizontal}
+          options={[
+            { label: "Most recent", value: "recent" },
+            { label: "Ends soonest", value: "ends" },
+            { label: "Highest risk", value: "risk" },
+          ]}
+          value={sort}
+          onChange={(v) => setSort(v as typeof sort)}
+        />
+
+        {hasFilters && (
+          <button
+            onClick={() => {
+              setQ("");
+              setType("All");
+              setRisk("All risk");
+            }}
+            className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] px-2 py-1"
+          >
+            <X className="size-3.5" /> Clear
+          </button>
+        )}
+
+        <div className="ml-auto inline-flex items-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] p-0.5">
+          {(["grid", "list"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              aria-label={v}
+              className={cn(
+                "inline-flex size-8 items-center justify-center rounded-[var(--radius-xs)] transition-colors",
+                view === v
+                  ? "bg-[var(--surface-2)] text-[var(--foreground)]"
+                  : "text-[var(--faint)] hover:text-[var(--foreground)]"
+              )}
+            >
+              {v === "grid" ? <LayoutGrid className="size-4" /> : <List className="size-4" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--faint)]">
+        Showing {filtered.length} of {documents.length}
+      </p>
+
+      {/* Body */}
+      {filtered.length === 0 ? (
+        <EmptyState onClear={() => { setQ(""); setType("All"); setRisk("All risk"); }} />
+      ) : view === "grid" ? (
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map((d) => (
+            <DocumentCard key={d.id} doc={d} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <div className="hidden md:grid grid-cols-[2.6fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--surface-2)] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            <span>Document</span>
+            <span>Ends</span>
+            <span>Jurisdiction</span>
+            <span>Risk</span>
+          </div>
+          <div className="divide-y divide-[var(--border)]">
+            {filtered.map((d) => (
+              <DocumentRow key={d.id} doc={d} />
+            ))}
+          </div>
+        </div>
+      )}
+    </PageBody>
+  );
+}
+
+/* ── Lightweight filter chip dropdown ───────────────────────────────── */
+type Option = string | { label: string; value: string };
+function FilterChip({
+  label,
+  options,
+  value,
+  onChange,
+  icon: Icon,
+}: {
+  label: string;
+  options: Option[];
+  value: string;
+  onChange: (v: string) => void;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border h-10 px-3 text-[13px] font-medium transition-colors",
+          open
+            ? "border-[var(--border-strong)] bg-[var(--surface-2)]"
+            : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
+        )}
+      >
+        {Icon && <Icon className="size-3.5 text-[var(--muted)]" />}
+        {label}
+        <ChevronDown className="size-3.5 text-[var(--faint)]" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)] p-1">
+          {options.map((opt) => {
+            const o = typeof opt === "string" ? { label: opt, value: opt } : opt;
+            const active = o.value === value;
+            return (
+              <button
+                key={o.value}
+                onClick={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between gap-3 rounded-[var(--radius-xs)] px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--surface-2)]",
+                  active && "bg-[var(--surface-2)] text-[var(--foreground)]"
+                )}
+              >
+                {o.label}
+                {active && <span className="size-1.5 rounded-full bg-[var(--accent)]" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="mt-10 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-12 text-center">
+      <p className="font-serif text-[22px] leading-tight tracking-[-0.01em]">
+        No documents match those filters.
+      </p>
+      <p className="mt-2 text-[13px] text-[var(--muted)]">
+        Try widening the filters, or clear them to see everything.
+      </p>
+      <Button variant="secondary" size="sm" onClick={onClear} className="mt-5">
+        Clear filters
+      </Button>
+    </div>
+  );
+}

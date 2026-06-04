@@ -1,0 +1,188 @@
+"use client";
+
+import * as React from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import {
+  BellRing,
+  Calendar,
+  Check,
+  Clock,
+  Send,
+  X,
+  CalendarClock,
+  Sparkles,
+  ShieldAlert,
+} from "lucide-react";
+import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { Badge } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/button";
+import { reminders as allReminders, type ReminderStatus } from "@/lib/mock-reminders";
+import { cn } from "@/lib/utils";
+
+const tabs: { id: ReminderStatus; label: string; description: string }[] = [
+  { id: "suggested", label: "Suggested", description: "Clausly noticed these. Approve, edit, or ignore." },
+  { id: "approved", label: "Approved", description: "Reminders you've okayed. They'll fire on schedule." },
+  { id: "sent", label: "Sent", description: "Reminders Clausly has already delivered." },
+];
+
+const iconFor = (t: string) =>
+  t === "Renewal" ? CalendarClock : t === "Notice" ? Calendar : t === "Review" ? Sparkles : ShieldAlert;
+
+export default function RemindersPage() {
+  const [tab, setTab] = React.useState<ReminderStatus>("suggested");
+  const list = allReminders.filter((r) => r.status === tab);
+  const counts: Record<ReminderStatus, number> = {
+    suggested: allReminders.filter((r) => r.status === "suggested").length,
+    approved: allReminders.filter((r) => r.status === "approved").length,
+    sent: allReminders.filter((r) => r.status === "sent").length,
+  };
+
+  return (
+    <PageBody>
+      <PageHeader
+        eyebrow="Inbox"
+        title="Reminders"
+        description="Everything is suggested first. Clausly never fires a reminder without your nod."
+        actions={
+          <Button variant="secondary" size="md">
+            <Calendar className="size-3.5" /> Calendar view
+          </Button>
+        }
+      />
+
+      <div className="mt-8 flex items-center gap-1 p-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] w-fit overflow-x-auto scrollbar-none">
+        {tabs.map((t) => {
+          const active = t.id === tab;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "relative inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
+                active ? "text-[var(--foreground)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              )}
+            >
+              {active && (
+                <motion.span
+                  layoutId="reminders-tab"
+                  className="absolute inset-0 rounded-[var(--radius-sm)] bg-[var(--surface-2)] border border-[var(--border)]"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className="relative">{t.label}</span>
+              <span
+                className={cn(
+                  "relative font-mono text-[10.5px] tabular-nums rounded-full px-1.5 py-px",
+                  active
+                    ? "bg-[var(--background)] text-[var(--muted)] border border-[var(--border)]"
+                    : "bg-[var(--surface-2)] text-[var(--faint)]"
+                )}
+              >
+                {counts[t.id]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="mt-4 text-[13px] text-[var(--muted)]">{tabs.find((t) => t.id === tab)?.description}</p>
+
+      <div className="mt-6 space-y-2.5">
+        {list.length === 0 && <EmptyState status={tab} />}
+        {list.map((r) => {
+          const Icon = iconFor(r.type);
+          const urgent = r.daysAway > 0 && r.daysAway < 14;
+          return (
+            <motion.div
+              key={r.id}
+              layout
+              className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 grid grid-cols-1 md:grid-cols-[1fr_auto] items-start md:items-center gap-4"
+            >
+              <div className="flex items-start gap-4 min-w-0">
+                <span
+                  className={cn(
+                    "inline-flex size-11 items-center justify-center rounded-[var(--radius-sm)] border shrink-0",
+                    tab === "sent"
+                      ? "bg-[var(--surface-2)] text-[var(--muted)] border-[var(--border)]"
+                      : urgent
+                      ? "bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)] border-[color-mix(in_oklch,var(--color-coral)_22%,transparent)]"
+                      : "bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)] border-[color-mix(in_oklch,var(--color-ember)_22%,transparent)]"
+                  )}
+                >
+                  <Icon className="size-4" />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <p className="text-[14.5px] font-medium leading-tight">{r.title}</p>
+                    <Badge tone="outline">{r.type}</Badge>
+                  </div>
+                  <p className="text-[12.5px] text-[var(--muted)] leading-relaxed">
+                    {r.description}
+                  </p>
+                  <p className="mt-2 text-[11.5px] text-[var(--faint)]">
+                    For{" "}
+                    <Link href={`/dashboard/documents/${r.docId}`} className="text-[var(--accent-ink)] hover:underline">
+                      {r.docTitle}
+                    </Link>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between md:justify-end gap-3">
+                <div className="text-right">
+                  <p className="font-serif text-[20px] leading-none tracking-[-0.01em] tabular-nums">
+                    {tab === "sent" ? "✓" : Math.abs(r.daysAway)}
+                  </p>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--faint)] mt-1">
+                    {tab === "sent" ? "delivered" : r.daysAway < 0 ? "days late" : "days away"}
+                  </p>
+                  <p className="font-mono text-[11px] text-[var(--muted)] mt-1 tabular-nums">{r.fireOn}</p>
+                </div>
+                {tab === "suggested" && (
+                  <div className="flex items-center gap-1.5">
+                    <Button variant="primary" size="sm">
+                      <Check className="size-3.5" /> Approve
+                    </Button>
+                    <Button variant="ghost" size="sm" aria-label="Edit timing">
+                      <Clock className="size-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" aria-label="Ignore">
+                      <X className="size-3.5" />
+                    </Button>
+                  </div>
+                )}
+                {tab === "approved" && (
+                  <Button variant="secondary" size="sm">
+                    <Clock className="size-3.5" /> Edit
+                  </Button>
+                )}
+                {tab === "sent" && (
+                  <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--muted)]">
+                    <Send className="size-3" />
+                    Email · {r.channel.toLowerCase()}
+                  </span>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+    </PageBody>
+  );
+}
+
+function EmptyState({ status }: { status: ReminderStatus }) {
+  const copy =
+    status === "suggested"
+      ? "No suggestions right now — Clausly's caught up."
+      : status === "approved"
+      ? "No approved reminders yet. Approve a suggestion to queue one up."
+      : "No reminders sent yet.";
+  return (
+    <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] bg-[var(--surface)] p-12 text-center">
+      <BellRing className="size-5 mx-auto text-[var(--faint)]" />
+      <p className="mt-3 font-serif text-[18px]">{copy}</p>
+    </div>
+  );
+}

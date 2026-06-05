@@ -5,12 +5,14 @@ import { PageBody } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/primitives";
 import { RiskPill } from "@/components/ui/risk-pill";
-import { documents } from "@/lib/mock-data";
-import { getClausesFor } from "@/lib/mock-clauses";
-import { reminders } from "@/lib/mock-reminders";
+import { getDocumentDetail, listDocuments } from "@/lib/db/documents";
 import { DocumentView } from "@/components/dashboard/document-view";
 
-export function generateStaticParams() {
+export const dynamic = "force-dynamic";
+
+export async function generateStaticParams() {
+  if (process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
+  const documents = await listDocuments();
   return documents.map((d) => ({ id: d.id }));
 }
 
@@ -20,11 +22,9 @@ interface PageProps {
 
 export default async function DocumentDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const doc = documents.find((d) => d.id === id);
-  if (!doc) notFound();
-
-  const docClauses = getClausesFor(doc.id);
-  const docReminders = reminders.filter((r) => r.docId === doc.id);
+  const detail = await getDocumentDetail(id);
+  if (!detail) notFound();
+  const { document: doc, clauses: docClauses, reminders: docReminders } = detail;
 
   return (
     <PageBody className="max-w-[1480px]">

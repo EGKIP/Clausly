@@ -14,7 +14,7 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
-import { documents } from "@/lib/mock-data";
+import { useDocuments } from "@/lib/hooks/use-documents";
 import { RiskPill } from "@/components/ui/risk-pill";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export function CommandPalette({
 }) {
   const [q, setQ] = React.useState("");
   const ref = React.useRef<HTMLInputElement>(null);
+  const { documents } = useDocuments();
 
   React.useEffect(() => {
     if (open) requestAnimationFrame(() => ref.current?.focus());

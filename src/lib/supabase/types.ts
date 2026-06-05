@@ -1,0 +1,237 @@
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+export type Database = {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          default_state: string | null;
+          subscription_tier: "free" | "pro";
+          notification_preferences: Json;
+          onboarding_completed: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string | null;
+          default_state?: string | null;
+          subscription_tier?: "free" | "pro";
+          notification_preferences?: Json;
+          onboarding_completed?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["users"]["Insert"]>;
+        Relationships: [];
+      };
+      documents: {
+        Row: {
+          id: string;
+          user_id: string;
+          title: string;
+          party: string | null;
+          document_type: Database["public"]["Enums"]["document_type"];
+          jurisdiction: string | null;
+          page_count: number;
+          storage_path: string;
+          file_name: string;
+          mime_type: string;
+          file_size_bytes: number;
+          status: Database["public"]["Enums"]["document_status"];
+          risk_level: Database["public"]["Enums"]["risk_level"] | null;
+          monthly_value: number | null;
+          effective_date: string | null;
+          end_date: string | null;
+          notice_window_days: number | null;
+          summary_short: string | null;
+          summary: string | null;
+          tags: string[];
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          title: string;
+          party?: string | null;
+          document_type?: Database["public"]["Enums"]["document_type"];
+          jurisdiction?: string | null;
+          page_count?: number;
+          storage_path: string;
+          file_name: string;
+          mime_type?: string;
+          file_size_bytes?: number;
+          status?: Database["public"]["Enums"]["document_status"];
+          risk_level?: Database["public"]["Enums"]["risk_level"] | null;
+          monthly_value?: number | null;
+          effective_date?: string | null;
+          end_date?: string | null;
+          notice_window_days?: number | null;
+          summary_short?: string | null;
+          summary?: string | null;
+          tags?: string[];
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["documents"]["Insert"]>;
+        Relationships: [];
+      };
+      clauses: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string;
+          title: string;
+          category: string;
+          risk_level: Database["public"]["Enums"]["risk_level"];
+          page_number: number;
+          source_quote: string;
+          plain_english: string;
+          why_it_matters: string | null;
+          confidence: number | null;
+          bbox: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id: string;
+          title: string;
+          category: string;
+          risk_level?: Database["public"]["Enums"]["risk_level"];
+          page_number?: number;
+          source_quote: string;
+          plain_english: string;
+          why_it_matters?: string | null;
+          confidence?: number | null;
+          bbox?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["clauses"]["Insert"]>;
+        Relationships: [];
+      };
+      dates: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string;
+          clause_id: string | null;
+          label: string;
+          date_value: string;
+          kind: Database["public"]["Enums"]["date_kind"];
+          description: string | null;
+          source_quote: string | null;
+          confidence: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id: string;
+          clause_id?: string | null;
+          label: string;
+          date_value: string;
+          kind?: Database["public"]["Enums"]["date_kind"];
+          description?: string | null;
+          source_quote?: string | null;
+          confidence?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["dates"]["Insert"]>;
+        Relationships: [];
+      };
+      reminders: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string;
+          date_id: string | null;
+          title: string;
+          description: string;
+          fire_on: string;
+          reminder_time: string | null;
+          status: Database["public"]["Enums"]["reminder_status"];
+          channel: Database["public"]["Enums"]["reminder_channel"];
+          reminder_type: string;
+          source_quote: string | null;
+          confidence: number | null;
+          sent_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id: string;
+          date_id?: string | null;
+          title: string;
+          description: string;
+          fire_on: string;
+          reminder_time?: string | null;
+          status?: Database["public"]["Enums"]["reminder_status"];
+          channel?: Database["public"]["Enums"]["reminder_channel"];
+          reminder_type?: string;
+          source_quote?: string | null;
+          confidence?: number | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["reminders"]["Insert"]>;
+        Relationships: [];
+      };
+      usage_metrics: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string | null;
+          job_type: string;
+          provider: string | null;
+          model: string | null;
+          input_token_count: number;
+          output_token_count: number;
+          status: "completed" | "failed";
+          error_message: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id?: string | null;
+          job_type: string;
+          provider?: string | null;
+          model?: string | null;
+          input_token_count?: number;
+          output_token_count?: number;
+          status?: "completed" | "failed";
+          error_message?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["usage_metrics"]["Insert"]>;
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: {
+      document_type: "lease" | "auto" | "employment" | "service" | "nda" | "other";
+      document_status: "pending" | "analyzing" | "ready" | "failed";
+      risk_level: "low" | "medium" | "high" | "needs_review";
+      reminder_status: "suggested" | "approved" | "sent" | "ignored";
+      reminder_channel: "email";
+      date_kind: "deadline" | "renewal" | "notice" | "payment" | "effective" | "end" | "review";
+    };
+    CompositeTypes: Record<string, never>;
+  };
+};

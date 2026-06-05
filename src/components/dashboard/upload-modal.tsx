@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, UploadCloud, FileText, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,22 +14,50 @@ export function UploadModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [drag, setDrag] = React.useState(false);
   const [file, setFile] = React.useState<File | null>(null);
-  const [phase, setPhase] = React.useState<"idle" | "uploading" | "analyzing">("idle");
+  const [phase, setPhase] = React.useState<"idle" | "uploading" | "analyzing" | "error">("idle");
+  const [documentId, setDocumentId] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!open) {
       setFile(null);
       setPhase("idle");
+      setDocumentId(null);
+      setError(null);
     }
   }, [open]);
 
   React.useEffect(() => {
     if (!file) return;
-    setPhase("uploading");
-    const t1 = setTimeout(() => setPhase("analyzing"), 900);
-    return () => clearTimeout(t1);
+    let cancelled = false;
+    const uploadFile = file;
+    async function upload() {
+      setPhase("uploading");
+      setError(null);
+      const body = new FormData();
+      body.set("file", uploadFile);
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body,
+      });
+      if (cancelled) return;
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: "Upload failed." }));
+        setError(payload.error ?? "Upload failed.");
+        setPhase("error");
+        return;
+      }
+      const payload = (await response.json()) as { id: string };
+      setDocumentId(payload.id);
+      setPhase("analyzing");
+    }
+    void upload();
+    return () => {
+      cancelled = true;
+    };
   }, [file]);
 
   const onDrop = (e: React.DragEvent<HTMLLabelElement>) => {
@@ -125,17 +154,17 @@ export function UploadModal({
                   <div className="mt-4 h-1 rounded-full bg-[var(--border)] overflow-hidden">
                     <motion.div
                       key={phase}
-                      initial={{ width: phase === "uploading" ? "0%" : "60%" }}
-                      animate={{ width: phase === "uploading" ? "55%" : "100%" }}
+                      initial={{ width: phase === "uploading" ? "0%" : "72%" }}
+                      animate={{ width: phase === "uploading" ? "72%" : phase === "error" ? "72%" : "100%" }}
                       transition={{ duration: phase === "uploading" ? 0.9 : 1.2, ease: "easeInOut" }}
-                      className="h-full bg-[var(--accent)]"
+                      className={cn("h-full", phase === "error" ? "bg-[var(--color-coral)]" : "bg-[var(--accent)]")}
                     />
                   </div>
                   <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-[var(--accent-ink)]">
                     <Sparkles className="size-3" />
-                    {phase === "uploading"
-                      ? "Uploading securely…"
-                      : "Reading clauses, dates and risks…"}
+                    {phase === "uploading" && "Uploading securely…"}
+                    {phase === "analyzing" && "Queued for clause, date and risk analysis…"}
+                    {phase === "error" && (error ?? "Upload failed.")}
                   </p>
                 </div>
               )}
@@ -150,7 +179,17 @@ export function UploadModal({
               <Button variant="ghost" size="sm" onClick={onClose}>
                 Cancel
               </Button>
-              <Button variant="primary" size="sm" disabled={!file}>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!documentId}
+                onClick={() => {
+                  if (!documentId) return;
+                  router.push(`/dashboard/documents/${documentId}`);
+                  router.refresh();
+                  onClose();
+                }}
+              >
                 {phase === "analyzing" ? "Open document" : "Analyze"}
               </Button>
             </div>

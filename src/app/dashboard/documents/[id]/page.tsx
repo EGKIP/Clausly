@@ -24,7 +24,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   const { id } = await params;
   const detail = await getDocumentDetail(id);
   if (!detail) notFound();
-  const { document: doc, clauses: docClauses, reminders: docReminders } = detail;
+  const { document: doc, clauses: docClauses, reminders: docReminders, signedUrl } = detail;
 
   return (
     <PageBody className="max-w-[1480px]">
@@ -75,7 +75,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <DocumentView doc={doc} clauses={docClauses} reminders={docReminders} />
+      <DocumentView doc={doc} clauses={docClauses} reminders={docReminders} signedUrl={signedUrl} />
 
       <p className="mt-10 text-[11.5px] leading-relaxed text-[var(--faint)] max-w-2xl">
         Clausly&apos;s analysis is an aid, not legal advice. Always read clauses we flag as

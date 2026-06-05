@@ -17,7 +17,7 @@ export type Document = {
   pageCount: number;
   storagePath: string;
   status: DocumentStatus;
-  riskLevel: "low" | "medium" | "high" | null;
+  riskLevel: "low" | "medium" | "high" | "needs_review" | null;
   monthlyValue: number | null;
   endDate: string | null;
   noticeWindowDays: number | null;
@@ -28,7 +28,7 @@ export type Clause = {
   documentId: string;
   title: string;
   category: UiClause["category"];
-  riskLevel: "low" | "medium" | "high";
+  riskLevel: "low" | "medium" | "high" | "needs_review";
   page: number;
   sourceQuote: string;
   plainEnglish: string;

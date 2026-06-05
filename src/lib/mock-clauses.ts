@@ -18,6 +18,10 @@ export interface Clause {
   quote: string;
   plainEnglish: string;
   whyItMatters: string;
+  /** Normalized PDF page coordinates from the top-left as `[x, y, w, h]`,
+   * each in `[0, 1]`. When omitted the PDF viewer falls back to a
+   * whole-page indicator (no precise rectangle). */
+  bbox?: [number, number, number, number] | null;
 }
 
 export const clauses: Clause[] = [

@@ -37,10 +37,12 @@ export function DocumentView({
   doc,
   clauses,
   reminders,
+  signedUrl,
 }: {
   doc: ContractDoc;
   clauses: Clause[];
   reminders: Reminder[];
+  signedUrl?: string | null;
 }) {
   const [tab, setTab] = React.useState<Tab>("summary");
   const [activeClauseId, setActiveClauseId] = React.useState<string | undefined>(clauses[0]?.id);
@@ -99,7 +101,12 @@ export function DocumentView({
 
       {/* Right column: PDF */}
       <div className="lg:sticky lg:top-[88px] self-start">
-        <PDFPreview docTitle={doc.title} pages={doc.pages} activeClause={activeClause} />
+        <PDFPreview
+          docTitle={doc.title}
+          pages={doc.pages}
+          activeClause={activeClause}
+          signedUrl={signedUrl}
+        />
       </div>
     </div>
   );

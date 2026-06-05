@@ -79,6 +79,7 @@ export function toUiClause(row: ClauseRow): UiClause {
     quote: row.source_quote,
     plainEnglish: row.plain_english,
     whyItMatters: row.why_it_matters ?? "This clause may be worth reviewing in context.",
+    bbox: isBbox(row.bbox) ? row.bbox : null,
   };
 }
 

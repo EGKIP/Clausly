@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { reminderPatchSchema, validationIssues } from "@/lib/validation";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -15,12 +16,16 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await context.params;
-  const body = await request.json() as {
-    status?: "suggested" | "approved" | "sent" | "ignored";
-    title?: string;
-    description?: string;
-    fireOn?: string;
-  };
+  const parsed = reminderPatchSchema.safeParse(await request.json());
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid reminder update.", issues: validationIssues(parsed.error) },
+      { status: 400 }
+    );
+  }
+
+  const body = parsed.data;
 
   const { error } = await supabase
     .from("reminders")

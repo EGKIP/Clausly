@@ -38,6 +38,21 @@ export function boundedTextSchema(min: number, max: number) {
   return z.string().trim().min(min).max(max);
 }
 
+export const reminderCreateSchema = z.object({
+  documentId: z.string().uuid(),
+  dateId: z.string().uuid().nullable().optional(),
+  title: boundedTextSchema(1, 120),
+  description: boundedTextSchema(0, 500).default(""),
+  fireOn: iso8601DateSchema,
+  type: reminderTypeSchema.default("Review"),
+  channel: reminderChannelSchema,
+}).strict();
+
+export const reminderPatchSchema = reminderCreateSchema
+  .partial()
+  .extend({ status: reminderStatusSchema.optional() })
+  .strict();
+
 export function validationIssues(error: z.ZodError) {
   return error.issues.map((issue) => ({
     path: issue.path.join("."),

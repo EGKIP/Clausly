@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { toUiReminder } from "@/lib/db/adapters";
 import type { ReminderRow } from "@/lib/db/types";
 import { reminders as mockReminders } from "@/lib/mock-reminders";
+import { reminderCreateSchema, validationIssues } from "@/lib/validation";
 
 export async function GET() {
   if (!hasSupabaseEnv()) {
@@ -32,17 +33,25 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await request.json() as {
-    documentId?: string;
-    dateId?: string | null;
-    title?: string;
-    description?: string;
-    fireOn?: string;
-    type?: string;
-  };
+  const rawBody = await request.json();
+  const parsed = reminderCreateSchema.safeParse(rawBody);
 
-  if (!body.documentId || !body.title || !body.description || !body.fireOn) {
-    return NextResponse.json({ error: "Missing reminder fields." }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid reminder.", issues: validationIssues(parsed.error) },
+      { status: 400 }
+    );
+  }
+
+  const body = parsed.data;
+  const { data: document, error: documentError } = await supabase
+    .from("documents")
+    .select("id")
+    .eq("id", body.documentId)
+    .single();
+
+  if (documentError || !document) {
+    return NextResponse.json({ error: "Document not found." }, { status: 404 });
   }
 
   const { data, error } = await supabase
@@ -54,7 +63,7 @@ export async function POST(request: Request) {
       title: body.title,
       description: body.description,
       fire_on: body.fireOn,
-      reminder_type: body.type ?? "Review",
+      reminder_type: body.type,
       status: "suggested",
       channel: "email",
     })

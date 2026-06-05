@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { toApiDocument, toUiDocument } from "@/lib/db/adapters";
+import { toUiDocument } from "@/lib/db/adapters";
 import { createClient } from "@/lib/supabase/server";
 import { documents as mockDocuments } from "@/lib/mock-data";
 
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ documents: [] });
   }
   if (!hasSupabaseEnv()) {
-    return NextResponse.json({ documents: mockDocuments, apiDocuments: [] });
+    return NextResponse.json({ documents: mockDocuments });
   }
 
   const supabase = await createClient();
@@ -23,10 +23,7 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({
-    documents: (data ?? []).map(toUiDocument),
-    apiDocuments: (data ?? []).map(toApiDocument),
-  });
+  return NextResponse.json({ documents: (data ?? []).map(toUiDocument) });
 }
 
 function hasSupabaseEnv() {

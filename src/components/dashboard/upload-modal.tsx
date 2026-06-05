@@ -20,9 +20,12 @@ export function UploadModal({
   const [phase, setPhase] = React.useState<"idle" | "uploading" | "analyzing" | "error">("idle");
   const [documentId, setDocumentId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     if (!open) {
+      abortRef.current?.abort();
+      abortRef.current = null;
       setFile(null);
       setPhase("idle");
       setDocumentId(null);
@@ -32,33 +35,53 @@ export function UploadModal({
 
   React.useEffect(() => {
     if (!file) return;
-    let cancelled = false;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     const uploadFile = file;
     async function upload() {
       setPhase("uploading");
       setError(null);
+      setDocumentId(null);
       const body = new FormData();
       body.set("file", uploadFile);
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body,
-      });
-      if (cancelled) return;
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "Upload failed." }));
-        setError(payload.error ?? "Upload failed.");
+      try {
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({ error: "Upload failed." }));
+          setError(payload.error ?? "Upload failed.");
+          setPhase("error");
+          return;
+        }
+        const payload = (await response.json()) as { id: string };
+        setDocumentId(payload.id);
+        setPhase("analyzing");
+      } catch (uploadError) {
+        if (controller.signal.aborted) return;
+        setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
         setPhase("error");
-        return;
       }
-      const payload = (await response.json()) as { id: string };
-      setDocumentId(payload.id);
-      setPhase("analyzing");
     }
     void upload();
     return () => {
-      cancelled = true;
+      controller.abort();
+      if (abortRef.current === controller) abortRef.current = null;
     };
   }, [file]);
+
+  const resetUpload = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setFile(null);
+    setDocumentId(null);
+    setError(null);
+    setPhase("idle");
+  };
 
   const onDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
@@ -166,6 +189,11 @@ export function UploadModal({
                     {phase === "analyzing" && "Queued for clause, date and risk analysis…"}
                     {phase === "error" && (error ?? "Upload failed.")}
                   </p>
+                  {phase === "error" && (
+                    <Button variant="secondary" size="sm" onClick={resetUpload} className="mt-4">
+                      Try again
+                    </Button>
+                  )}
                 </div>
               )}
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { reminderPatchSchema, validationIssues } from "@/lib/validation";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -15,12 +16,16 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await context.params;
-  const body = await request.json() as {
-    status?: "suggested" | "approved" | "sent" | "ignored";
-    title?: string;
-    description?: string;
-    fireOn?: string;
-  };
+  const parsed = reminderPatchSchema.safeParse(await request.json());
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid reminder update.", issues: validationIssues(parsed.error) },
+      { status: 400 }
+    );
+  }
+
+  const body = parsed.data;
 
   const { error } = await supabase
     .from("reminders")
@@ -30,7 +35,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       description: body.description,
       fire_on: body.fireOn,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
@@ -46,7 +52,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await context.params;
-  const { error } = await supabase.from("reminders").delete().eq("id", id);
+  const { error } = await supabase
+    .from("reminders")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

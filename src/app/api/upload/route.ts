@@ -1,7 +1,37 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { boundedTextSchema, validationIssues } from "@/lib/validation";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const titleSchema = boundedTextSchema(1, 200);
+
+function validateUpload(formData: FormData) {
+  const rawFile = formData.get("file");
+  const rawTitle = formData.get("title");
+  const file = rawFile instanceof File ? rawFile : null;
+  const fallbackTitle = file?.name.replace(/\.pdf$/i, "") ?? "";
+  const title = String(rawTitle || fallbackTitle);
+  const titleResult = titleSchema.safeParse(title);
+  const issues: { path: string; message: string }[] = [];
+
+  if (!titleResult.success) issues.push(...validationIssues(titleResult.error));
+  if (!file) {
+    issues.push({ path: "file", message: "Upload a PDF file." });
+  } else {
+    if (file.type !== "application/pdf") {
+      issues.push({ path: "file", message: "Only PDF uploads are supported right now." });
+    }
+    if (file.size > MAX_FILE_BYTES) {
+      issues.push({ path: "file", message: "PDF must be 25 MB or smaller." });
+    }
+  }
+
+  if (issues.length > 0 || !file || !titleResult.success) {
+    return { success: false as const, issues };
+  }
+
+  return { success: true as const, file, title: titleResult.data };
+}
 
 export async function POST(request: Request) {
   if (!hasSupabaseEnv()) {
@@ -13,18 +43,16 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await request.formData();
-  const file = formData.get("file");
+  const validation = validateUpload(formData);
 
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Upload a PDF file." }, { status: 400 });
-  }
-  if (file.type !== "application/pdf") {
-    return NextResponse.json({ error: "Only PDF uploads are supported right now." }, { status: 400 });
-  }
-  if (file.size > MAX_FILE_BYTES) {
-    return NextResponse.json({ error: "PDF must be 25 MB or smaller." }, { status: 400 });
+  if (!validation.success) {
+    return NextResponse.json(
+      { error: "Invalid upload.", issues: validation.issues },
+      { status: 400 }
+    );
   }
 
+  const { file, title } = validation;
   const id = crypto.randomUUID();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
   const storagePath = `${user.id}/${id}/${safeName}`;
@@ -38,7 +66,6 @@ export async function POST(request: Request) {
 
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
-  const title = String(formData.get("title") || file.name.replace(/\.pdf$/i, ""));
   const { data: document, error: insertError } = await supabase
     .from("documents")
     .insert({

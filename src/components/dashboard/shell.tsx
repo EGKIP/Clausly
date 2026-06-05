@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
@@ -73,6 +74,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
+
+      {/* ?upload=1 deep-link, isolated in a Suspense boundary so the layout
+       * stays static. Used by /welcome and empty-state CTAs to open the modal. */}
+      <React.Suspense fallback={null}>
+        <UploadDeepLink onOpen={() => setUploadOpen(true)} />
+      </React.Suspense>
     </div>
   );
+}
+
+function UploadDeepLink({ onOpen }: { onOpen: () => void }) {
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  React.useEffect(() => {
+    if (searchParams.get("upload") !== "1") return;
+    onOpen();
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("upload");
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [searchParams, pathname, router, onOpen]);
+  return null;
 }

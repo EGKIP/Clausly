@@ -35,7 +35,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       description: body.description,
       fire_on: body.fireOn,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
@@ -51,7 +52,11 @@ export async function DELETE(_request: Request, context: RouteContext) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await context.params;
-  const { error } = await supabase.from("reminders").delete().eq("id", id);
+  const { error } = await supabase
+    .from("reminders")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

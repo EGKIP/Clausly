@@ -598,6 +598,20 @@ This feature gives users a reason to keep paying even after their initial docume
 
 ## 10. Technical Stack
 
+> **Amendment (2026-06-05, v0.2):** The recommendations in this section
+> reflect the original architectural direction. For v0.2 we are using
+> **Supabase** as the backend platform (database, authentication,
+> storage, and Row Level Security) to move faster on auth, data, and
+> user-level permissions. **AWS remains the documented scale-up path**
+> for object storage (S3), OCR (Textract), transactional email (SES),
+> scheduled jobs (EventBridge), and production-grade infrastructure as
+> the product matures. See [`docs/adr/0001-supabase-over-django.md`](./docs/adr/0001-supabase-over-django.md)
+> for the full decision record, trade-offs, reversal cost, and the
+> explicit triggers that would force a re-evaluation.
+>
+> The sub-sections below are preserved as the original v0.1 plan and as
+> the reference target for the scale-up architecture.
+
 ### 10.1 Frontend
 
 Recommended frontend:
@@ -1237,18 +1251,23 @@ These questions can be answered during implementation:
 
 ## 24. Recommended MVP Decision Defaults
 
+> **Amendment (2026-06-05, v0.2):** The list below preserves the
+> original defaults. The v0.2 implementation stack is recorded
+> alongside each affected item. See ADR-0001 for the decision record.
+
 Unless changed later, use these defaults:
 
 - Product name: Clausly.app.
 - Primary input: PDF upload.
-- Frontend: Next.js + Tailwind CSS.
-- Backend: Django + Django REST Framework.
-- Database: PostgreSQL.
-- Storage: AWS S3.
+- Frontend: Next.js + Tailwind CSS. *(v0.2: Next.js 15 App Router, Tailwind v4, React 19.)*
+- Backend: Django + Django REST Framework. *(v0.2: Supabase + Next.js Route Handlers; Django remains the scale-up option.)*
+- Database: PostgreSQL. *(v0.2: Supabase-managed Postgres with Row Level Security.)*
+- Storage: AWS S3. *(v0.2: Supabase Storage; AWS S3 remains the scale-up target.)*
 - AI: OpenAI or Claude for MVP.
 - Payments: Stripe.
-- Notifications: Email first.
-- Auth: Clerk for speed or Cognito for AWS-native direction.
+- Notifications: Email first. *(v0.2: Resend or AWS SES; AWS SES remains the scale target.)*
+- Auth: Clerk for speed or Cognito for AWS-native direction. *(v0.2: Supabase Auth; Clerk / Cognito remain available migration targets.)*
+- Async jobs: AWS EventBridge / Celery beat. *(v0.2: Inngest for durable long-running jobs; `pg_cron` for in-database schedules.)*
 - UI theme: Light mode default, dark mode supported.
 - Core dashboard focus: Upcoming actions and documents needing review.
 - Legal positioning: Contract intelligence and reminder platform, not legal advice.

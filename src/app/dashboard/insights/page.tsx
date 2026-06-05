@@ -14,9 +14,19 @@ import { Button } from "@/components/ui/button";
 import { RiskPill } from "@/components/ui/risk-pill";
 import { listDocuments } from "@/lib/db/documents";
 import { listReminders } from "@/lib/db/reminders";
+import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
 
 export default async function InsightsPage() {
   const [documents, reminders] = await Promise.all([listDocuments(), listReminders()]);
+
+  if (documents.length === 0) {
+    return (
+      <PageBody>
+        <PortfolioEmptyState variant="insights" />
+      </PageBody>
+    );
+  }
+
   const monthlySpend = 2054;
   const renewalsSoon = documents.filter((d) => d.tags.includes("Auto-renew")).length;
   const flagged = documents.filter((d) => d.risk === "High" || d.risk === "Needs Review");

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import type { DocType } from "@/lib/mock-data";
 import { useDocuments } from "@/lib/hooks/use-documents";
 import { DocumentCard, DocumentRow } from "@/components/dashboard/document-card";
+import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
 import type { RiskLevel } from "@/components/ui/risk-pill";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,15 @@ export default function DocumentsPage() {
   }, [documents, q, type, risk, sort]);
 
   const hasFilters = q !== "" || type !== "All" || risk !== "All risk";
+  const portfolioEmpty = !isLoading && !error && documents.length === 0;
+
+  if (portfolioEmpty) {
+    return (
+      <PageBody>
+        <PortfolioEmptyState variant="documents" />
+      </PageBody>
+    );
+  }
 
   return (
     <PageBody>
@@ -70,7 +80,7 @@ export default function DocumentsPage() {
         title="Documents"
         description="Everything you've uploaded. Filter by type or risk, search by party or clause."
         actions={
-          <Button variant="primary" size="md">
+          <Button variant="primary" size="md" href="/dashboard/documents?upload=1">
             <Upload className="size-3.5" /> Upload
           </Button>
         }

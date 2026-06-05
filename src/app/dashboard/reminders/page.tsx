@@ -18,6 +18,8 @@ import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { useReminders } from "@/lib/hooks/use-reminders";
+import { useDocuments } from "@/lib/hooks/use-documents";
+import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
 import type { ReminderStatus } from "@/lib/mock-reminders";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +35,16 @@ const iconFor = (t: string) =>
 export default function RemindersPage() {
   const [tab, setTab] = React.useState<ReminderStatus>("suggested");
   const { reminders: allReminders, isLoading, error } = useReminders();
+  const { documents, isLoading: docsLoading } = useDocuments();
+
+  if (!docsLoading && documents.length === 0) {
+    return (
+      <PageBody>
+        <PortfolioEmptyState variant="reminders" />
+      </PageBody>
+    );
+  }
+
   const list = allReminders.filter((r) => r.status === tab);
   const counts: Record<ReminderStatus, number> = {
     suggested: allReminders.filter((r) => r.status === "suggested").length,

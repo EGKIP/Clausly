@@ -14,10 +14,21 @@ import { listReminders } from "@/lib/db/reminders";
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { DocumentCard } from "@/components/dashboard/document-card";
+import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
 import { cn } from "@/lib/utils";
 
 export default async function DashboardHomePage() {
   const [documents, reminders] = await Promise.all([listDocuments(), listReminders()]);
+
+  if (documents.length === 0) {
+    return (
+      <PageBody>
+        <PortfolioEmptyState variant="home" />
+        <Disclaimer />
+      </PageBody>
+    );
+  }
+
   const upcoming = [...reminders]
     .filter((r) => r.status !== "sent")
     .sort((a, b) => a.daysAway - b.daysAway)

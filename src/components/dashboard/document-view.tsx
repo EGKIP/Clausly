@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import {
   FileText,
   ListTree,
@@ -13,6 +14,7 @@ import {
   Send,
   Sparkles,
   CheckCircle2,
+  Upload,
 } from "lucide-react";
 import type { ContractDoc } from "@/lib/mock-data";
 import type { Clause } from "@/lib/mock-clauses";
@@ -47,9 +49,12 @@ export function DocumentView({
   const [tab, setTab] = React.useState<Tab>("summary");
   const [activeClauseId, setActiveClauseId] = React.useState<string | undefined>(clauses[0]?.id);
   const activeClause = clauses.find((c) => c.id === activeClauseId);
+  const isDemo = doc.tags.includes("Demo");
 
   return (
-    <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,520px)] gap-6">
+    <>
+      {isDemo && <DemoNotice />}
+      <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,520px)] gap-6">
       {/* Left column: tabs */}
       <div>
         <div className="flex items-center gap-1 p-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] overflow-x-auto scrollbar-none">
@@ -108,6 +113,34 @@ export function DocumentView({
           signedUrl={signedUrl}
         />
       </div>
+      </div>
+    </>
+  );
+}
+
+/* Inline banner for the three seeded demo documents. No PDF is on disk for
+ * these, so the preview falls back to FauxPaper — the notice explains why
+ * and points the user at the real upload path. */
+function DemoNotice() {
+  return (
+    <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)] px-4 py-3">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="inline-flex size-7 items-center justify-center rounded-[var(--radius-xs)] bg-[var(--accent-soft)] text-[var(--accent-ink)] shrink-0">
+          <Sparkles className="size-3.5" />
+        </span>
+        <p className="text-[12.5px] text-[var(--muted)] leading-relaxed">
+          <span className="font-medium text-[var(--foreground)]">Sample contract.</span>{" "}
+          The clauses, dates, and reminders are illustrative — upload your own
+          PDF to see real Clausly analysis.
+        </p>
+      </div>
+      <Link
+        href="/dashboard/documents?upload=1"
+        className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12px] font-medium text-[var(--foreground)] hover:border-[var(--border-strong)]"
+      >
+        <Upload className="size-3.5" />
+        Upload your own
+      </Link>
     </div>
   );
 }

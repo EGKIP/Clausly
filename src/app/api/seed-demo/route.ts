@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getDemoDocuments } from "@/lib/db/seed-demo";
+import type { Database } from "@/lib/supabase/types";
 
 export async function POST() {
   if (!hasSupabaseEnv()) {
@@ -22,7 +24,16 @@ export async function POST() {
     return NextResponse.json({ error: "Portfolio not empty." }, { status: 409 });
   }
 
-  const seeded = [];
+  /* Inserts are not wrapped in a single SQL transaction (supabase-js has no
+   * client-side transactions). Instead, track every document we create so we
+   * can cascade-delete them if any later step fails — leaving the portfolio
+   * in its original empty state so the user can retry cleanly. */
+  const seeded: string[] = [];
+  const fail = async (message: string, status = 500) => {
+    await rollback(supabase, seeded);
+    return NextResponse.json({ error: message }, { status });
+  };
+
   for (const demo of getDemoDocuments()) {
     const documentId = crypto.randomUUID();
     const { error: documentError } = await supabase.from("documents").insert({
@@ -47,7 +58,8 @@ export async function POST() {
       summary_short: demo.summary,
       tags: demo.tags,
     });
-    if (documentError) return NextResponse.json({ error: documentError.message }, { status: 500 });
+    if (documentError) return fail(documentError.message);
+    seeded.push(documentId);
 
     const clauseRows = demo.clauses.map((clause) => ({
       id: crypto.randomUUID(),
@@ -64,7 +76,7 @@ export async function POST() {
       bbox: clause.bbox,
     }));
     const { error: clauseError } = await supabase.from("clauses").insert(clauseRows);
-    if (clauseError) return NextResponse.json({ error: clauseError.message }, { status: 500 });
+    if (clauseError) return fail(clauseError.message);
 
     const dateRows = demo.dates.map((date) => ({
       id: crypto.randomUUID(),
@@ -81,7 +93,7 @@ export async function POST() {
       .from("dates")
       .insert(dateRows)
       .select("id");
-    if (dateError) return NextResponse.json({ error: dateError.message }, { status: 500 });
+    if (dateError) return fail(dateError.message);
 
     const { error: reminderError } = await supabase.from("reminders").insert({
       user_id: user.id,
@@ -96,12 +108,15 @@ export async function POST() {
       source_quote: demo.reminder.sourceQuote,
       confidence: demo.reminder.confidence,
     });
-    if (reminderError) return NextResponse.json({ error: reminderError.message }, { status: 500 });
-
-    seeded.push(documentId);
+    if (reminderError) return fail(reminderError.message);
   }
 
   return NextResponse.json({ seeded: seeded.length, documentIds: seeded });
+}
+
+async function rollback(supabase: SupabaseClient<Database>, documentIds: string[]) {
+  if (documentIds.length === 0) return;
+  await supabase.from("documents").delete().in("id", documentIds);
 }
 
 function hasSupabaseEnv() {

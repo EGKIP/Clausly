@@ -116,10 +116,12 @@ export default function WelcomePage() {
 
       {/* CTA */}
       <div className="mt-12 flex flex-wrap items-center gap-3">
-        <MarkOnboardedLink href="/dashboard/documents?upload=1" icon={Upload}>
+        <MarkOnboardedLink href="/dashboard/documents?upload=1">
+          <Upload className="size-4" />
           Upload your first document
         </MarkOnboardedLink>
-        <MarkOnboardedLink href="/dashboard" icon={ArrowRight} variant="secondary">
+        <MarkOnboardedLink href="/dashboard" variant="secondary">
+          <ArrowRight className="size-4" />
           Take me to the dashboard
         </MarkOnboardedLink>
         <Link

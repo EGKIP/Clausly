@@ -2,18 +2,18 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+/* Children render inside the button as-is so the parent server component can
+ * compose lucide icons + label without serializing component types across the
+ * server/client boundary. */
 export function MarkOnboardedLink({
   href,
   children,
-  icon: Icon,
   variant = "primary",
 }: {
   href: string;
   children: React.ReactNode;
-  icon?: LucideIcon;
   variant?: "primary" | "secondary";
 }) {
   const router = useRouter();
@@ -35,7 +35,6 @@ export function MarkOnboardedLink({
         router.refresh();
       }}
     >
-      {Icon && <Icon className="size-4" />}
       {pending ? "Saving..." : children}
     </Button>
   );

@@ -41,6 +41,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
+  if (user && shouldRequireOnboarding(request.nextUrl.pathname)) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("onboarded_at")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.onboarded_at) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/dashboard/welcome";
+      redirectUrl.search = "";
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   return response;
 }
 
@@ -52,4 +67,8 @@ export const config = {
 
 function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+function shouldRequireOnboarding(pathname: string) {
+  return (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) && pathname !== "/dashboard/welcome";
 }

@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/primitives";
-import { Button } from "@/components/ui/button";
+import { MarkOnboardedLink } from "./mark-onboarded-link";
 
 export const metadata = {
   title: "Welcome to Clausly",
@@ -116,12 +116,12 @@ export default function WelcomePage() {
 
       {/* CTA */}
       <div className="mt-12 flex flex-wrap items-center gap-3">
-        <Button variant="primary" size="lg" href="/dashboard/documents?upload=1">
-          <Upload className="size-4" /> Upload your first document
-        </Button>
-        <Button variant="secondary" size="lg" href="/dashboard">
-          Take me to the dashboard <ArrowRight className="size-4" />
-        </Button>
+        <MarkOnboardedLink href="/dashboard/documents?upload=1" icon={Upload}>
+          Upload your first document
+        </MarkOnboardedLink>
+        <MarkOnboardedLink href="/dashboard" icon={ArrowRight} variant="secondary">
+          Take me to the dashboard
+        </MarkOnboardedLink>
         <Link
           href="/dashboard/documents"
           className="ml-auto inline-flex items-center gap-1.5 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)]"

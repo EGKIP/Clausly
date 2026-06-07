@@ -200,7 +200,29 @@ export function createSupabaseClient() {
   return {
     auth: {
       getUser: vi.fn(async () => ({ data: { user: currentUser }, error: null })),
+      signOut: vi.fn(async () => {
+        currentUser = null;
+        return { error: null };
+      }),
     },
+    rpc: vi.fn(async (name: string, args: Row = {}) => {
+      if (name !== "delete_account") {
+        return { data: null, error: { message: "Unknown RPC.", code: "TEST_ERROR" } };
+      }
+
+      const targetUserId = args.target_user_id;
+      if (!currentUser || currentUser.id !== targetUserId) {
+        return { data: null, error: { message: "Cannot delete another user account.", code: "42501" } };
+      }
+
+      tables.users = tables.users.filter((row) => row.id !== targetUserId);
+      const documentIds = new Set(
+        tables.documents.filter((row) => row.user_id === targetUserId).map((row) => row.id)
+      );
+      tables.documents = tables.documents.filter((row) => row.user_id !== targetUserId);
+      cascadeDocuments(documentIds);
+      return { data: null, error: null };
+    }),
     from(table: TableName) {
       return new Query(table);
     },

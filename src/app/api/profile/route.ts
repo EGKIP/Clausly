@@ -77,6 +77,59 @@ export async function PATCH(request: Request) {
   });
 }
 
+export async function DELETE() {
+  if (!hasSupabaseEnv()) {
+    return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { data: documents, error: documentsError } = await supabase
+    .from("documents")
+    .select("storage_path")
+    .eq("user_id", user.id);
+
+  if (documentsError) {
+    return NextResponse.json({ error: documentsError.message }, { status: 500 });
+  }
+
+  const storagePaths = (documents ?? [])
+    .map((document) => document.storage_path)
+    .filter((path) => path.startsWith(`${user.id}/`));
+
+  if (storagePaths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from("documents")
+      .remove(storagePaths);
+
+    if (storageError) {
+      return NextResponse.json({ error: storageError.message }, { status: 500 });
+    }
+  }
+
+  const { error: deletionError } = await supabase.rpc("delete_account", {
+    target_user_id: user.id,
+  });
+
+  if (deletionError) {
+    return NextResponse.json({ error: deletionError.message }, { status: 500 });
+  }
+
+  const { error: signOutError } = await supabase.auth.signOut();
+  if (signOutError) {
+    console.warn("Account deleted, but Supabase sign-out did not complete.", {
+      userId: user.id,
+      message: signOutError.message,
+    });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
 function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }

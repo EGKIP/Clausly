@@ -25,6 +25,9 @@ export default function SettingsPage() {
   const [status, setStatus] = React.useState<"idle" | "saving" | "saved" | "error">("idle");
   const [message, setMessage] = React.useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [confirmEmail, setConfirmEmail] = React.useState("");
+  const [deleteStatus, setDeleteStatus] = React.useState<"idle" | "deleting" | "error">("idle");
+  const [deleteMessage, setDeleteMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -71,6 +74,24 @@ export default function SettingsPage() {
     setDisplayName(payload.displayName);
     setStatus("saved");
     setMessage("Profile saved.");
+  }
+
+  async function deleteAccount(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (profile.mockMode || confirmEmail !== profile.email) return;
+
+    setDeleteStatus("deleting");
+    setDeleteMessage(null);
+
+    const response = await fetch("/api/profile", { method: "DELETE" });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "Account could not be deleted." }));
+      setDeleteStatus("error");
+      setDeleteMessage(payload.error ?? "Account could not be deleted.");
+      return;
+    }
+
+    window.location.assign("/?account=deleted");
   }
 
   return (
@@ -195,7 +216,10 @@ export default function SettingsPage() {
 
       {confirmOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-[420px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-float)]">
+          <form
+            onSubmit={deleteAccount}
+            className="w-full max-w-[460px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-float)]"
+          >
             <div className="inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)]">
               <AlertTriangle className="size-4" />
             </div>
@@ -203,17 +227,52 @@ export default function SettingsPage() {
               Delete account
             </h2>
             <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--muted)]">
-              Available soon - email support@clausly.app to delete now.
+              This permanently removes your account, saved contracts, clauses, dates,
+              reminders, and uploaded files. Type your email to confirm.
             </p>
+            <label className="mt-5 grid gap-2">
+              <span className="text-[12.5px] font-medium text-[var(--foreground)]">
+                Confirm email
+              </span>
+              <input
+                value={confirmEmail}
+                onChange={(event) => setConfirmEmail(event.target.value)}
+                placeholder={profile.email}
+                disabled={profile.mockMode || deleteStatus === "deleting"}
+                className="h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--background)] px-3 text-[14px] outline-none transition-colors focus:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </label>
+            {deleteMessage && (
+              <p className="mt-4 rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] px-3 py-2 text-[12.5px] text-[var(--color-coral-ink)]">
+                {deleteMessage}
+              </p>
+            )}
             <div className="mt-6 flex justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setConfirmOpen(false);
+                  setConfirmEmail("");
+                  setDeleteMessage(null);
+                  setDeleteStatus("idle");
+                }}
+                disabled={deleteStatus === "deleting"}
+              >
                 Close
               </Button>
-              <Button variant="outline" size="sm" disabled>
-                Confirm delete
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                className="border-[color-mix(in_oklch,var(--color-coral)_42%,var(--border))] text-[var(--color-coral-ink)] hover:bg-[var(--color-coral-soft)]"
+                disabled={profile.mockMode || confirmEmail !== profile.email || deleteStatus === "deleting"}
+              >
+                {deleteStatus === "deleting" ? "Deleting..." : "Delete permanently"}
               </Button>
             </div>
-          </div>
+          </form>
         </div>
       )}
     </PageBody>

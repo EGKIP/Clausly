@@ -1,5 +1,8 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, BellRing, FileText, ShieldCheck, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -62,6 +65,23 @@ export function PortfolioEmptyState({
   className?: string;
 }) {
   const c = copy[variant];
+  const router = useRouter();
+  const [seedState, setSeedState] = React.useState<"idle" | "loading" | "error">("idle");
+  const [seedError, setSeedError] = React.useState<string | null>(null);
+
+  async function seedDemo() {
+    setSeedState("loading");
+    setSeedError(null);
+    const response = await fetch("/api/seed-demo", { method: "POST" });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "Could not seed demo data." }));
+      setSeedError(payload.error ?? "Could not seed demo data.");
+      setSeedState("error");
+      return;
+    }
+    router.refresh();
+  }
+
   return (
     <section
       className={cn(
@@ -99,6 +119,23 @@ export function PortfolioEmptyState({
             <Button variant="ghost" size="md" href="/dashboard/welcome">
               How it works <ArrowRight className="size-3.5" />
             </Button>
+          </div>
+
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={seedDemo}
+              disabled={seedState === "loading"}
+            >
+              <Sparkles className="size-3.5" />
+              {seedState === "loading" ? "Reading three sample contracts..." : "Try with sample data"}
+            </Button>
+            {seedError && (
+              <p className="mt-2 text-[12px] text-[var(--color-coral-ink)]">
+                {seedError}
+              </p>
+            )}
           </div>
 
           <p className="mt-6 inline-flex items-center gap-1.5 text-[11.5px] text-[var(--faint)]">

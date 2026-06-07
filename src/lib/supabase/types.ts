@@ -11,7 +11,6 @@ export type Database = {
           default_state: string | null;
           subscription_tier: "free" | "pro";
           notification_preferences: Json;
-          onboarding_completed: boolean;
           onboarded_at: string | null;
           created_at: string;
           updated_at: string;
@@ -23,7 +22,6 @@ export type Database = {
           default_state?: string | null;
           subscription_tier?: "free" | "pro";
           notification_preferences?: Json;
-          onboarding_completed?: boolean;
           onboarded_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -191,7 +189,15 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["reminders"]["Insert"]>;
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "reminders_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       usage_metrics: {
         Row: {
@@ -225,7 +231,12 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      delete_account: {
+        Args: { target_user_id: string };
+        Returns: void;
+      };
+    };
     Enums: {
       document_type: "lease" | "auto" | "employment" | "service" | "nda" | "other";
       document_status: "pending" | "analyzing" | "ready" | "failed";

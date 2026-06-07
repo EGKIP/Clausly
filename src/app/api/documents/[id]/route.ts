@@ -44,17 +44,18 @@ export async function DELETE(_request: Request, context: RouteContext) {
   if (readError) return NextResponse.json({ error: readError.message }, { status: 404 });
 
   if (!document.storage_path.startsWith(`${user.id}/`)) {
-    console.warn("Skipped document storage delete due to owner path mismatch.", {
+    console.warn("Rejected document delete due to owner path mismatch.", {
       documentId: id,
       userId: user.id,
     });
-  } else {
-    const { error: storageError } = await supabase.storage
-      .from("documents")
-      .remove([document.storage_path]);
-
-    if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 });
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  const { error: storageError } = await supabase.storage
+    .from("documents")
+    .remove([document.storage_path]);
+
+  if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 });
 
   const { error: deleteError } = await supabase.from("documents").delete().eq("id", id);
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });

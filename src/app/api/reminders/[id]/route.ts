@@ -27,7 +27,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const body = parsed.data;
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("reminders")
     .update({
       status: body.status,
@@ -36,10 +36,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       fire_on: body.fireOn,
     })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("id")
+    .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  if (error) {
+    if (error.code === "PGRST116") {
+      return NextResponse.json({ error: "Reminder not found." }, { status: 404 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, id: data.id });
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {

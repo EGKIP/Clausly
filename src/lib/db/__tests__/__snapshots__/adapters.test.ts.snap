@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`clause adapters > preserves and displays clause risk level high 1`] = `"High"`;
+
+exports[`clause adapters > preserves and displays clause risk level low 1`] = `"Low"`;
+
+exports[`clause adapters > preserves and displays clause risk level medium 1`] = `"Medium"`;
+
+exports[`clause adapters > preserves and displays clause risk level needs_review 1`] = `"Needs Review"`;
+
+exports[`document adapters > preserves and displays risk level high 1`] = `"High"`;
+
+exports[`document adapters > preserves and displays risk level low 1`] = `"Low"`;
+
+exports[`document adapters > preserves and displays risk level medium 1`] = `"Medium"`;
+
+exports[`document adapters > preserves and displays risk level needs_review 1`] = `"Needs Review"`;

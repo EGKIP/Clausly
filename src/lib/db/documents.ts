@@ -73,16 +73,23 @@ export async function getDocumentDetail(id: string): Promise<DocumentDetail | nu
   if (datesError) throw datesError;
   if (remindersError) throw remindersError;
 
-  const { data: signedUrl } = await supabase.storage
-    .from("documents")
-    .createSignedUrl(document.storage_path, 60 * 10);
+  /* Demo / seeded documents land with an empty storage_path because they
+   * have no PDF on disk. Skip the signed-URL roundtrip and let the preview
+   * fall back to the FauxPaper rendering. */
+  const signedUrl = document.storage_path
+    ? (
+        await supabase.storage
+          .from("documents")
+          .createSignedUrl(document.storage_path, 60 * 10)
+      ).data?.signedUrl ?? null
+    : null;
 
   return {
     document: toUiDocument(document),
     clauses: (clauses ?? []).map(toUiClause),
     dates: (dates ?? []).map(toApiDate),
     reminders: ((reminders ?? []) as ReminderRow[]).map(toUiReminder),
-    signedUrl: signedUrl?.signedUrl ?? null,
+    signedUrl,
   };
 }
 

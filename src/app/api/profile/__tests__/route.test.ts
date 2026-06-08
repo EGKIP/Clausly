@@ -107,6 +107,19 @@ describe("/api/profile", () => {
     expect(body.notificationPreferences.version).toBe(1);
   });
 
+  it("ignores client-supplied notification preference version", async () => {
+    seedUser(userA, { notification_preferences: { email: true, version: 4 } });
+
+    const response = await PATCH(
+      jsonRequest({ notification_preferences: { version: 9999 } }, { method: "PATCH" })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.notificationPreferences.version).toBe(4);
+    expect(db().users[0].notification_preferences.version).toBe(4);
+  });
+
   it("returns 401 when deleting without a session", async () => {
     setSupabaseUser(null);
 

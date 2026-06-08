@@ -174,13 +174,17 @@ function mergeNotificationPreferences(
   patch: NotificationPreferencesPatch
 ): NotificationPreferences {
   const current = normalizeNotificationPreferences(storedValue);
+  const sanitizedPatch = { ...(patch ?? {}) };
+  delete sanitizedPatch.version;
   const merged = notificationPreferencesSchema.parse({
     ...current,
-    ...patch,
-    defaults: patch?.defaults ? { ...current.defaults, ...patch.defaults } : current.defaults,
+    ...sanitizedPatch,
+    defaults: sanitizedPatch.defaults
+      ? { ...current.defaults, ...sanitizedPatch.defaults }
+      : current.defaults,
   });
 
-  if (patch?.email !== undefined && patch.email !== current.email) {
+  if (sanitizedPatch.email !== undefined && sanitizedPatch.email !== current.email) {
     merged.version = current.version === undefined ? 1 : current.version + 1;
   }
 

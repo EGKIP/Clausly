@@ -3,6 +3,7 @@ import {
   boundedTextSchema,
   documentTypeSchema,
   iso8601DateSchema,
+  notificationPreferencesSchema,
   reminderChannelSchema,
   reminderCreateSchema,
   reminderPatchSchema,
@@ -66,5 +67,36 @@ describe("validation schemas", () => {
     expect(reminderPatchSchema.parse({ status: "approved" }).status).toBe("approved");
     expect(reminderPatchSchema.safeParse({ status: "done" }).success).toBe(false);
     expect(reminderPatchSchema.safeParse({ unexpected: "field" }).success).toBe(false);
+  });
+
+  it("validates notification preferences and defaults email to true", () => {
+    expect(notificationPreferencesSchema.parse({}).email).toBe(true);
+    expect(
+      notificationPreferencesSchema.parse({
+        email: false,
+        version: 2,
+        defaults: {
+          renewal_offsets: ["30_days_before"],
+          notice_offsets: ["7_days_before", "14_days_before"],
+        },
+      })
+    ).toEqual({
+      email: false,
+      version: 2,
+      defaults: {
+        renewal_offsets: ["30_days_before"],
+        notice_offsets: ["7_days_before", "14_days_before"],
+      },
+    });
+  });
+
+  it("rejects unknown notification preference keys", () => {
+    expect(notificationPreferencesSchema.safeParse({ email: true, sms: true }).success).toBe(false);
+    expect(
+      notificationPreferencesSchema.safeParse({
+        email: true,
+        defaults: { renewal_offsets: ["30_days_before"], custom_offsets: ["1_day_before"] },
+      }).success
+    ).toBe(false);
   });
 });

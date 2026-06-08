@@ -55,6 +55,58 @@ describe("/api/profile", () => {
     expect(db().users[0].full_name).toBe("Ada Claus");
   });
 
+  it("accepts partial notification preference updates and persists them", async () => {
+    seedUser(userA, { notification_preferences: { email: true, version: 3 } });
+
+    const response = await PATCH(
+      jsonRequest({ notification_preferences: { defaults: { renewal_offsets: ["30_days_before"] } } }, { method: "PATCH" })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.notificationPreferences).toEqual({
+      email: true,
+      version: 3,
+      defaults: { renewal_offsets: ["30_days_before"] },
+    });
+    expect(db().users[0].notification_preferences).toEqual(body.notificationPreferences);
+  });
+
+  it("returns 400 for unknown notification preference keys", async () => {
+    seedUser(userA);
+
+    const response = await PATCH(
+      jsonRequest({ notification_preferences: { email: true, sms: true } }, { method: "PATCH" })
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("bumps notification preference version when the email toggle changes", async () => {
+    seedUser(userA, { notification_preferences: { email: true, version: 4 } });
+
+    const response = await PATCH(
+      jsonRequest({ notification_preferences: { email: false } }, { method: "PATCH" })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.notificationPreferences).toEqual({ email: false, version: 5 });
+    expect(db().users[0].notification_preferences).toEqual({ email: false, version: 5 });
+  });
+
+  it("starts notification preference version at 1 when toggling email from unversioned settings", async () => {
+    seedUser(userA, { notification_preferences: { email: true } });
+
+    const response = await PATCH(
+      jsonRequest({ notification_preferences: { email: false } }, { method: "PATCH" })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.notificationPreferences.version).toBe(1);
+  });
+
   it("returns 401 when deleting without a session", async () => {
     setSupabaseUser(null);
 

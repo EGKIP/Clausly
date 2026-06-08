@@ -4,8 +4,9 @@ import { toUiReminder } from "@/lib/db/adapters";
 import type { ReminderRow } from "@/lib/db/types";
 import { reminders as mockReminders } from "@/lib/mock-reminders";
 import { reminderCreateSchema, validationIssues } from "@/lib/validation";
+import { reminderListQuerySchema, toDbStatus, validationIssues as reminderValidationIssues } from "@/lib/reminders/validation";
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!hasSupabaseEnv()) {
     return NextResponse.json({ reminders: mockReminders });
   }
@@ -14,11 +15,29 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
+  const url = new URL(request.url);
+  const parsed = reminderListQuerySchema.safeParse({
+    status: url.searchParams.get("status") ?? undefined,
+    document_id: url.searchParams.get("document_id") ?? undefined,
+  });
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid reminder filters.", issues: reminderValidationIssues(parsed.error) },
+      { status: 400 }
+    );
+  }
+
+  let query = supabase
     .from("reminders")
     .select("*, documents(title)")
-    .neq("status", "ignored")
-    .order("fire_on", { ascending: true });
+    .eq("user_id", user.id);
+
+  if (parsed.data.status) query = query.eq("status", toDbStatus(parsed.data.status));
+  else query = query.neq("status", "ignored");
+  if (parsed.data.document_id) query = query.eq("document_id", parsed.data.document_id);
+
+  const { data, error } = await query.order("fire_on", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ reminders: ((data ?? []) as ReminderRow[]).map(toUiReminder) });

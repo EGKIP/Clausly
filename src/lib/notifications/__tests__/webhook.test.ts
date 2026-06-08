@@ -136,16 +136,28 @@ describe("Resend webhook event handling", () => {
     expect(second.duplicate).toBe(true);
     expect(store.usage_metrics).toHaveLength(1);
   });
+
+  it("does not log usage_metrics when no matching user is found", async () => {
+    const payload = JSON.stringify(eventPayload("evt-orphan", "email.delivered", {}, ["stranger@example.com"]));
+
+    const result = await handleResendWebhook(payload, signedHeaders(payload), {
+      supabase: createSupabaseMock(),
+      secret: webhookSecret,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(store.usage_metrics).toHaveLength(0);
+  });
 });
 
-function eventPayload(id: string, type: string, data: Row = {}) {
+function eventPayload(id: string, type: string, data: Row = {}, to: string[] = ["ada@clausly.test"]) {
   return {
     id,
     type,
     created_at: "2026-06-08T15:00:00.000Z",
     data: {
       email_id: "email-1",
-      to: ["ada@clausly.test"],
+      to,
       ...data,
     },
   };

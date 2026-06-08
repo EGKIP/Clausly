@@ -7,7 +7,6 @@ import { notificationPreferenceVersion } from "./templates";
 
 const EMAIL_WEBHOOK_JOB_TYPE = "email_webhook";
 const RESEND_PROVIDER = "resend";
-const NIL_USER_ID = "00000000-0000-0000-0000-000000000000";
 
 export type ResendWebhookType =
   | "email.delivered"
@@ -111,12 +110,17 @@ export async function processVerifiedResendWebhook(
     await disableUserEmail(supabase, user);
   }
 
-  await logWebhookEvent(supabase, {
-    eventId,
-    userId: user?.id ?? taggedUserId ?? NIL_USER_ID,
-    status: statusForEvent(type),
-    errorMessage: errorMessageForEvent(type, event),
-  });
+  // usage_metrics.user_id has a FK to auth.users; only log when we matched a real user.
+  // Orphan events (deleted users, Resend test sends) are processed and acknowledged
+  // without persisted dedup — re-processing them is a no-op.
+  if (user) {
+    await logWebhookEvent(supabase, {
+      eventId,
+      userId: user.id,
+      status: statusForEvent(type),
+      errorMessage: errorMessageForEvent(type, event),
+    });
+  }
 
   return { ok: true, duplicate: false, eventId, type };
 }

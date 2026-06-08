@@ -16,6 +16,7 @@ describe("reminder lifecycle validation", () => {
   it("maps API dismissed status to the current database enum", () => {
     const parsed = reminderListQuerySchema.parse({ status: "dismissed" });
 
-    expect(toDbStatus(parsed.status)).toBe("ignored");
+    expect(parsed.status).toBe("dismissed");
+    expect(toDbStatus("dismissed")).toBe("ignored");
   });
 });

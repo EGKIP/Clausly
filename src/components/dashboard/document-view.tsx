@@ -23,6 +23,7 @@ import { RiskPill } from "@/components/ui/risk-pill";
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { PDFPreview } from "./pdf-preview";
+import { DocumentRemindersSection } from "./reminders/document-reminders-section";
 import { cn } from "@/lib/utils";
 
 type Tab = "summary" | "clauses" | "dates" | "reminders" | "ask";
@@ -57,6 +58,8 @@ export function DocumentView({
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,520px)] gap-6">
       {/* Left column: tabs */}
       <div>
+        <DocumentRemindersSection doc={doc} />
+
         <div className="flex items-center gap-1 p-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] overflow-x-auto scrollbar-none">
           {tabs.map((t) => {
             const active = t.id === tab;

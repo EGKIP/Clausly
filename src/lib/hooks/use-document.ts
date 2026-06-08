@@ -4,10 +4,12 @@ import * as React from "react";
 import type { Clause } from "@/lib/mock-clauses";
 import type { ContractDoc } from "@/lib/mock-data";
 import type { Reminder } from "@/lib/mock-reminders";
-import type { KeyDate } from "@/lib/db/types";
+import type { DocumentStatus, KeyDate } from "@/lib/db/types";
 
 type DocumentPayload = {
   document: ContractDoc;
+  status: DocumentStatus;
+  errorMessage: string | null;
   clauses: Clause[];
   dates: KeyDate[];
   reminders: Reminder[];
@@ -41,4 +43,58 @@ export function useDocument(id: string) {
   }, [id]);
 
   return { data, isLoading, error };
+}
+
+/* Polls /api/documents/[id] every `intervalMs` while `enabled` is true.
+ * Stops polling automatically when the returned status leaves the set of
+ * in-flight states. Designed for the analyzing → ready/failed transition on
+ * the document detail page. */
+export function useDocumentStatusPoll(
+  id: string,
+  initialStatus: DocumentStatus,
+  options?: { intervalMs?: number; enabled?: boolean }
+) {
+  const interval = options?.intervalMs ?? 2500;
+  const enabled = options?.enabled ?? true;
+  const [status, setStatus] = React.useState<DocumentStatus>(initialStatus);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
+
+  React.useEffect(() => {
+    if (!enabled) return;
+    if (status !== "analyzing" && status !== "pending") return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function tick() {
+      try {
+        const response = await fetch(`/api/documents/${id}`, { cache: "no-store" });
+        if (cancelled) return;
+        if (response.ok) {
+          const payload = (await response.json()) as Pick<DocumentPayload, "status" | "errorMessage">;
+          setStatus(payload.status);
+          setErrorMessage(payload.errorMessage ?? null);
+          if (payload.status === "analyzing" || payload.status === "pending") {
+            timer = setTimeout(tick, interval);
+          }
+          return;
+        }
+      } catch {
+        /* swallow transient network errors; next tick will retry */
+      }
+      if (!cancelled) timer = setTimeout(tick, interval);
+    }
+
+    timer = setTimeout(tick, interval);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [enabled, id, interval, status]);
+
+  return { status, errorMessage };
 }

@@ -66,6 +66,8 @@ export type Reminder = {
 
 export type DocumentDetail = {
   document: ContractDoc;
+  status: DocumentStatus;
+  errorMessage: string | null;
   clauses: UiClause[];
   dates: KeyDate[];
   reminders: UiReminder[];

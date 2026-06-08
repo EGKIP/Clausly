@@ -3,7 +3,11 @@
 import * as React from "react";
 import { AlertTriangle, CheckCircle2, LogOut, Mail, Save, ShieldAlert, User } from "lucide-react";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
-import { Badge, Card } from "@/components/ui/primitives";
+import {
+  NotificationPreferencesCard,
+  type NotificationPreferences,
+} from "@/components/dashboard/settings/notification-preferences-card";
+import { Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
 
@@ -11,12 +15,14 @@ type Profile = {
   displayName: string;
   email: string;
   mockMode: boolean;
+  notificationPreferences: NotificationPreferences;
 };
 
 const fallbackProfile: Profile = {
   displayName: "Demo User",
   email: "demo@clausly.app",
   mockMode: true,
+  notificationPreferences: { email: true },
 };
 
 export default function SettingsPage() {
@@ -169,18 +175,9 @@ export default function SettingsPage() {
         <section>
           <SectionHeader
             title="Preferences"
-            description="Reminder defaults will move here once the notification worker is live."
+            description="Control notification delivery and default reminder timing."
           />
-          <Card className="p-6">
-            <Badge tone="iris">Coming soon</Badge>
-            <p className="mt-3 font-serif text-[20px] leading-tight tracking-[-0.005em]">
-              Reminder timing defaults
-            </p>
-            <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--muted)]">
-              Choose your usual lead times for renewals, notice windows, and payment
-              deadlines. For now, each reminder is edited individually.
-            </p>
-          </Card>
+          <NotificationPreferencesCard profile={profile} onProfileSaved={setProfile} />
         </section>
 
         <section>

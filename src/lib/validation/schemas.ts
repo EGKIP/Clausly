@@ -1,4 +1,14 @@
 import { z } from "zod";
+import type { ReminderOffset } from "@/lib/ai/schema";
+
+const reminderOffsetValues = [
+  "1_day_before",
+  "7_days_before",
+  "14_days_before",
+  "30_days_before",
+  "60_days_before",
+  "90_days_before",
+] as const satisfies readonly ReminderOffset[];
 
 export const documentTypeSchema = z.enum([
   "lease",
@@ -24,6 +34,19 @@ export const reminderTypeSchema = z.enum([
 ]);
 
 export const reminderChannelSchema = z.enum(["Email"]).default("Email");
+
+const notificationPreferenceDefaultsSchema = z.object({
+  renewal_offsets: z.array(z.enum(reminderOffsetValues)).optional(),
+  notice_offsets: z.array(z.enum(reminderOffsetValues)).optional(),
+  payment_offsets: z.array(z.enum(reminderOffsetValues)).optional(),
+  review_offsets: z.array(z.enum(reminderOffsetValues)).optional(),
+}).strict();
+
+export const notificationPreferencesSchema = z.object({
+  email: z.boolean().default(true),
+  version: z.number().int().min(0).optional(),
+  defaults: notificationPreferenceDefaultsSchema.optional(),
+}).strict();
 
 export const iso8601DateSchema = z.string().refine(
   (value) => {

@@ -1,12 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, seedDocument, setSupabaseUser, userA } from "@/../tests/helpers/supabase";
+import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, seedDocument, seedReminder, setSupabaseUser, userA } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 
-import { POST } from "../route";
+import { GET, POST } from "../route";
 
-describe("POST /api/reminders", () => {
+describe("/api/reminders", () => {
   beforeEach(() => resetSupabaseMock(userA));
+
+  it("lists only current-user reminders and applies status and document filters", async () => {
+    const document = seedDocument(userA);
+    const otherDocument = seedDocument(userA, { title: "Other Lease" });
+    const approved = seedReminder(document.id, userA, { status: "approved", title: "Approved" });
+    seedReminder(otherDocument.id, userA, { status: "approved", title: "Other approved" });
+    seedReminder(document.id, userA, { status: "sent", title: "Sent" });
+    seedReminder(document.id, userA, { status: "ignored", title: "Ignored" });
+
+    const response = await GET(new Request(`http://localhost.test/api/reminders?status=approved&document_id=${document.id}`));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.reminders).toHaveLength(1);
+    expect(payload.reminders[0]).toMatchObject({ id: approved.id, title: "Approved", status: "approved" });
+  });
 
   it("returns 400 for invalid reminder payloads", async () => {
     const response = await POST(jsonRequest({ title: "Missing document" }));

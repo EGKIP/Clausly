@@ -38,7 +38,7 @@ describe("POST /api/upload", () => {
     expect(response.status).toBe(400);
   });
 
-  it("stores the PDF and creates a pending document for the session user", async () => {
+  it("stores the PDF and kicks off analysis for the session user", async () => {
     const file = new File(["%PDF-1.7"], "my lease.pdf", { type: "application/pdf" });
 
     const response = await POST(uploadRequest(file, "My Lease"));
@@ -50,7 +50,7 @@ describe("POST /api/upload", () => {
     expect(db().documents[0]).toMatchObject({
       user_id: userA.id,
       title: "My Lease",
-      status: "pending",
+      status: "analyzing",
       document_type: "other",
     });
     expect(db().documents[0].storage_path).toMatch(new RegExp("^" + userA.id + "/"));

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { runAnalysis } from "@/lib/ai/run-analysis";
 import { boundedTextSchema, validationIssues } from "@/lib/validation";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -87,6 +88,14 @@ export async function POST(request: Request) {
     await supabase.storage.from("documents").remove([storagePath]);
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
+
+  void runAnalysis(supabase, document.id, user.id).catch((error) => {
+    console.error("Background document analysis failed.", {
+      documentId: document.id,
+      userId: user.id,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  });
 
   return NextResponse.json({ id: document.id, document }, { status: 201 });
 }

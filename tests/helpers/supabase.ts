@@ -24,6 +24,7 @@ const storage = {
   uploaded: [] as { path: string; file: File; options?: unknown }[],
   removed: [] as string[],
   signedUrls: [] as string[],
+  files: new Map<string, Blob>(),
 };
 
 let currentUser: TestUser | null = null;
@@ -42,6 +43,7 @@ export function resetSupabaseMock(user: TestUser | null = userA) {
   storage.uploaded = [];
   storage.removed = [];
   storage.signedUrls = [];
+  storage.files = new Map();
   currentUser = user;
   failure = null;
   uuidCounter = 0;
@@ -73,6 +75,14 @@ export function db() {
 
 export function storageCalls() {
   return storage;
+}
+
+export function seedStoredPdf(path: string, bytes: BlobPart = "%PDF-1.7") {
+  const file = bytes instanceof Blob
+    ? bytes
+    : new Blob([bytes], { type: "application/pdf" });
+  storage.files.set(path, file);
+  return file;
 }
 
 export const userA = { id: "11111111-1111-4111-8111-111111111111", email: "ada@clausly.app" };
@@ -231,10 +241,19 @@ export function createSupabaseClient() {
         return {
           upload: vi.fn(async (path: string, file: File, options?: unknown) => {
             storage.uploaded.push({ path, file, options });
+            storage.files.set(path, file);
             return { data: { path }, error: null };
+          }),
+          download: vi.fn(async (path: string) => {
+            const file = storage.files.get(path);
+            if (!file) {
+              return { data: null, error: { message: "Stored file not found.", code: "NOT_FOUND" } };
+            }
+            return { data: file, error: null };
           }),
           remove: vi.fn(async (paths: string[]) => {
             storage.removed.push(...paths);
+            paths.forEach((path) => storage.files.delete(path));
             return { data: paths.map((path) => ({ name: path })), error: null };
           }),
           createSignedUrl: vi.fn(async (path: string) => {
@@ -328,7 +347,7 @@ class Query {
 
   private async executeInsert(single: boolean) {
     const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
-    const inserted = rows.filter(Boolean).map((row) => ({ ...row }));
+    const inserted = rows.filter(Boolean).map((row) => ({ ...row, id: row.id ?? nextUuid() }));
     tables[this.table].push(...inserted);
     return { data: single ? clone(inserted[0]) : clone(inserted), error: null, count: null };
   }

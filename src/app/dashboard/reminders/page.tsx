@@ -17,9 +17,11 @@ import {
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
-import { useReminders } from "@/lib/hooks/use-reminders";
+import { useReminders, type ReminderMutationPatch } from "@/lib/hooks/use-reminders";
 import { useDocuments } from "@/lib/hooks/use-documents";
 import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
+import { ReminderEditModal } from "@/components/dashboard/reminders/reminder-edit-modal";
+import type { Reminder } from "@/lib/mock-reminders";
 import type { ReminderStatus } from "@/lib/mock-reminders";
 import { cn } from "@/lib/utils";
 
@@ -34,8 +36,24 @@ const iconFor = (t: string) =>
 
 export default function RemindersPage() {
   const [tab, setTab] = React.useState<ReminderStatus>("suggested");
-  const { reminders: allReminders, isLoading, error } = useReminders();
+  const [editingReminder, setEditingReminder] = React.useState<Reminder | null>(null);
+  const suggested = useReminders({ status: "suggested" });
+  const approved = useReminders({ status: "approved" });
+  const sent = useReminders({ status: "sent" });
   const { documents, isLoading: docsLoading } = useDocuments();
+  const activeReminders = tab === "suggested" ? suggested : tab === "approved" ? approved : sent;
+  const editingReminders = editingReminder?.status === "approved" ? approved : suggested;
+
+  const handleApprove = React.useCallback(async (id: string) => {
+    const saved = await suggested.approve(id);
+    if (saved) void approved.refetch();
+  }, [approved, suggested]);
+
+  const handleSave = React.useCallback((id: string, patch: ReminderMutationPatch) => {
+    return editingReminder?.status === "approved"
+      ? approved.update(id, patch)
+      : suggested.update(id, patch);
+  }, [approved, editingReminder?.status, suggested]);
 
   if (!docsLoading && documents.length === 0) {
     return (
@@ -45,11 +63,11 @@ export default function RemindersPage() {
     );
   }
 
-  const list = allReminders.filter((r) => r.status === tab);
+  const list = activeReminders.reminders;
   const counts: Record<ReminderStatus, number> = {
-    suggested: allReminders.filter((r) => r.status === "suggested").length,
-    approved: allReminders.filter((r) => r.status === "approved").length,
-    sent: allReminders.filter((r) => r.status === "sent").length,
+    suggested: suggested.reminders.length,
+    approved: approved.reminders.length,
+    sent: sent.reminders.length,
   };
 
   return (
@@ -103,12 +121,13 @@ export default function RemindersPage() {
       <p className="mt-4 text-[13px] text-[var(--muted)]">{tabs.find((t) => t.id === tab)?.description}</p>
 
       <div className="mt-6 space-y-2.5">
-        {isLoading && <LoadingState />}
-        {error && <EmptyState status={tab} message={error} />}
-        {!isLoading && !error && list.length === 0 && <EmptyState status={tab} />}
-        {!isLoading && !error && list.map((r) => {
+        {activeReminders.isLoading && <LoadingState />}
+        {activeReminders.error && <InlineError message={activeReminders.error} />}
+        {!activeReminders.isLoading && list.length === 0 && <EmptyState status={tab} />}
+        {!activeReminders.isLoading && list.map((r) => {
           const Icon = iconFor(r.type);
           const urgent = r.daysAway > 0 && r.daysAway < 14;
+          const isPending = activeReminders.pendingIds.has(r.id);
           return (
             <motion.div
               key={r.id}
@@ -157,19 +176,41 @@ export default function RemindersPage() {
                 </div>
                 {tab === "suggested" && (
                   <div className="flex items-center gap-1.5">
-                    <Button variant="primary" size="sm">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => void handleApprove(r.id)}
+                    >
                       <Check className="size-3.5" /> Approve
                     </Button>
-                    <Button variant="ghost" size="sm" aria-label="Edit timing">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Edit timing"
+                      disabled={isPending}
+                      onClick={() => setEditingReminder(r)}
+                    >
                       <Clock className="size-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" aria-label="Ignore">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Ignore"
+                      disabled={isPending}
+                      onClick={() => void suggested.dismiss(r.id)}
+                    >
                       <X className="size-3.5" />
                     </Button>
                   </div>
                 )}
                 {tab === "approved" && (
-                  <Button variant="secondary" size="sm">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => setEditingReminder(r)}
+                  >
                     <Clock className="size-3.5" /> Edit
                   </Button>
                 )}
@@ -184,6 +225,13 @@ export default function RemindersPage() {
           );
         })}
       </div>
+      <ReminderEditModal
+        reminder={editingReminder}
+        isSaving={editingReminder ? editingReminders.pendingIds.has(editingReminder.id) : false}
+        error={editingReminders.error}
+        onClose={() => setEditingReminder(null)}
+        onSave={handleSave}
+      />
     </PageBody>
   );
 }
@@ -198,6 +246,14 @@ function LoadingState() {
         />
       ))}
     </>
+  );
+}
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] px-3 py-2 text-[12.5px] text-[var(--color-coral-ink)]">
+      {message}
+    </div>
   );
 }
 

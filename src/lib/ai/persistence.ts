@@ -16,6 +16,8 @@ export type PersistResult = {
  * Persist a validated analysis result for an owned document. Updates the
  * documents row, inserts clauses/dates/reminders, and rolls back to
  * status='failed' if any insert fails so the caller gets a clean retry path.
+ * Replaces any existing clauses, dates, and reminders for this
+ * (documentId, userId) pair before inserting the new snapshot.
  *
  * Callers must verify documentId ownership before calling. RLS provides a
  * second line of defense, but this helper trusts the caller's user_id.
@@ -26,6 +28,22 @@ export async function persistAnalysis(
   userId: string,
   result: AnalysisResult,
 ): Promise<PersistResult> {
+  // Snapshot semantics: a successful persist replaces the prior analysis. On a
+  // first analyze these deletes hit zero rows; on reanalyze they clear stale
+  // extracted data so the new snapshot is clean. RLS + the explicit user_id
+  // filter keep this scoped to the owner.
+  const { error: clauseClearError } = await supabase
+    .from("clauses").delete().eq("document_id", documentId).eq("user_id", userId);
+  if (clauseClearError) throw new AnalysisPersistenceError("clauses.clear", clauseClearError.message);
+
+  const { error: dateClearError } = await supabase
+    .from("dates").delete().eq("document_id", documentId).eq("user_id", userId);
+  if (dateClearError) throw new AnalysisPersistenceError("dates.clear", dateClearError.message);
+
+  const { error: reminderClearError } = await supabase
+    .from("reminders").delete().eq("document_id", documentId).eq("user_id", userId);
+  if (reminderClearError) throw new AnalysisPersistenceError("reminders.clear", reminderClearError.message);
+
   const documentUpdate = {
     title: result.documentTitle,
     document_type: result.documentType,

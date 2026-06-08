@@ -1,8 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
-import { analyzeDocument } from "./provider";
+import { analyzeDocument, getAnalysisModel, getAnalysisProvider } from "./provider";
 import { persistAnalysis } from "./persistence";
 import { extractPdfText } from "./pdf-text";
+import { recordUsage } from "./usage-metrics";
 
 type AnyClient = SupabaseClient<Database>;
 
@@ -65,6 +66,9 @@ export async function runAnalysis(
   }
 
   let result;
+  const provider = getAnalysisProvider();
+  const model = getAnalysisModel(provider);
+  let analysisError: unknown = null;
   try {
     result = await analyzeDocument({
       text,
@@ -73,8 +77,18 @@ export async function runAnalysis(
       jurisdictionHint: doc.jurisdiction,
     });
   } catch (error) {
+    analysisError = error;
     await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error));
     throw error;
+  } finally {
+    await recordUsage(supabase, {
+      userId,
+      documentId: doc.id,
+      provider,
+      model,
+      status: analysisError ? "failed" : "completed",
+      errorMessage: analysisError ? errorMessage(analysisError) : null,
+    });
   }
 
   return persistAnalysis(supabase, doc.id, userId, result);

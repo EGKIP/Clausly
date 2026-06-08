@@ -33,6 +33,9 @@ yarn-error.log*
 !.env.example
 !.env.local.example
 
+# local secrets (never commit)
+.supabase-*-credentials*
+
 # vercel
 .vercel
 

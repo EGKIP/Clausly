@@ -39,6 +39,8 @@ export async function getDocumentDetail(id: string): Promise<DocumentDetail | nu
     if (!document) return null;
     return {
       document,
+      status: "ready",
+      errorMessage: null,
       clauses: getClausesFor(id),
       dates: [],
       reminders: mockReminders.filter((item) => item.docId === id),
@@ -86,6 +88,8 @@ export async function getDocumentDetail(id: string): Promise<DocumentDetail | nu
 
   return {
     document: toUiDocument(document),
+    status: document.status,
+    errorMessage: document.error_message,
     clauses: (clauses ?? []).map(toUiClause),
     dates: (dates ?? []).map(toApiDate),
     reminders: ((reminders ?? []) as ReminderRow[]).map(toUiReminder),

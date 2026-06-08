@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/primitives";
 import { RiskPill } from "@/components/ui/risk-pill";
 import { getDocumentDetail, listDocuments } from "@/lib/db/documents";
 import { DocumentView } from "@/components/dashboard/document-view";
+import { AnalysisGate } from "@/components/dashboard/analysis-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,15 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   const { id } = await params;
   const detail = await getDocumentDetail(id);
   if (!detail) notFound();
-  const { document: doc, clauses: docClauses, reminders: docReminders, signedUrl } = detail;
+  const {
+    document: doc,
+    status,
+    errorMessage,
+    clauses: docClauses,
+    reminders: docReminders,
+    signedUrl,
+  } = detail;
+  const isReady = status === "ready";
 
   return (
     <PageBody className="max-w-[1480px]">
@@ -40,7 +49,11 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <RiskPill level={doc.risk} />
+            {isReady ? (
+              <RiskPill level={doc.risk} />
+            ) : (
+              <Badge tone="outline">{statusLabel(status)}</Badge>
+            )}
             <Badge tone="outline">{doc.type}</Badge>
             {doc.jurisdiction !== "—" && <Badge tone="outline">{doc.jurisdiction}</Badge>}
             <Badge tone="outline">{doc.pages} pages</Badge>
@@ -75,7 +88,13 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <DocumentView doc={doc} clauses={docClauses} reminders={docReminders} signedUrl={signedUrl} />
+      <AnalysisGate
+        documentId={doc.id}
+        initialStatus={status}
+        initialErrorMessage={errorMessage}
+      >
+        <DocumentView doc={doc} clauses={docClauses} reminders={docReminders} signedUrl={signedUrl} />
+      </AnalysisGate>
 
       <p className="mt-10 text-[11.5px] leading-relaxed text-[var(--faint)] max-w-2xl">
         Clausly&apos;s analysis is an aid, not legal advice. Always read clauses we flag as
@@ -84,4 +103,17 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       </p>
     </PageBody>
   );
+}
+
+function statusLabel(status: "pending" | "analyzing" | "ready" | "failed") {
+  switch (status) {
+    case "analyzing":
+      return "Analyzing";
+    case "pending":
+      return "Queued";
+    case "failed":
+      return "Failed";
+    default:
+      return "Ready";
+  }
 }

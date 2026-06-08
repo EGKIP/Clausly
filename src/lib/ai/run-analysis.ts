@@ -2,9 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { analyzeDocument } from "./provider";
 import { persistAnalysis } from "./persistence";
-import { extractPdfText } from "./pdf-text";
+import * as pdfText from "./pdf-text";
 
 type AnyClient = SupabaseClient<Database>;
+type PdfTextExtractor = typeof pdfText.extractPdfText;
+type PdfTextModule = {
+  extractPdfText: PdfTextExtractor;
+  extractPdfTextWithOcr?: PdfTextExtractor;
+};
 
 type AnalysisDocument = {
   id: string;
@@ -58,7 +63,7 @@ export async function runAnalysis(
     if (downloadError) throw new Error(downloadError.message);
     if (!file) throw new Error("Document file could not be downloaded.");
 
-    text = await extractPdfText(file);
+    text = await getPdfTextExtractor()(file);
   } catch (error) {
     await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error));
     throw error;
@@ -107,4 +112,12 @@ async function loadOwnedDocument(supabase: AnyClient, documentId: string, userId
     throw new Error(error?.message ?? "Document not found.");
   }
   return document;
+}
+
+function getPdfTextExtractor() {
+  const pdfTextModule = pdfText as PdfTextModule;
+  if ("extractPdfTextWithOcr" in pdfTextModule) {
+    return pdfTextModule.extractPdfTextWithOcr ?? pdfTextModule.extractPdfText;
+  }
+  return pdfTextModule.extractPdfText;
 }

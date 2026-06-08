@@ -24,8 +24,10 @@ export function AnalysisGate({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { status, errorMessage } = useDocumentStatusPoll(documentId, initialStatus, {
-    enabled: initialStatus === "analyzing" || initialStatus === "pending",
+  const [localStatus, setLocalStatus] = React.useState<DocumentStatus | null>(null);
+  const pollingInitialStatus = localStatus ?? initialStatus;
+  const { status, errorMessage } = useDocumentStatusPoll(documentId, pollingInitialStatus, {
+    enabled: pollingInitialStatus === "analyzing" || pollingInitialStatus === "pending",
   });
 
   /* When the analysis completes (or fails), refetch the server component so
@@ -38,7 +40,13 @@ export function AnalysisGate({
 
   if (status === "ready") return <>{children}</>;
   if (status === "failed") {
-    return <FailedState message={errorMessage ?? initialErrorMessage} />;
+    return (
+      <FailedState
+        documentId={documentId}
+        message={errorMessage ?? initialErrorMessage}
+        onRetryStarted={() => setLocalStatus("analyzing")}
+      />
+    );
   }
   return <AnalyzingState />;
 }
@@ -83,7 +91,43 @@ function AnalyzingState() {
   );
 }
 
-function FailedState({ message }: { message: string | null }) {
+function FailedState({
+  documentId,
+  message,
+  onRetryStarted,
+}: {
+  documentId: string;
+  message: string | null;
+  onRetryStarted: () => void;
+}) {
+  const [isRetrying, setIsRetrying] = React.useState(false);
+  const [retryError, setRetryError] = React.useState<string | null>(null);
+
+  async function retryAnalysis() {
+    setIsRetrying(true);
+    setRetryError(null);
+
+    let response: Response;
+    try {
+      response = await fetch(`/api/documents/${documentId}/reanalyze`, {
+        method: "POST",
+      });
+    } catch {
+      setRetryError("Re-analysis failed. Check your connection and try again.");
+      setIsRetrying(false);
+      return;
+    }
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ error: "Re-analysis failed." }));
+      setRetryError(payload.error ?? "Re-analysis failed.");
+      setIsRetrying(false);
+      return;
+    }
+
+    onRetryStarted();
+  }
+
   return (
     <div className="mt-8 rounded-[var(--radius-lg)] border border-[color-mix(in_oklch,var(--color-coral)_25%,var(--border))] bg-[var(--color-coral-soft)] p-8 md:p-10">
       <div className="flex items-start gap-3">
@@ -106,13 +150,16 @@ function FailedState({ message }: { message: string | null }) {
           </p>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
-            <Button variant="primary" size="sm" disabled aria-disabled>
-              <RefreshCw className="size-3.5" /> Re-analyze
+            <Button variant="primary" size="sm" onClick={retryAnalysis} disabled={isRetrying}>
+              <RefreshCw className={isRetrying ? "size-3.5 animate-spin" : "size-3.5"} />
+              {isRetrying ? "Starting..." : "Re-analyze"}
             </Button>
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
-              Coming soon
-            </span>
           </div>
+          {retryError && (
+            <p className="mt-3 rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--surface)] px-3 py-2 text-[12.5px] text-[var(--color-coral-ink)]">
+              {retryError}
+            </p>
+          )}
         </div>
       </div>
     </div>

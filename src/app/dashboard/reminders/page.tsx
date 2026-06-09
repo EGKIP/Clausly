@@ -21,6 +21,7 @@ import { useReminders, type ReminderMutationPatch } from "@/lib/hooks/use-remind
 import { useDocuments } from "@/lib/hooks/use-documents";
 import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
 import { ReminderEditModal } from "@/components/dashboard/reminders/reminder-edit-modal";
+import { DeliveryBadge } from "@/components/dashboard/reminders/delivery-badge";
 import type { Reminder } from "@/lib/mock-reminders";
 import type { ReminderStatus } from "@/lib/mock-reminders";
 import { cn } from "@/lib/utils";
@@ -166,12 +167,18 @@ export default function RemindersPage() {
 
               <div className="flex flex-wrap items-center justify-between md:justify-end gap-3">
                 <div className="text-right">
-                  <p className="font-serif text-[20px] leading-none tracking-[-0.01em] tabular-nums">
-                    {tab === "sent" ? "✓" : Math.abs(r.daysAway)}
-                  </p>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--faint)] mt-1">
-                    {tab === "sent" ? "delivered" : r.daysAway < 0 ? "days late" : "days away"}
-                  </p>
+                  {tab === "sent" ? (
+                    <DeliveryBadge status={r.deliveryStatus ?? "pending"} />
+                  ) : (
+                    <>
+                      <p className="font-serif text-[20px] leading-none tracking-[-0.01em] tabular-nums">
+                        {Math.abs(r.daysAway)}
+                      </p>
+                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--faint)] mt-1">
+                        {r.daysAway < 0 ? "days late" : "days away"}
+                      </p>
+                    </>
+                  )}
                   <p className="font-mono text-[11px] text-[var(--muted)] mt-1 tabular-nums">{r.fireOn}</p>
                 </div>
                 {tab === "suggested" && (

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { Reminder, ReminderStatus } from "@/lib/mock-reminders";
+import type { Reminder, ReminderDeliveryStatus, ReminderStatus } from "@/lib/mock-reminders";
 
 export type ReminderFilters = {
   status?: ReminderStatus | "ignored" | "dismissed";
@@ -16,9 +16,14 @@ export type ReminderMutationPatch = {
 };
 
 type ReminderPayload = {
-  reminder?: Reminder;
-  reminders?: Reminder[];
+  reminder?: ApiReminder;
+  reminders?: ApiReminder[];
   error?: string;
+};
+
+type ApiReminder = Reminder & {
+  reminder_time?: string | null;
+  delivery_status?: ReminderDeliveryStatus | null;
 };
 
 type State = {
@@ -63,7 +68,7 @@ export function useReminders(filters: ReminderFilters = {}): State {
     }
 
     const payload = (await response.json()) as ReminderPayload;
-    setReminders(payload.reminders ?? []);
+    setReminders((payload.reminders ?? []).map(normalizeReminder));
     setIsLoading(false);
   }, [documentId, status]);
 
@@ -106,9 +111,11 @@ export function useReminders(filters: ReminderFilters = {}): State {
 
       const payload = (await response.json()) as ReminderPayload;
       if (payload.reminder) {
-        setReminders((current) => replaceReminder(current, payload.reminder as Reminder));
+        const nextReminder = normalizeReminder(payload.reminder);
+        setReminders((current) => replaceReminder(current, nextReminder));
+        return nextReminder;
       }
-      return payload.reminder ?? null;
+      return null;
     });
   }, [reminders, withPending]);
 
@@ -129,9 +136,11 @@ export function useReminders(filters: ReminderFilters = {}): State {
 
       const payload = (await response.json()) as ReminderPayload;
       if (payload.reminder) {
-        setReminders((current) => replaceReminder(current, payload.reminder as Reminder));
+        const nextReminder = normalizeReminder(payload.reminder);
+        setReminders((current) => replaceReminder(current, nextReminder));
+        return nextReminder;
       }
-      return payload.reminder ?? null;
+      return null;
     });
   }, [withPending]);
 
@@ -167,7 +176,28 @@ function applyPatchToReminder(reminder: Reminder, patch: ReminderMutationPatch) 
     description: patch.description ?? reminder.description,
     fireOn: patch.fire_on ? formatDate(patch.fire_on) : reminder.fireOn,
     daysAway: patch.fire_on ? daysUntil(patch.fire_on) : reminder.daysAway,
+    reminderTime: patch.reminder_time === undefined ? reminder.reminderTime : normalizeReminderTime(patch.reminder_time),
   };
+}
+
+function normalizeReminder(reminder: ApiReminder): Reminder {
+  const reminderTime = normalizeReminderTime(reminder.reminderTime ?? reminder.reminder_time ?? null);
+  const deliveryStatus = normalizeDeliveryStatus(reminder.deliveryStatus ?? reminder.delivery_status, reminder.status);
+  return {
+    ...reminder,
+    reminderTime,
+    deliveryStatus,
+  };
+}
+
+function normalizeReminderTime(value: string | null | undefined) {
+  if (!value) return null;
+  return value.slice(0, 5);
+}
+
+function normalizeDeliveryStatus(value: unknown, status: ReminderStatus): ReminderDeliveryStatus | undefined {
+  if (value === "delivered" || value === "bounced" || value === "complained" || value === "pending") return value;
+  return status === "sent" ? "pending" : undefined;
 }
 
 async function responseError(response: Response, fallback: string) {

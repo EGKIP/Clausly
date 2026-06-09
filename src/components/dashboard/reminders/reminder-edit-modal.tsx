@@ -26,7 +26,7 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
     setTitle(reminder.title);
     setDescription(reminder.description);
     setFireOn(dateForInput(reminder.fireOn));
-    setReminderTime("");
+    setReminderTime(timeForInput(reminder.reminderTime));
     setLocalError(null);
   }, [reminder]);
 
@@ -47,12 +47,24 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
       return;
     }
 
-    const saved = await onSave(currentReminder.id, {
-      title: title.trim(),
-      description: description.trim(),
-      fire_on: fireOn,
-      reminder_time: reminderTime || null,
-    });
+    const patch: ReminderMutationPatch = {};
+    const nextTitle = title.trim();
+    const nextDescription = description.trim();
+    const nextReminderTime = reminderTime || null;
+    const currentFireOn = dateForInput(currentReminder.fireOn);
+    const currentReminderTime = timeForInput(currentReminder.reminderTime) || null;
+
+    if (nextTitle !== currentReminder.title) patch.title = nextTitle;
+    if (nextDescription !== currentReminder.description) patch.description = nextDescription;
+    if (fireOn !== currentFireOn) patch.fire_on = fireOn;
+    if (nextReminderTime !== currentReminderTime) patch.reminder_time = nextReminderTime;
+
+    if (Object.keys(patch).length === 0) {
+      onClose();
+      return;
+    }
+
+    const saved = await onSave(currentReminder.id, patch);
 
     if (saved) onClose();
   }
@@ -148,4 +160,9 @@ function dateForInput(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toISOString().slice(0, 10);
+}
+
+function timeForInput(value: string | null | undefined) {
+  if (!value) return "";
+  return value.slice(0, 5);
 }

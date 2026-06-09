@@ -62,6 +62,8 @@ export type Reminder = {
   type: UiReminder["type"];
   confidence: number | null;
   sourceQuote: string | null;
+  reminderTime: string | null;
+  deliveryStatus?: UiReminder["deliveryStatus"];
 };
 
 export type DocumentDetail = {

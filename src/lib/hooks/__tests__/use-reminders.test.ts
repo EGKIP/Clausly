@@ -14,6 +14,7 @@ const reminder: Reminder = {
   status: "suggested",
   channel: "Email",
   type: "Renewal",
+  reminderTime: null,
 };
 
 describe("useReminders", () => {
@@ -37,6 +38,26 @@ describe("useReminders", () => {
     );
   });
 
+  it("round-trips raw reminder_time and delivery status fields through the hook", async () => {
+    mockFetch(jsonResponse({
+      reminders: [{
+        ...reminder,
+        status: "sent",
+        reminder_time: "09:30:00",
+        delivery_status: "delivered",
+      }],
+    }));
+
+    const { result } = renderHook(() => useReminders({ status: "sent" }));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.reminders[0]).toMatchObject({
+      reminderTime: "09:30",
+      deliveryStatus: "delivered",
+    });
+  });
+
   it("sets an error when fetching reminders fails", async () => {
     mockFetch(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
 
@@ -57,6 +78,16 @@ describe("useReminders", () => {
 
     expect(result.current.reminders).toEqual([]);
     expect(result.current.error).toBeNull();
+  });
+
+  it("defaults sent reminders to pending delivery when no webhook status is present", async () => {
+    mockFetch(jsonResponse({ reminders: [{ ...reminder, status: "sent" }] }));
+
+    const { result } = renderHook(() => useReminders({ status: "sent" }));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.reminders[0].deliveryStatus).toBe("pending");
   });
 
   it("calls approve, update, and dismiss endpoints with the expected bodies", async () => {

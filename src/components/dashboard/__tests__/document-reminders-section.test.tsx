@@ -23,7 +23,7 @@ type ReminderHookState = {
   pendingIds: Set<string>;
 };
 
-const doc: ContractDoc & { status?: "ready" | "analyzing" } = {
+const doc: ContractDoc = {
   id: "doc-1",
   title: "Lease agreement",
   party: "Greenfield Holdings",
@@ -90,6 +90,16 @@ describe("DocumentRemindersSection", () => {
     setupReminders({ suggested: [suggestedReminder], approved: [approvedReminder] });
 
     render(<DocumentRemindersSection doc={{ ...doc, status: "analyzing" }} />);
+
+    expect(screen.queryByText("Reminders")).not.toBeInTheDocument();
+  });
+
+  it("hides when document status is missing", () => {
+    setupReminders({ suggested: [suggestedReminder], approved: [approvedReminder] });
+
+    const docWithoutStatus = { ...doc };
+    delete (docWithoutStatus as Partial<ContractDoc>).status;
+    render(<DocumentRemindersSection doc={docWithoutStatus as ContractDoc} />);
 
     expect(screen.queryByText("Reminders")).not.toBeInTheDocument();
   });

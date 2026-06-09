@@ -180,6 +180,7 @@ export function seedReminder(documentId: string, user = userA, overrides: Row = 
     title: "Review notice window",
     description: "Review the contract before notice is due.",
     fire_on: "2026-10-01",
+    reminder_time: null,
     reminder_type: "Notice",
     status: "suggested",
     channel: "email",

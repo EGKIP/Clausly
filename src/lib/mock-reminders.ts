@@ -1,4 +1,5 @@
 export type ReminderStatus = "suggested" | "approved" | "sent";
+export type ReminderDeliveryStatus = "delivered" | "bounced" | "complained" | "pending";
 
 export interface Reminder {
   id: string;
@@ -11,6 +12,8 @@ export interface Reminder {
   status: ReminderStatus;
   channel: "Email";
   type: "Renewal" | "Notice" | "Payment" | "Review";
+  reminderTime?: string | null;
+  deliveryStatus?: ReminderDeliveryStatus;
 }
 
 export const reminders: Reminder[] = [

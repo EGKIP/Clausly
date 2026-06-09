@@ -49,6 +49,7 @@ export function toUiDocument(row: DocumentRow): ContractDoc {
     monthly: row.monthly_value ? `$${Number(row.monthly_value).toLocaleString()} / mo` : undefined,
     summary: row.summary ?? row.summary_short ?? statusSummary(row.status),
     tags: row.tags.length > 0 ? row.tags : [statusLabel(row.status)],
+    status: row.status,
   };
 }
 
@@ -111,6 +112,8 @@ export function toApiReminder(row: ReminderRow): Reminder {
     type: normalizeReminderType(row.reminder_type),
     confidence: row.confidence,
     sourceQuote: row.source_quote,
+    reminderTime: normalizeReminderTime(row.reminder_time),
+    deliveryStatus: row.status === "sent" ? "pending" : undefined,
   };
 }
 
@@ -126,6 +129,8 @@ export function toUiReminder(row: ReminderRow): UiReminder {
     status: normalizeReminderStatus(row.status),
     channel: "Email",
     type: normalizeReminderType(row.reminder_type),
+    reminderTime: normalizeReminderTime(row.reminder_time),
+    deliveryStatus: row.status === "sent" ? "pending" : undefined,
   };
 }
 
@@ -152,6 +157,11 @@ function normalizeReminderType(type: string): UiReminder["type"] {
 
 function normalizeReminderStatus(status: ReminderRow["status"]): ReminderStatus {
   return status === "ignored" ? "suggested" : status;
+}
+
+function normalizeReminderTime(value: string | null) {
+  if (!value) return null;
+  return value.slice(0, 5);
 }
 
 function isBbox(value: unknown): value is [number, number, number, number] {

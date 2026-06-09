@@ -10,10 +10,6 @@ import { useReminders, type ReminderMutationPatch } from "@/lib/hooks/use-remind
 import { cn } from "@/lib/utils";
 import { ReminderEditModal } from "./reminder-edit-modal";
 
-type DocumentWithStatus = ContractDoc & {
-  status?: "pending" | "analyzing" | "ready" | "failed";
-};
-
 type ReminderWithDocumentAliases = Reminder & {
   document_id?: string;
   documentId?: string;
@@ -22,12 +18,12 @@ type ReminderWithDocumentAliases = Reminder & {
 const iconFor = (type: Reminder["type"]) =>
   type === "Renewal" ? CalendarClock : type === "Notice" ? Calendar : type === "Review" ? Sparkles : ShieldAlert;
 
-export function DocumentRemindersSection({ doc }: { doc: DocumentWithStatus }) {
-  if (doc.status && doc.status !== "ready") return null;
+export function DocumentRemindersSection({ doc }: { doc: ContractDoc }) {
+  if (doc.status !== "ready") return null;
   return <ReadyDocumentRemindersSection doc={doc} />;
 }
 
-function ReadyDocumentRemindersSection({ doc }: { doc: DocumentWithStatus }) {
+function ReadyDocumentRemindersSection({ doc }: { doc: ContractDoc }) {
   const [suggestedOpen, setSuggestedOpen] = React.useState(true);
   const [approvedOpen, setApprovedOpen] = React.useState(false);
   const [editingReminder, setEditingReminder] = React.useState<Reminder | null>(null);

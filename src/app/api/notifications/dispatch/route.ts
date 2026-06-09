@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { dispatchDueReminderEmails, hasServiceSupabaseEnv, hasSupabaseEnv } from "@/lib/notifications/dispatch";
 
-export async function POST(request: Request) {
-  const secret = process.env.CLAUSLY_DISPATCH_SECRET;
+async function handle(request: Request) {
+  const dispatchSecret = process.env.CLAUSLY_DISPATCH_SECRET;
+  const cronSecret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");
 
-  if (!secret || authorization !== `Bearer ${secret}`) {
+  const expected = [dispatchSecret, cronSecret].filter((value): value is string => Boolean(value));
+  if (expected.length === 0 || !expected.some((secret) => authorization === `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,4 +21,12 @@ export async function POST(request: Request) {
 
   const result = await dispatchDueReminderEmails();
   return NextResponse.json(result);
+}
+
+export async function POST(request: Request) {
+  return handle(request);
+}
+
+export async function GET(request: Request) {
+  return handle(request);
 }

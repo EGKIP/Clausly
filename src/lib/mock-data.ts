@@ -1,4 +1,5 @@
 import type { RiskLevel } from "@/components/ui/risk-pill";
+import type { DocumentStatus } from "@/lib/db/types";
 
 export type DocType =
   | "Lease"
@@ -24,6 +25,7 @@ export interface ContractDoc {
   monthly?: string;
   summary: string;
   tags: string[];
+  status: DocumentStatus;
 }
 
 export const documents: ContractDoc[] = [
@@ -43,6 +45,7 @@ export const documents: ContractDoc[] = [
     summary:
       "12-month residential lease at $1,850/mo, beginning Sep 1, 2025. Auto-renews unless tenant provides 60 days' written notice. Minnesota law governs. Standard late-fee and early-termination clauses are present, with a higher-than-typical termination fee.",
     tags: ["Residential", "Auto-renew", "60-day notice"],
+    status: "ready",
   },
   {
     id: "statefarm-auto",
@@ -59,6 +62,7 @@ export const documents: ContractDoc[] = [
     summary:
       "6-month personal auto policy. Liability 100/300/100, comprehensive and collision with $500 deductible each. Premium $142/month. Renews automatically; you can change coverage 30 days before the renewal date.",
     tags: ["Auto", "6 months", "Renewable"],
+    status: "ready",
   },
   {
     id: "acme-freelance",
@@ -75,6 +79,7 @@ export const documents: ContractDoc[] = [
     summary:
       "12-month independent contractor agreement. Includes a broad IP-assignment clause and a 30-mile, 12-month non-solicit. Termination for convenience by either party with 14 days' written notice.",
     tags: ["IP assignment", "Non-solicit", "California"],
+    status: "ready",
   },
   {
     id: "verizon-wireless",
@@ -91,6 +96,7 @@ export const documents: ContractDoc[] = [
     summary:
       "24-month wireless service plan with $85/mo line charges and a $350 early-termination fee that decreases by ~$15/month. Arbitration clause with class-action waiver.",
     tags: ["Wireless", "Arbitration", "24 months"],
+    status: "ready",
   },
   {
     id: "storage-bin-14",
@@ -107,6 +113,7 @@ export const documents: ContractDoc[] = [
     summary:
       "Month-to-month storage rental at $78/mo. 10-day late grace period before auction notice. Renter responsible for own contents insurance.",
     tags: ["Storage", "Month-to-month"],
+    status: "ready",
   },
   {
     id: "loft-gym",
@@ -123,6 +130,7 @@ export const documents: ContractDoc[] = [
     summary:
       "Annual membership with auto-renew. 90-day cancellation notice required to avoid renewal, an unusually long window. Initiation fee of $99 is non-refundable.",
     tags: ["Auto-renew", "90-day notice", "Non-refundable"],
+    status: "ready",
   },
   {
     id: "acme-employment",
@@ -138,6 +146,7 @@ export const documents: ContractDoc[] = [
     summary:
       "At-will employment offer with base $148,000, $12,000 sign-on (repayable if you leave within 12 months), and an arbitration agreement. Equity vests over 4 years with a 1-year cliff.",
     tags: ["At-will", "Sign-on clawback", "Vesting"],
+    status: "ready",
   },
 ];
 

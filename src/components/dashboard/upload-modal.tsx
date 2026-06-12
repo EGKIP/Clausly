@@ -1,11 +1,20 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, UploadCloud, FileText, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+type UploadUsage = {
+  plan: "free" | "pro";
+  documents: {
+    current: number;
+    limit: number | null;
+  };
+};
 
 export function UploadModal({
   open,
@@ -20,7 +29,15 @@ export function UploadModal({
   const [phase, setPhase] = React.useState<"idle" | "uploading" | "analyzing" | "error">("idle");
   const [documentId, setDocumentId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [limitError, setLimitError] = React.useState(false);
+  const [usage, setUsage] = React.useState<UploadUsage | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
+
+  const atDocumentLimit = Boolean(
+    usage?.plan === "free" &&
+    usage.documents.limit !== null &&
+    usage.documents.current >= usage.documents.limit
+  );
 
   React.useEffect(() => {
     if (!open) {
@@ -30,7 +47,34 @@ export function UploadModal({
       setPhase("idle");
       setDocumentId(null);
       setError(null);
+      setLimitError(false);
+      setUsage(null);
     }
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    async function loadUsage() {
+      const response = await fetch("/api/profile");
+      if (cancelled || !response.ok) return;
+      const payload = (await response.json()) as {
+        plan?: "free" | "pro";
+        usage?: { documents?: { current?: number; limit?: number | null } };
+      };
+      if (!payload.plan || !payload.usage?.documents) return;
+      setUsage({
+        plan: payload.plan,
+        documents: {
+          current: payload.usage.documents.current ?? 0,
+          limit: payload.usage.documents.limit ?? null,
+        },
+      });
+    }
+    void loadUsage();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   React.useEffect(() => {
@@ -54,6 +98,7 @@ export function UploadModal({
         if (controller.signal.aborted) return;
         if (!response.ok) {
           const payload = await response.json().catch(() => ({ error: "Upload failed." }));
+          setLimitError(response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS");
           setError(payload.error ?? "Upload failed.");
           setPhase("error");
           return;
@@ -80,12 +125,14 @@ export function UploadModal({
     setFile(null);
     setDocumentId(null);
     setError(null);
+    setLimitError(false);
     setPhase("idle");
   };
 
   const onDrop = (e: React.DragEvent<HTMLLabelElement>) => {
     e.preventDefault();
     setDrag(false);
+    if (atDocumentLimit) return;
     const f = e.dataTransfer.files?.[0];
     if (f) setFile(f);
   };
@@ -129,36 +176,49 @@ export function UploadModal({
 
             <div className="p-6">
               {phase === "idle" && (
-                <label
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDrag(true);
-                  }}
-                  onDragLeave={() => setDrag(false)}
-                  onDrop={onDrop}
-                  className={cn(
-                    "block rounded-[var(--radius-lg)] border-2 border-dashed cursor-pointer transition-colors p-10 text-center",
-                    drag
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                      : "border-[var(--border-strong)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
+                <>
+                  {usage?.plan === "free" && (
+                    <PlanUsageLine usage={usage} atLimit={atDocumentLimit} />
                   )}
-                >
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    className="sr-only"
-                    onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])}
-                  />
-                  <div className="mx-auto inline-flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-card)]">
-                    <UploadCloud className="size-5 text-[var(--accent)]" />
-                  </div>
-                  <p className="mt-4 font-medium text-[15px]">
-                    Drop a PDF here, or click to browse
-                  </p>
-                  <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
-                    Lease, insurance, employment, or any contract.
-                  </p>
-                </label>
+                  <label
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (!atDocumentLimit) setDrag(true);
+                    }}
+                    onDragLeave={() => setDrag(false)}
+                    onDrop={onDrop}
+                    className={cn(
+                      "block rounded-[var(--radius-lg)] border-2 border-dashed cursor-pointer transition-colors p-10 text-center",
+                      usage?.plan === "free" && "mt-3",
+                      atDocumentLimit && "cursor-not-allowed opacity-65",
+                      drag
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                        : "border-[var(--border-strong)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
+                    )}
+                  >
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="sr-only"
+                      disabled={atDocumentLimit}
+                      onChange={(e) => {
+                        if (atDocumentLimit) return;
+                        if (e.target.files?.[0]) setFile(e.target.files[0]);
+                      }}
+                    />
+                    <div className="mx-auto inline-flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-card)]">
+                      <UploadCloud className="size-5 text-[var(--accent)]" />
+                    </div>
+                    <p className="mt-4 font-medium text-[15px]">
+                      Drop a PDF here, or click to browse
+                    </p>
+                    <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
+                      {atDocumentLimit
+                        ? "Upgrade to Pro for unlimited uploads."
+                        : "Lease, insurance, employment, or any contract."}
+                    </p>
+                  </label>
+                </>
               )}
 
               {phase !== "idle" && file && (
@@ -189,6 +249,14 @@ export function UploadModal({
                     {phase === "analyzing" && "Queued for clause, date and risk analysis…"}
                     {phase === "error" && (error ?? "Upload failed.")}
                   </p>
+                  {phase === "error" && limitError && (
+                    <p className="mt-3 text-[12.5px] text-[var(--muted)]">
+                      <Link href="/upgrade" className="text-[var(--accent-ink)] hover:underline">
+                        Upgrade to Pro
+                      </Link>{" "}
+                      for unlimited uploads.
+                    </p>
+                  )}
                   {phase === "error" && (
                     <Button variant="secondary" size="sm" onClick={resetUpload} className="mt-4">
                       Try again
@@ -225,5 +293,30 @@ export function UploadModal({
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function PlanUsageLine({ usage, atLimit }: { usage: UploadUsage; atLimit: boolean }) {
+  const limit = usage.documents.limit ?? "Unlimited";
+  return (
+    <div
+      className={cn(
+        "rounded-[var(--radius-sm)] border px-3 py-2 text-[12.5px]",
+        atLimit
+          ? "border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)]"
+          : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)]"
+      )}
+    >
+      {usage.documents.current} / {limit} documents used
+      {atLimit && (
+        <>
+          {" "}
+          ·{" "}
+          <Link href="/upgrade" className="font-medium underline underline-offset-2">
+            Upgrade to Pro for unlimited uploads
+          </Link>
+        </>
+      )}
+    </div>
   );
 }

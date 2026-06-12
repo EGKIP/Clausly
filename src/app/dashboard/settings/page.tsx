@@ -1,21 +1,29 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, LogOut, Mail, Save, ShieldAlert, User } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LogOut, Mail, Save, ShieldAlert, Sparkles, User } from "lucide-react";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
 import {
   NotificationPreferencesCard,
   type NotificationPreferences,
 } from "@/components/dashboard/settings/notification-preferences-card";
-import { Card } from "@/components/ui/primitives";
+import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
+import type { PlanName } from "@/lib/billing/limits";
 
 type Profile = {
   displayName: string;
   email: string;
   mockMode: boolean;
   notificationPreferences: NotificationPreferences;
+  plan: PlanName;
+  usage: {
+    documents: {
+      current: number;
+      limit: number | null;
+    };
+  };
 };
 
 const fallbackProfile: Profile = {
@@ -23,6 +31,8 @@ const fallbackProfile: Profile = {
   email: "demo@clausly.app",
   mockMode: true,
   notificationPreferences: { email: true },
+  plan: "free",
+  usage: { documents: { current: 0, limit: 5 } },
 };
 
 export default function SettingsPage() {
@@ -174,10 +184,52 @@ export default function SettingsPage() {
 
         <section>
           <SectionHeader
+            title="Plan"
+            description="Your plan sets portfolio limits and unlocks portfolio-level intelligence."
+          />
+          <Card className="p-6">
+            <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={profile.plan === "pro" ? "iris" : "outline"}>
+                    {profile.plan === "pro" && <Sparkles className="size-2.5" />}
+                    {profile.plan === "pro" ? "Pro" : "Free"}
+                  </Badge>
+                  <span className="text-[12.5px] text-[var(--muted)]">
+                    Current subscription
+                  </span>
+                </div>
+                <p className="mt-4 text-[14px] font-medium">
+                  Documents:{" "}
+                  <span className="tabular-nums">
+                    {profile.usage.documents.current} / {formatDocumentLimit(profile.usage.documents.limit)}
+                  </span>
+                </p>
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
+                  Pro unlocks unlimited documents, portfolio insights, and priority processing.
+                </p>
+              </div>
+              {profile.plan === "free" && (
+                <Button href="/upgrade" variant="primary" size="md">
+                  <Sparkles className="size-3.5" />
+                  Upgrade to Pro
+                </Button>
+              )}
+            </div>
+          </Card>
+        </section>
+
+        <section>
+          <SectionHeader
             title="Preferences"
             description="Control notification delivery and default reminder timing."
           />
-          <NotificationPreferencesCard profile={profile} onProfileSaved={setProfile} />
+          <NotificationPreferencesCard
+            profile={profile}
+            onProfileSaved={(savedProfile) => {
+              setProfile((current) => ({ ...current, ...savedProfile }));
+            }}
+          />
         </section>
 
         <section>
@@ -274,4 +326,8 @@ export default function SettingsPage() {
       )}
     </PageBody>
   );
+}
+
+function formatDocumentLimit(limit: number | null) {
+  return limit === null ? "Unlimited" : limit;
 }

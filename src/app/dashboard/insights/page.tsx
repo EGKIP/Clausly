@@ -15,8 +15,31 @@ import { RiskPill } from "@/components/ui/risk-pill";
 import { listDocuments } from "@/lib/db/documents";
 import { listReminders } from "@/lib/db/reminders";
 import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
+import { InsightsUpgradeCard } from "@/components/dashboard/insights-upgrade-card";
+import { createClient } from "@/lib/supabase/server";
+import { canAccessInsights } from "@/lib/billing/plan";
 
 export default async function InsightsPage() {
+  if (hasSupabaseEnv()) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const access = await canAccessInsights(supabase, user.id);
+      if (!access.allowed) {
+        return (
+          <PageBody>
+            <PageHeader
+              eyebrow="Insights"
+              title="Pro insights"
+              description="Portfolio-level intelligence is available on Clausly Pro."
+            />
+            <InsightsUpgradeCard />
+          </PageBody>
+        );
+      }
+    }
+  }
+
   const [documents, reminders] = await Promise.all([listDocuments(), listReminders()]);
 
   if (documents.length === 0) {
@@ -207,4 +230,8 @@ export default async function InsightsPage() {
       </p>
     </PageBody>
   );
+}
+
+function hasSupabaseEnv() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }

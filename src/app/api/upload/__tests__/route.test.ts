@@ -1,5 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseClient, db, resetSupabaseMock, setSupabaseUser, storageCalls, userA } from "@/../tests/helpers/supabase";
+import {
+  createSupabaseClient,
+  db,
+  resetSupabaseMock,
+  seedDocument,
+  seedUser,
+  setSupabaseUser,
+  storageCalls,
+  userA,
+} from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 
@@ -39,6 +48,7 @@ describe("POST /api/upload", () => {
   });
 
   it("stores the PDF and kicks off analysis for the session user", async () => {
+    seedUser(userA, { subscription_tier: "free" });
     const file = new File(["%PDF-1.7"], "my lease.pdf", { type: "application/pdf" });
 
     const response = await POST(uploadRequest(file, "My Lease"));
@@ -55,5 +65,49 @@ describe("POST /api/upload", () => {
     });
     expect(db().documents[0].storage_path).toMatch(new RegExp("^" + userA.id + "/"));
     expect(storageCalls().uploaded[0].path).toBe(db().documents[0].storage_path);
+  });
+
+  it("returns 402 when a free user is at the document limit", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    for (let index = 0; index < 5; index += 1) {
+      seedDocument(userA, { id: `document-${index}` });
+    }
+
+    const response = await POST(uploadRequest(new File(["%PDF"], "lease.pdf", { type: "application/pdf" })));
+    const body = await response.json();
+
+    expect(response.status).toBe(402);
+    expect(body).toMatchObject({
+      error: "Free plan is limited to 5 documents.",
+      code: "PLAN_LIMIT_DOCUMENTS",
+      current: 5,
+      limit: 5,
+      plan: "free",
+    });
+    expect(storageCalls().uploaded).toHaveLength(0);
+  });
+
+  it("allows a free user under the document limit", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    for (let index = 0; index < 4; index += 1) {
+      seedDocument(userA, { id: `document-${index}` });
+    }
+
+    const response = await POST(uploadRequest(new File(["%PDF"], "lease.pdf", { type: "application/pdf" })));
+
+    expect(response.status).toBe(201);
+    expect(storageCalls().uploaded).toHaveLength(1);
+  });
+
+  it("allows a pro user above the free document limit", async () => {
+    seedUser(userA, { subscription_tier: "pro" });
+    for (let index = 0; index < 100; index += 1) {
+      seedDocument(userA, { id: `document-${index}` });
+    }
+
+    const response = await POST(uploadRequest(new File(["%PDF"], "lease.pdf", { type: "application/pdf" })));
+
+    expect(response.status).toBe(201);
+    expect(storageCalls().uploaded).toHaveLength(1);
   });
 });

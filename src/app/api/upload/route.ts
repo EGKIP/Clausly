@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { runAnalysis } from "@/lib/ai/run-analysis";
 import { boundedTextSchema, validationIssues } from "@/lib/validation";
+import { canUploadDocument } from "@/lib/billing/plan";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const titleSchema = boundedTextSchema(1, 200);
@@ -54,6 +55,20 @@ export async function POST(request: Request) {
   }
 
   const { file, title } = validation;
+  const uploadLimit = await canUploadDocument(supabase, user.id);
+  if (!uploadLimit.allowed) {
+    return NextResponse.json(
+      {
+        error: "Free plan is limited to 5 documents.",
+        code: "PLAN_LIMIT_DOCUMENTS",
+        current: uploadLimit.current,
+        limit: uploadLimit.limit,
+        plan: uploadLimit.plan,
+      },
+      { status: 402 }
+    );
+  }
+
   const id = crypto.randomUUID();
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
   const storagePath = `${user.id}/${id}/${safeName}`;

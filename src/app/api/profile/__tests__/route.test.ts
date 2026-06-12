@@ -29,7 +29,43 @@ describe("/api/profile", () => {
     const response = await GET();
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({ mockMode: true, email: "demo@clausly.app" });
+    await expect(response.json()).resolves.toMatchObject({
+      mockMode: true,
+      email: "demo@clausly.app",
+      plan: "free",
+      usage: { documents: { current: 0, limit: 5 } },
+    });
+  });
+
+  it("returns plan and document usage in the profile payload", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    seedDocument(userA, { id: "document-1" });
+    seedDocument(userA, { id: "document-2" });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      plan: "free",
+      usage: { documents: { current: 2, limit: 5 } },
+    });
+  });
+
+  it("serializes pro unlimited document usage as null limit", async () => {
+    seedUser(userA, { subscription_tier: "pro" });
+    for (let index = 0; index < 7; index += 1) {
+      seedDocument(userA, { id: `document-${index}` });
+    }
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      plan: "pro",
+      usage: { documents: { current: 7, limit: null } },
+    });
   });
 
   it("returns 400 for empty displayName", async () => {

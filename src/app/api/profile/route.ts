@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { notificationPreferencesSchema, validationIssues } from "@/lib/validation/schemas";
+import { canUploadDocument } from "@/lib/billing/plan";
+import type { PlanName } from "@/lib/billing/limits";
 
 const profileSchema = z.object({
   displayName: z.string().trim().min(1).max(80).optional(),
@@ -17,6 +19,8 @@ export async function GET() {
       displayName: "Demo User",
       email: "demo@clausly.app",
       notificationPreferences: normalizeNotificationPreferences(null),
+      plan: "free",
+      usage: { documents: { current: 0, limit: 5 } },
       mockMode: true,
     });
   }
@@ -34,11 +38,14 @@ export async function GET() {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const usage = await resolveProfileUsage(supabase, user.id);
 
   return NextResponse.json({
     displayName: data.full_name ?? user.email?.split("@")[0] ?? "Clausly user",
     email: data.email,
     notificationPreferences: normalizeNotificationPreferences(data.notification_preferences),
+    plan: usage.plan,
+    usage: { documents: { current: usage.current, limit: serializeLimit(usage.limit) } },
     mockMode: false,
   });
 }
@@ -97,11 +104,14 @@ export async function PATCH(request: Request) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const usage = await resolveProfileUsage(supabase, user.id);
 
   return NextResponse.json({
     displayName: data.full_name ?? currentProfile.full_name ?? user.email?.split("@")[0] ?? "Clausly user",
     email: data.email,
     notificationPreferences: normalizeNotificationPreferences(data.notification_preferences),
+    plan: usage.plan,
+    usage: { documents: { current: usage.current, limit: serializeLimit(usage.limit) } },
     mockMode: false,
   });
 }
@@ -161,6 +171,23 @@ export async function DELETE() {
 
 function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+async function resolveProfileUsage(supabase: Parameters<typeof canUploadDocument>[0], userId: string): Promise<{
+  plan: PlanName;
+  current: number;
+  limit: number;
+}> {
+  const upload = await canUploadDocument(supabase, userId);
+  return {
+    plan: upload.plan,
+    current: upload.current,
+    limit: upload.limit,
+  };
+}
+
+function serializeLimit(limit: number) {
+  return Number.isFinite(limit) ? limit : null;
 }
 
 function normalizeNotificationPreferences(value: unknown): NotificationPreferences {

@@ -3,7 +3,7 @@ import "server-only";
 import { PLAN_LIMITS, type PlanName } from "./limits";
 
 type SupabaseLike = {
-  from: (table: any) => {
+  from: (table: "users" | "documents") => {
     select: (columns?: string, options?: { count?: string; head?: boolean }) => unknown;
   };
 };

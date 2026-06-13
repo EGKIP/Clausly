@@ -24,6 +24,7 @@ import { ReminderEditModal } from "@/components/dashboard/reminders/reminder-edi
 import { DeliveryBadge } from "@/components/dashboard/reminders/delivery-badge";
 import type { Reminder } from "@/lib/mock-reminders";
 import type { ReminderStatus } from "@/lib/mock-reminders";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const tabs: { id: ReminderStatus; label: string; description: string }[] = [
@@ -249,8 +250,21 @@ function LoadingState() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="h-[120px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] animate-pulse"
-        />
+          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 grid grid-cols-1 md:grid-cols-[1fr_auto] items-center gap-4"
+        >
+          <div className="flex items-start gap-4 min-w-0">
+            <Skeleton variant="block" className="size-11 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <Skeleton className="h-4 w-3/5" />
+              <Skeleton className="h-3 w-2/5" />
+              <Skeleton className="h-3 w-4/5" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            <Skeleton variant="pill" className="w-20 h-8" />
+            <Skeleton variant="pill" className="w-20 h-8" />
+          </div>
+        </div>
       ))}
     </>
   );

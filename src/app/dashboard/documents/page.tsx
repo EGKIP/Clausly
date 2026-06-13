@@ -17,6 +17,7 @@ import { useDocuments } from "@/lib/hooks/use-documents";
 import { DocumentCard, DocumentRow } from "@/components/dashboard/document-card";
 import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
 import type { RiskLevel } from "@/components/ui/risk-pill";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const docTypes: ("All" | DocType)[] = [
@@ -196,8 +197,25 @@ function LoadingState() {
       {Array.from({ length: 6 }).map((_, index) => (
         <div
           key={index}
-          className="h-[230px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] animate-pulse"
-        />
+          className="flex flex-col rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <Skeleton variant="block" className="size-10" />
+            <Skeleton variant="pill" className="w-16 h-5" />
+          </div>
+          <Skeleton className="mt-5 h-5 w-4/5" />
+          <Skeleton className="mt-2 h-3 w-1/3" />
+          <Skeleton className="mt-4 h-3 w-full" />
+          <Skeleton className="mt-2 h-3 w-2/3" />
+          <div className="mt-4 flex gap-1.5">
+            <Skeleton variant="pill" className="w-14 h-5" />
+            <Skeleton variant="pill" className="w-12 h-5" />
+            <Skeleton variant="pill" className="w-16 h-5" />
+          </div>
+          <div className="mt-5 pt-4 border-t border-[var(--border)] flex items-center justify-between">
+            <Skeleton className="h-3 w-24" />
+          </div>
+        </div>
       ))}
     </div>
   );

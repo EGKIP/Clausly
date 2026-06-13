@@ -199,6 +199,38 @@ export type Database = {
           },
         ];
       };
+      document_chunks: {
+        Row: {
+          id: string;
+          document_id: string;
+          user_id: string;
+          chunk_index: number;
+          content: string;
+          page_number: number | null;
+          embedding: number[] | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          user_id: string;
+          chunk_index: number;
+          content: string;
+          page_number?: number | null;
+          embedding?: number[] | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_chunks"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "document_chunks_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       usage_metrics: {
         Row: {
           id: string;
@@ -235,6 +267,22 @@ export type Database = {
       delete_account: {
         Args: { target_user_id: string };
         Returns: void;
+      };
+      match_document_chunks: {
+        Args: {
+          target_document_id: string;
+          query_embedding: number[];
+          match_count?: number;
+        };
+        Returns: Array<{
+          id: string;
+          document_id: string;
+          user_id: string;
+          chunk_index: number;
+          content: string;
+          page_number: number | null;
+          similarity: number;
+        }>;
       };
     };
     Enums: {

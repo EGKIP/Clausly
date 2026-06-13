@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { motion } from "framer-motion";
 import {
   Search,
   LayoutGrid,
@@ -168,8 +169,15 @@ export default function DocumentsPage() {
         <EmptyState onClear={() => { setQ(""); setType("All"); setRisk("All risk"); }} />
       ) : view === "grid" ? (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map((d) => (
-            <DocumentCard key={d.id} doc={d} />
+          {filtered.map((d, i) => (
+            <motion.div
+              key={d.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, delay: Math.min(i, 8) * 0.04, ease: [0.165, 0.84, 0.44, 1] }}
+            >
+              <DocumentCard doc={d} />
+            </motion.div>
           ))}
         </div>
       ) : (
@@ -181,8 +189,15 @@ export default function DocumentsPage() {
             <span>Risk</span>
           </div>
           <div className="divide-y divide-[var(--border)]">
-            {filtered.map((d) => (
-              <DocumentRow key={d.id} doc={d} />
+            {filtered.map((d, i) => (
+              <motion.div
+                key={d.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28, delay: Math.min(i, 10) * 0.025, ease: [0.165, 0.84, 0.44, 1] }}
+              >
+                <DocumentRow doc={d} />
+              </motion.div>
             ))}
           </div>
         </div>

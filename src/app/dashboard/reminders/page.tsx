@@ -141,7 +141,7 @@ export default function RemindersPage() {
         {activeReminders.isLoading && <LoadingState />}
         {activeReminders.error && <InlineError message={activeReminders.error} />}
         {!activeReminders.isLoading && list.length === 0 && <EmptyState status={tab} />}
-        {!activeReminders.isLoading && list.map((r) => {
+        {!activeReminders.isLoading && list.map((r, i) => {
           const Icon = iconFor(r.type);
           const urgent = r.daysAway > 0 && r.daysAway < 14;
           const isPending = activeReminders.pendingIds.has(r.id);
@@ -149,6 +149,9 @@ export default function RemindersPage() {
             <motion.div
               key={r.id}
               layout
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, delay: Math.min(i, 8) * 0.04, ease: [0.165, 0.84, 0.44, 1] }}
               className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 grid grid-cols-1 md:grid-cols-[1fr_auto] items-start md:items-center gap-4"
             >
               <div className="flex items-start gap-4 min-w-0">

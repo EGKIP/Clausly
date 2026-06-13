@@ -60,30 +60,32 @@ export function DocumentView({
       <div>
         <DocumentRemindersSection doc={doc} />
 
-        <div className="flex items-center gap-1 p-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] overflow-x-auto scrollbar-none">
-          {tabs.map((t) => {
-            const active = t.id === tab;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  "relative inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
-                  active ? "text-[var(--foreground)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                )}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="doc-tab"
-                    className="absolute inset-0 rounded-[var(--radius-sm)] bg-[var(--surface-2)] border border-[var(--border)]"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-                <t.icon className="relative size-3.5" />
-                <span className="relative">{t.label}</span>
-              </button>
-            );
-          })}
+        <div className="sticky top-16 z-20 -mx-1 px-1 py-2 bg-[color-mix(in_oklch,var(--background)_82%,transparent)] backdrop-blur-md">
+          <div className="flex items-center gap-1 p-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] overflow-x-auto scrollbar-none">
+            {tabs.map((t) => {
+              const active = t.id === tab;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={cn(
+                    "relative inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
+                    active ? "text-[var(--foreground)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                  )}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="doc-tab"
+                      className="absolute inset-0 rounded-[var(--radius-sm)] bg-[var(--surface-2)] border border-[var(--border)]"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <t.icon className="relative size-3.5" />
+                  <span className="relative">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="mt-5">

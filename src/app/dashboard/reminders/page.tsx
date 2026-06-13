@@ -25,6 +25,7 @@ import { DeliveryBadge } from "@/components/dashboard/reminders/delivery-badge";
 import type { Reminder } from "@/lib/mock-reminders";
 import type { ReminderStatus } from "@/lib/mock-reminders";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const tabs: { id: ReminderStatus; label: string; description: string }[] = [
@@ -48,13 +49,27 @@ export default function RemindersPage() {
 
   const handleApprove = React.useCallback(async (id: string) => {
     const saved = await suggested.approve(id);
-    if (saved) void approved.refetch();
+    if (saved) {
+      void approved.refetch();
+      toast.success("Reminder approved.");
+    } else {
+      toast.error("Could not approve reminder.");
+    }
   }, [approved, suggested]);
 
-  const handleSave = React.useCallback((id: string, patch: ReminderMutationPatch) => {
-    return editingReminder?.status === "approved"
-      ? approved.update(id, patch)
-      : suggested.update(id, patch);
+  const handleDismiss = React.useCallback(async (id: string) => {
+    const ok = await suggested.dismiss(id);
+    if (ok) toast.success("Reminder ignored.");
+    else toast.error("Could not ignore reminder.");
+  }, [suggested]);
+
+  const handleSave = React.useCallback(async (id: string, patch: ReminderMutationPatch) => {
+    const result = editingReminder?.status === "approved"
+      ? await approved.update(id, patch)
+      : await suggested.update(id, patch);
+    if (result) toast.success("Reminder updated.");
+    else toast.error("Could not update reminder.");
+    return result;
   }, [approved, editingReminder?.status, suggested]);
 
   if (!docsLoading && documents.length === 0) {
@@ -206,7 +221,7 @@ export default function RemindersPage() {
                       size="sm"
                       aria-label="Ignore"
                       disabled={isPending}
-                      onClick={() => void suggested.dismiss(r.id)}
+                      onClick={() => void handleDismiss(r.id)}
                     >
                       <X className="size-3.5" />
                     </Button>

@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes";
+import { Toaster } from "sonner";
 
 /* ── ThemeProvider ──────────────────────────────────────────────────────
    Wraps the app with next-themes. The `.dark` class on <html> activates
@@ -19,6 +20,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       storageKey="clausly-theme"
     >
       {children}
+      <ThemedToaster />
     </NextThemesProvider>
+  );
+}
+
+/* Mounted inside the theme provider so the toaster receives the resolved
+   theme and matches the rest of the surface. */
+function ThemedToaster() {
+  const { resolvedTheme } = useTheme();
+  return (
+    <Toaster
+      position="bottom-right"
+      theme={(resolvedTheme as "light" | "dark") ?? "light"}
+      closeButton
+      richColors={false}
+      toastOptions={{
+        style: {
+          background: "var(--surface)",
+          color: "var(--foreground)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-md)",
+          boxShadow: "var(--shadow-float)",
+        },
+      }}
+    />
   );
 }

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/lib/auth/actions";
 import type { PlanName } from "@/lib/billing/limits";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 type Profile = {
@@ -84,6 +85,7 @@ export default function SettingsPage() {
       setDisplayName(previous.displayName);
       setStatus("error");
       setMessage(payload.error ?? "Profile could not be saved.");
+      toast.error(payload.error ?? "Profile could not be saved.");
       return;
     }
 
@@ -92,6 +94,7 @@ export default function SettingsPage() {
     setDisplayName(payload.displayName);
     setStatus("saved");
     setMessage("Profile saved.");
+    toast.success("Profile saved.");
   }
 
   async function deleteAccount(event: React.FormEvent<HTMLFormElement>) {

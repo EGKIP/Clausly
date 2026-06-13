@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, UploadCloud, FileText, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 type UploadUsage = {
@@ -98,18 +99,23 @@ export function UploadModal({
         if (controller.signal.aborted) return;
         if (!response.ok) {
           const payload = await response.json().catch(() => ({ error: "Upload failed." }));
-          setLimitError(response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS");
+          const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
+          setLimitError(limit);
           setError(payload.error ?? "Upload failed.");
           setPhase("error");
+          if (!limit) toast.error(payload.error ?? "Upload failed.");
           return;
         }
         const payload = (await response.json()) as { id: string };
         setDocumentId(payload.id);
         setPhase("analyzing");
+        toast.success("Document uploaded. Clausly is reading it now.");
       } catch (uploadError) {
         if (controller.signal.aborted) return;
-        setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+        const message = uploadError instanceof Error ? uploadError.message : "Upload failed.";
+        setError(message);
         setPhase("error");
+        toast.error(message);
       }
     }
     void upload();

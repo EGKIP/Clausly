@@ -9,6 +9,7 @@ import {
 } from "@/components/dashboard/settings/notification-preferences-card";
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/lib/auth/actions";
 import type { PlanName } from "@/lib/billing/limits";
 import { cn } from "@/lib/utils";
@@ -227,14 +228,27 @@ export default function SettingsPage() {
         <section>
           <SectionHeader
             title="Preferences"
-            description="Control notification delivery and default reminder timing."
+            description="Control notification delivery, theme, and default reminder timing."
           />
-          <NotificationPreferencesCard
-            profile={profile}
-            onProfileSaved={(savedProfile) => {
-              setProfile((current) => ({ ...current, ...savedProfile }));
-            }}
-          />
+          <div className="grid gap-4">
+            <Card className="p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[12.5px] font-medium">Appearance</p>
+                  <p className="mt-1 text-[12.5px] text-[var(--muted)]">
+                    System follows your device. Light and dark are explicit.
+                  </p>
+                </div>
+                <ThemeToggle />
+              </div>
+            </Card>
+            <NotificationPreferencesCard
+              profile={profile}
+              onProfileSaved={(savedProfile) => {
+                setProfile((current) => ({ ...current, ...savedProfile }));
+              }}
+            />
+          </div>
         </section>
 
         <section>

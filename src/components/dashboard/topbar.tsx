@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Search, Upload, Bell, Menu, ChevronDown, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggleButton } from "@/components/theme-toggle";
 import { signOut } from "@/lib/auth/actions";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,9 @@ export function Topbar({ onOpenSidebar, onOpenUpload, onOpenSearch }: TopbarProp
         >
           <Upload className="size-4" />
         </Button>
+
+        {/* Theme */}
+        <ThemeToggleButton className="hidden sm:inline-flex" />
 
         {/* Notifications */}
         <button

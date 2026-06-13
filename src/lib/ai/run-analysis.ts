@@ -4,6 +4,7 @@ import { analyzeDocument, getAnalysisModel, getAnalysisProvider } from "./provid
 import { persistAnalysis } from "./persistence";
 import * as pdfText from "./pdf-text";
 import { recordUsage } from "./usage-metrics";
+import { embedDocumentChunks } from "./embeddings";
 
 type AnyClient = SupabaseClient<Database>;
 type PdfTextExtractor = typeof pdfText.extractPdfText;
@@ -96,7 +97,15 @@ export async function runAnalysis(
     });
   }
 
-  return persistAnalysis(supabase, doc.id, userId, result);
+  const persistResult = await persistAnalysis(supabase, doc.id, userId, result);
+  void embedDocumentChunks(supabase, doc.id, userId, text).catch((error) => {
+    console.warn("Document chunk indexing failed after analysis.", {
+      documentId: doc.id,
+      message: error instanceof Error ? error.message : "Unknown indexing error.",
+    });
+  });
+
+  return persistResult;
 }
 
 export async function markAnalysisFailed(

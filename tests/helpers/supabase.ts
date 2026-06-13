@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-type TableName = "users" | "documents" | "clauses" | "dates" | "reminders";
+type TableName = "users" | "documents" | "clauses" | "dates" | "reminders" | "document_chunks" | "usage_metrics";
 type Row = Record<string, any>;
 type TableStore = Record<TableName, Row[]>;
 type TestUser = { id: string; email?: string | null };
@@ -18,6 +18,8 @@ const tables: TableStore = {
   clauses: [],
   dates: [],
   reminders: [],
+  document_chunks: [],
+  usage_metrics: [],
 };
 
 const storage = {
@@ -194,6 +196,22 @@ export function seedReminder(documentId: string, user = userA, overrides: Row = 
   return row;
 }
 
+export function seedDocumentChunk(documentId: string, user = userA, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    user_id: user.id,
+    document_id: documentId,
+    chunk_index: overrides.chunk_index ?? 0,
+    content: "This lease requires 60 days written notice before renewal.",
+    page_number: 2,
+    embedding: Array.from({ length: 1536 }, (_, index) => index / 1536),
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.document_chunks.push(row);
+  return row;
+}
+
 export function jsonRequest(body: unknown, init: RequestInit = {}) {
   return new Request("http://localhost.test", {
     method: init.method ?? "POST",
@@ -217,6 +235,16 @@ export function createSupabaseClient() {
       }),
     },
     rpc: vi.fn(async (name: string, args: Row = {}) => {
+      if (name === "match_document_chunks") {
+        const targetDocumentId = args.target_document_id;
+        const limit = Number(args.match_count ?? 5);
+        const data = tables.document_chunks
+          .filter((row) => isVisible("document_chunks", row) && row.document_id === targetDocumentId)
+          .slice(0, limit)
+          .map((row, index) => ({ ...row, similarity: 0.9 - index * 0.01 }));
+        return { data: clone(data), error: null };
+      }
+
       if (name !== "delete_account") {
         return { data: null, error: { message: "Unknown RPC.", code: "TEST_ERROR" } };
       }
@@ -393,7 +421,7 @@ function isVisible(table: TableName, row: Row) {
 }
 
 function cascadeDocuments(ids: Set<string>) {
-  for (const table of ["clauses", "dates", "reminders"] as TableName[]) {
+  for (const table of ["clauses", "dates", "reminders", "document_chunks"] as TableName[]) {
     tables[table] = tables[table].filter((row) => !ids.has(row.document_id));
   }
 }

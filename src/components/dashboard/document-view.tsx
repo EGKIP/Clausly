@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Send,
   Sparkles,
-  CheckCircle2,
   Upload,
 } from "lucide-react";
 import type { ContractDoc } from "@/lib/mock-data";
@@ -103,7 +102,7 @@ export function DocumentView({
               )}
               {tab === "dates" && <DatesPanel doc={doc} />}
               {tab === "reminders" && <RemindersPanel reminders={reminders} />}
-              {tab === "ask" && <AskPanel docTitle={doc.title} />}
+              {tab === "ask" && <AskPanel docId={doc.id} docTitle={doc.title} />}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -347,22 +346,71 @@ function RemindersPanel({ reminders }: { reminders: Reminder[] }) {
 }
 
 /* ── Ask Clausly ────────────────────────────────────────────────────── */
-function AskPanel({ docTitle }: { docTitle: string }) {
+function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
   const suggestions = [
     "What happens if I move out early?",
     "When do I have to notify the landlord?",
     "Are there any auto-renewal traps?",
     "What's the worst-case financial outcome?",
   ];
+  const [question, setQuestion] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [result, setResult] = React.useState<{
+    answer: string;
+    citations: Array<{ chunkId: string; pageNumber: number | null; snippet: string }>;
+  } | null>(null);
+
+  async function askQuestion(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const trimmed = question.trim();
+    if (trimmed.length < 3 || loading) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/documents/${docId}/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: trimmed }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        setError(body?.error ?? "Ask Clausly could not answer that yet.");
+        return;
+      }
+      setResult(body);
+    } catch {
+      setError("Ask Clausly could not answer that yet.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6">
-      <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            Ask Clausly
+          </p>
+          <p className="mt-2 text-[14px] leading-relaxed text-[var(--muted)]">
+            Ask a grounded question about <span className="font-medium text-[var(--foreground)]">{docTitle}</span>.
+            Answers cite indexed excerpts and are informational only.
+          </p>
+        </div>
+        <Sparkles className="mt-1 size-4 shrink-0 text-[var(--accent)]" />
+      </div>
+
+      <p className="mt-6 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
         Suggested questions
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {suggestions.map((s) => (
           <button
             key={s}
+            type="button"
+            onClick={() => setQuestion(s)}
             className="text-left text-[13px] rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
           >
             {s}
@@ -370,29 +418,73 @@ function AskPanel({ docTitle }: { docTitle: string }) {
         ))}
       </div>
 
-      <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
-          Example answer
-        </p>
-        <p className="mt-2 text-[14px] leading-relaxed">
-          Based on <span className="font-medium">{docTitle}</span>, breaking the lease
-          early costs two months&apos; rent plus your security deposit — about $5,550.
-          The early termination clause is on page 9.
-        </p>
-        <p className="mt-3 inline-flex items-center gap-1.5 text-[11.5px] text-[var(--accent-ink)]">
-          <CheckCircle2 className="size-3" /> Cited from clause &ldquo;Early termination&rdquo; (p. 9)
-        </p>
-      </div>
-
-      <div className="mt-5 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background)] p-2">
+      <form
+        onSubmit={askQuestion}
+        className="mt-5 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background)] p-2"
+      >
         <input
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
           placeholder="Ask anything about this document…"
           className="flex-1 bg-transparent px-2 py-2 text-[14px] focus:outline-none placeholder:text-[var(--faint)]"
         />
-        <Button variant="primary" size="sm" aria-label="Send">
-          <Send className="size-3.5" />
+        <Button variant="primary" size="sm" aria-label="Send" disabled={loading || question.trim().length < 3}>
+          {loading ? (
+            <span className="size-3.5 rounded-full border border-current border-t-transparent motion-safe:animate-spin" />
+          ) : (
+            <Send className="size-3.5" />
+          )}
         </Button>
-      </div>
+      </form>
+
+      {loading && (
+        <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
+          <div className="h-3 w-24 rounded-full bg-[var(--border)]" />
+          <div className="mt-4 space-y-2">
+            <div className="h-3 w-full rounded-full bg-[var(--border)]" />
+            <div className="h-3 w-5/6 rounded-full bg-[var(--border)]" />
+            <div className="h-3 w-2/3 rounded-full bg-[var(--border)]" />
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-5 rounded-[var(--radius-md)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] p-4">
+          <p className="text-[13px] leading-relaxed text-[var(--color-coral-ink)]">{error}</p>
+          <button
+            type="button"
+            onClick={() => void askQuestion()}
+            className="mt-3 text-[12px] font-medium text-[var(--color-coral-ink)] underline underline-offset-4"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && result && (
+        <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            Answer
+          </p>
+          <p className="mt-2 text-[14px] leading-relaxed">{result.answer}</p>
+
+          {result.citations.length > 0 && (
+            <div className="mt-5 space-y-2">
+              {result.citations.map((citation) => (
+                <div
+                  key={citation.chunkId}
+                  className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] p-3"
+                >
+                  <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--accent-ink)]">
+                    {citation.pageNumber ? `Page ${citation.pageNumber}` : "Indexed excerpt"}
+                  </p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-[var(--muted)]">{citation.snippet}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

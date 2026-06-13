@@ -11,6 +11,7 @@ import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/actions";
 import type { PlanName } from "@/lib/billing/limits";
+import { cn } from "@/lib/utils";
 
 type Profile = {
   displayName: string;
@@ -205,7 +206,11 @@ export default function SettingsPage() {
                     {profile.usage.documents.current} / {formatDocumentLimit(profile.usage.documents.limit)}
                   </span>
                 </p>
-                <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
+                <DocumentUsageBar
+                  current={profile.usage.documents.current}
+                  limit={profile.usage.documents.limit}
+                />
+                <p className="mt-3 text-[12.5px] leading-relaxed text-[var(--muted)]">
                   Pro unlocks unlimited documents, portfolio insights, and priority processing.
                 </p>
               </div>
@@ -330,4 +335,29 @@ export default function SettingsPage() {
 
 function formatDocumentLimit(limit: number | null) {
   return limit === null ? "Unlimited" : limit;
+}
+
+function DocumentUsageBar({ current, limit }: { current: number; limit: number | null }) {
+  if (limit === null) return null;
+  const safeLimit = Math.max(limit, 1);
+  const pct = Math.min(100, Math.round((current / safeLimit) * 100));
+  const warning = pct >= 80;
+  return (
+    <div
+      className="mt-3 h-1.5 w-full max-w-[280px] overflow-hidden rounded-full bg-[var(--surface-2)]"
+      role="progressbar"
+      aria-valuenow={current}
+      aria-valuemin={0}
+      aria-valuemax={limit}
+      aria-label={`${current} of ${limit} documents used`}
+    >
+      <div
+        className={cn(
+          "h-full rounded-full transition-[width,background-color] duration-500 ease-[var(--ease-out-quart)]",
+          warning ? "bg-[var(--color-coral)]" : "bg-[var(--accent)]"
+        )}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
 }

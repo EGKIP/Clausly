@@ -34,9 +34,6 @@ export function getQAProvider(): QAProvider {
 }
 
 export function getQAProviderName(): QAProviderName {
-  const configured = process.env.CLAUSLY_QA_PROVIDER?.trim().toLowerCase();
-  if (configured === "openai" || configured === "mock") return configured;
-
   const aiProvider = process.env.CLAUSLY_AI_PROVIDER?.trim().toLowerCase();
   if (aiProvider === "openai") return "openai";
 
@@ -44,7 +41,7 @@ export function getQAProviderName(): QAProviderName {
 }
 
 export function getQAModel(): string {
-  return process.env.CLAUSLY_QA_MODEL?.trim() || process.env.CLAUSLY_AI_MODEL?.trim() || "gpt-4o-mini";
+  return process.env.CLAUSLY_AI_MODEL?.trim() || "gpt-4o-mini";
 }
 
 export async function answerWithMockProvider(input: QAInput): Promise<QAResult> {

@@ -219,7 +219,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               {profile.plan === "free" && (
-                <Button href="/upgrade" variant="primary" size="md">
+                <Button href="/upgrade" variant="primary" size="md" className="w-full md:w-auto">
                   <Sparkles className="size-3.5" />
                   Upgrade to Pro
                 </Button>

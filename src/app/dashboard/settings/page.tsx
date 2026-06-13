@@ -9,8 +9,11 @@ import {
 } from "@/components/dashboard/settings/notification-preferences-card";
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/lib/auth/actions";
 import type { PlanName } from "@/lib/billing/limits";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Profile = {
   displayName: string;
@@ -82,6 +85,7 @@ export default function SettingsPage() {
       setDisplayName(previous.displayName);
       setStatus("error");
       setMessage(payload.error ?? "Profile could not be saved.");
+      toast.error(payload.error ?? "Profile could not be saved.");
       return;
     }
 
@@ -90,6 +94,7 @@ export default function SettingsPage() {
     setDisplayName(payload.displayName);
     setStatus("saved");
     setMessage("Profile saved.");
+    toast.success("Profile saved.");
   }
 
   async function deleteAccount(event: React.FormEvent<HTMLFormElement>) {
@@ -205,12 +210,16 @@ export default function SettingsPage() {
                     {profile.usage.documents.current} / {formatDocumentLimit(profile.usage.documents.limit)}
                   </span>
                 </p>
-                <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
+                <DocumentUsageBar
+                  current={profile.usage.documents.current}
+                  limit={profile.usage.documents.limit}
+                />
+                <p className="mt-3 text-[12.5px] leading-relaxed text-[var(--muted)]">
                   Pro unlocks unlimited documents, portfolio insights, and priority processing.
                 </p>
               </div>
               {profile.plan === "free" && (
-                <Button href="/upgrade" variant="primary" size="md">
+                <Button href="/upgrade" variant="primary" size="md" className="w-full md:w-auto">
                   <Sparkles className="size-3.5" />
                   Upgrade to Pro
                 </Button>
@@ -222,14 +231,27 @@ export default function SettingsPage() {
         <section>
           <SectionHeader
             title="Preferences"
-            description="Control notification delivery and default reminder timing."
+            description="Control notification delivery, theme, and default reminder timing."
           />
-          <NotificationPreferencesCard
-            profile={profile}
-            onProfileSaved={(savedProfile) => {
-              setProfile((current) => ({ ...current, ...savedProfile }));
-            }}
-          />
+          <div className="grid gap-4">
+            <Card className="p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[12.5px] font-medium">Appearance</p>
+                  <p className="mt-1 text-[12.5px] text-[var(--muted)]">
+                    System follows your device. Light and dark are explicit.
+                  </p>
+                </div>
+                <ThemeToggle />
+              </div>
+            </Card>
+            <NotificationPreferencesCard
+              profile={profile}
+              onProfileSaved={(savedProfile) => {
+                setProfile((current) => ({ ...current, ...savedProfile }));
+              }}
+            />
+          </div>
         </section>
 
         <section>
@@ -330,4 +352,29 @@ export default function SettingsPage() {
 
 function formatDocumentLimit(limit: number | null) {
   return limit === null ? "Unlimited" : limit;
+}
+
+function DocumentUsageBar({ current, limit }: { current: number; limit: number | null }) {
+  if (limit === null) return null;
+  const safeLimit = Math.max(limit, 1);
+  const pct = Math.min(100, Math.round((current / safeLimit) * 100));
+  const warning = pct >= 80;
+  return (
+    <div
+      className="mt-3 h-1.5 w-full max-w-[280px] overflow-hidden rounded-full bg-[var(--surface-2)]"
+      role="progressbar"
+      aria-valuenow={current}
+      aria-valuemin={0}
+      aria-valuemax={limit}
+      aria-label={`${current} of ${limit} documents used`}
+    >
+      <div
+        className={cn(
+          "h-full rounded-full transition-[width,background-color] duration-500 ease-[var(--ease-out-quart)]",
+          warning ? "bg-[var(--color-coral)]" : "bg-[var(--accent)]"
+        )}
+        style={{ width: `${pct}%` }}
+      />
+    </div>
+  );
 }

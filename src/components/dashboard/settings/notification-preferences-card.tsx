@@ -4,6 +4,7 @@ import * as React from "react";
 import { Bell, CheckCircle2, Mail, Save } from "lucide-react";
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { notificationPreferencesSchema } from "@/lib/validation/schemas";
 import type { z } from "zod";
@@ -56,6 +57,7 @@ export function NotificationPreferencesCard({
       const payload = await response.json().catch(() => ({ error: "Preferences could not be saved." }));
       setStatus("error");
       setMessage(payload.error ?? "Preferences could not be saved.");
+      toast.error(payload.error ?? "Preferences could not be saved.");
       return;
     }
 
@@ -63,6 +65,7 @@ export function NotificationPreferencesCard({
     onProfileSaved(payload);
     setStatus("saved");
     setMessage("Notification preferences saved.");
+    toast.success("Notification preferences saved.");
   }
 
   return (

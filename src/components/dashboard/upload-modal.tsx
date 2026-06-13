@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, UploadCloud, FileText, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 type UploadUsage = {
@@ -98,18 +99,23 @@ export function UploadModal({
         if (controller.signal.aborted) return;
         if (!response.ok) {
           const payload = await response.json().catch(() => ({ error: "Upload failed." }));
-          setLimitError(response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS");
+          const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
+          setLimitError(limit);
           setError(payload.error ?? "Upload failed.");
           setPhase("error");
+          if (!limit) toast.error(payload.error ?? "Upload failed.");
           return;
         }
         const payload = (await response.json()) as { id: string };
         setDocumentId(payload.id);
         setPhase("analyzing");
+        toast.success("Document uploaded. Clausly is reading it now.");
       } catch (uploadError) {
         if (controller.signal.aborted) return;
-        setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+        const message = uploadError instanceof Error ? uploadError.message : "Upload failed.";
+        setError(message);
         setPhase("error");
+        toast.error(message);
       }
     }
     void upload();
@@ -155,9 +161,9 @@ export function UploadModal({
             onClick={(e) => e.stopPropagation()}
             className="relative w-full max-w-[560px] rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)] overflow-hidden"
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-              <div>
-                <h2 className="font-serif text-[22px] leading-none tracking-[-0.01em]">
+            <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-[var(--border)]">
+              <div className="min-w-0">
+                <h2 className="font-serif text-[20px] sm:text-[22px] leading-none tracking-[-0.01em]">
                   Upload a document
                 </h2>
                 <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
@@ -174,7 +180,7 @@ export function UploadModal({
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-5 sm:p-6">
               {phase === "idle" && (
                 <>
                   {usage?.plan === "free" && (
@@ -188,7 +194,7 @@ export function UploadModal({
                     onDragLeave={() => setDrag(false)}
                     onDrop={onDrop}
                     className={cn(
-                      "block rounded-[var(--radius-lg)] border-2 border-dashed cursor-pointer transition-colors p-10 text-center",
+                      "block rounded-[var(--radius-lg)] border-2 border-dashed cursor-pointer transition-colors p-7 sm:p-10 text-center",
                       usage?.plan === "free" && "mt-3",
                       atDocumentLimit && "cursor-not-allowed opacity-65",
                       drag
@@ -271,7 +277,7 @@ export function UploadModal({
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--border)] bg-[var(--surface-2)]">
+            <div className="flex items-center justify-end gap-2 px-5 sm:px-6 py-4 border-t border-[var(--border)] bg-[var(--surface-2)]">
               <Button variant="ghost" size="sm" onClick={onClose}>
                 Cancel
               </Button>

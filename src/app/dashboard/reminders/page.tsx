@@ -24,6 +24,8 @@ import { ReminderEditModal } from "@/components/dashboard/reminders/reminder-edi
 import { DeliveryBadge } from "@/components/dashboard/reminders/delivery-badge";
 import type { Reminder } from "@/lib/mock-reminders";
 import type { ReminderStatus } from "@/lib/mock-reminders";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const tabs: { id: ReminderStatus; label: string; description: string }[] = [
@@ -47,13 +49,27 @@ export default function RemindersPage() {
 
   const handleApprove = React.useCallback(async (id: string) => {
     const saved = await suggested.approve(id);
-    if (saved) void approved.refetch();
+    if (saved) {
+      void approved.refetch();
+      toast.success("Reminder approved.");
+    } else {
+      toast.error("Could not approve reminder.");
+    }
   }, [approved, suggested]);
 
-  const handleSave = React.useCallback((id: string, patch: ReminderMutationPatch) => {
-    return editingReminder?.status === "approved"
-      ? approved.update(id, patch)
-      : suggested.update(id, patch);
+  const handleDismiss = React.useCallback(async (id: string) => {
+    const ok = await suggested.dismiss(id);
+    if (ok) toast.success("Reminder ignored.");
+    else toast.error("Could not ignore reminder.");
+  }, [suggested]);
+
+  const handleSave = React.useCallback(async (id: string, patch: ReminderMutationPatch) => {
+    const result = editingReminder?.status === "approved"
+      ? await approved.update(id, patch)
+      : await suggested.update(id, patch);
+    if (result) toast.success("Reminder updated.");
+    else toast.error("Could not update reminder.");
+    return result;
   }, [approved, editingReminder?.status, suggested]);
 
   if (!docsLoading && documents.length === 0) {
@@ -125,7 +141,7 @@ export default function RemindersPage() {
         {activeReminders.isLoading && <LoadingState />}
         {activeReminders.error && <InlineError message={activeReminders.error} />}
         {!activeReminders.isLoading && list.length === 0 && <EmptyState status={tab} />}
-        {!activeReminders.isLoading && list.map((r) => {
+        {!activeReminders.isLoading && list.map((r, i) => {
           const Icon = iconFor(r.type);
           const urgent = r.daysAway > 0 && r.daysAway < 14;
           const isPending = activeReminders.pendingIds.has(r.id);
@@ -133,6 +149,9 @@ export default function RemindersPage() {
             <motion.div
               key={r.id}
               layout
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, delay: Math.min(i, 8) * 0.04, ease: [0.165, 0.84, 0.44, 1] }}
               className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 grid grid-cols-1 md:grid-cols-[1fr_auto] items-start md:items-center gap-4"
             >
               <div className="flex items-start gap-4 min-w-0">
@@ -205,7 +224,7 @@ export default function RemindersPage() {
                       size="sm"
                       aria-label="Ignore"
                       disabled={isPending}
-                      onClick={() => void suggested.dismiss(r.id)}
+                      onClick={() => void handleDismiss(r.id)}
                     >
                       <X className="size-3.5" />
                     </Button>
@@ -249,8 +268,21 @@ function LoadingState() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="h-[120px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] animate-pulse"
-        />
+          className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 grid grid-cols-1 md:grid-cols-[1fr_auto] items-center gap-4"
+        >
+          <div className="flex items-start gap-4 min-w-0">
+            <Skeleton variant="block" className="size-11 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <Skeleton className="h-4 w-3/5" />
+              <Skeleton className="h-3 w-2/5" />
+              <Skeleton className="h-3 w-4/5" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 justify-end">
+            <Skeleton variant="pill" className="w-20 h-8" />
+            <Skeleton variant="pill" className="w-20 h-8" />
+          </div>
+        </div>
       ))}
     </>
   );

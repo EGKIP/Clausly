@@ -193,6 +193,18 @@
 .animate-pulse-soft { animation: pulse-soft 3s ease-in-out infinite; }
 .animate-marquee { animation: marquee 40s linear infinite; }
 
+.animate-skeleton-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0,
+    color-mix(in oklch, var(--foreground) 6%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

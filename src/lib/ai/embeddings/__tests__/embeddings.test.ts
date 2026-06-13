@@ -16,6 +16,8 @@ import {
   userA,
 } from "@/../tests/helpers/supabase";
 
+type EmbedSupabaseClient = Parameters<typeof embedDocumentChunks>[0];
+
 describe("embedding providers", () => {
   const originalEnv = process.env;
 
@@ -61,7 +63,7 @@ describe("embedDocumentChunks", () => {
   });
 
   it("caps embedding batches at 100 chunks", async () => {
-    const supabase = createSupabaseClient() as any;
+    const supabase = createSupabaseClient() as unknown as EmbedSupabaseClient;
     const document = seedDocument(userA);
     const provider = vi.fn(async (texts: string[]) => texts.map(() => createMockEmbedding("batch")));
     const fullText = Array.from({ length: 101 }, (_, index) => `Paragraph ${index} ${"x".repeat(1500)}`).join("\n\n");
@@ -75,7 +77,7 @@ describe("embedDocumentChunks", () => {
   });
 
   it("replaces existing chunks when re-indexing", async () => {
-    const supabase = createSupabaseClient() as any;
+    const supabase = createSupabaseClient() as unknown as EmbedSupabaseClient;
     const document = seedDocument(userA);
     seedDocumentChunk(document.id, userA, {
       chunk_index: 0,
@@ -102,7 +104,7 @@ describe("embedDocumentChunks", () => {
   });
 
   it("returns zero indexed chunks instead of throwing on provider errors", async () => {
-    const supabase = createSupabaseClient() as any;
+    const supabase = createSupabaseClient() as unknown as EmbedSupabaseClient;
     const document = seedDocument(userA);
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
 

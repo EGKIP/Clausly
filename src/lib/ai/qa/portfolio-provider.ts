@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { QAResult } from "./provider";
+import { parseOpenAISse, type QAStreamEvent } from "./stream";
 
 export type PortfolioQAChunk = {
   id: string;
@@ -31,6 +32,13 @@ export function getPortfolioQAProvider(): PortfolioQAProvider {
   return answerPortfolioWithMockProvider;
 }
 
+export function getPortfolioQAStreamProvider(): (input: PortfolioQAInput) => AsyncIterable<QAStreamEvent> {
+  if (process.env.CLAUSLY_AI_PROVIDER?.trim().toLowerCase() === "openai") {
+    return streamPortfolioWithOpenAIProvider;
+  }
+  return (input) => streamPortfolioWithMockProvider(input);
+}
+
 export async function answerPortfolioWithMockProvider(input: PortfolioQAInput): Promise<QAResult> {
   const firstChunk = input.chunks[0];
   if (!firstChunk) {
@@ -53,9 +61,59 @@ export async function answerPortfolioWithOpenAIProvider(input: PortfolioQAInput)
   }
 
   return answerWithRetry(async (schemaError) => {
-    const response = await postOpenAI(apiKey, getQAModel(), input, schemaError);
+    const response = await postOpenAIJson(apiKey, getQAModel(), input, schemaError);
     return parseJson(extractText(response));
   });
+}
+
+export async function* streamPortfolioWithMockProvider(
+  input: PortfolioQAInput,
+  options: { delayMs?: number } = {},
+): AsyncIterable<QAStreamEvent> {
+  const result = await answerPortfolioWithMockProvider(input);
+  const words = result.answer.split(/\s+/).filter(Boolean);
+
+  for (const [index, word] of words.entries()) {
+    if ((options.delayMs ?? 10) > 0) {
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs ?? 10));
+    }
+    yield { type: "token", text: index === 0 ? word : ` ${word}` };
+  }
+
+  yield { type: "done" };
+}
+
+export async function* streamPortfolioWithOpenAIProvider(input: PortfolioQAInput): AsyncIterable<QAStreamEvent> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    yield { type: "error", message: "OpenAI portfolio QA streaming provider requires OPENAI_API_KEY." };
+    return;
+  }
+
+  let response: Response;
+  try {
+    response = await postOpenAI(apiKey, getQAModel(), input, undefined, true);
+  } catch (error) {
+    yield { type: "error", message: error instanceof Error ? error.message : "OpenAI portfolio QA streaming request failed." };
+    return;
+  }
+
+  if (!response.ok) {
+    yield { type: "error", message: `OpenAI portfolio QA streaming request failed with HTTP ${response.status}.` };
+    return;
+  }
+
+  if (!response.body) {
+    yield { type: "error", message: "OpenAI portfolio QA streaming response did not include a body." };
+    return;
+  }
+
+  for await (const event of parseOpenAISse(response.body)) {
+    yield event;
+    if (event.type === "done" || event.type === "error") return;
+  }
+
+  yield { type: "done" };
 }
 
 async function answerWithRetry(call: (schemaError?: string) => Promise<unknown>): Promise<QAResult> {
@@ -79,7 +137,8 @@ async function postOpenAI(
   model: string,
   input: PortfolioQAInput,
   schemaError?: string,
-): Promise<{ output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }> {
+  stream = false,
+): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -98,6 +157,7 @@ async function postOpenAI(
           { role: "user", content: userPrompt(input) },
         ],
         text: { format: { type: "json_object" } },
+        ...(stream ? { stream: true } : {}),
       }),
     });
 
@@ -105,7 +165,7 @@ async function postOpenAI(
       throw new Error(`OpenAI portfolio QA request failed with HTTP ${response.status}.`);
     }
 
-    return await response.json();
+    return response;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error("OpenAI portfolio QA request timed out after 60 seconds.");
@@ -114,6 +174,16 @@ async function postOpenAI(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function postOpenAIJson(
+  apiKey: string,
+  model: string,
+  input: PortfolioQAInput,
+  schemaError?: string,
+): Promise<{ output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }> {
+  const response = await postOpenAI(apiKey, model, input, schemaError);
+  return await response.json();
 }
 
 function systemPrompt(schemaError?: string): string {

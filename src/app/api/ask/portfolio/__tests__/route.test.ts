@@ -12,10 +12,12 @@ import {
 } from "@/../tests/helpers/supabase";
 
 const qaProviderMock = vi.hoisted(() => vi.fn());
+const qaStreamProviderMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 vi.mock("@/lib/ai/qa/portfolio-provider", () => ({
   getPortfolioQAProvider: () => qaProviderMock,
+  getPortfolioQAStreamProvider: () => qaStreamProviderMock,
 }));
 
 import { POST } from "../route";
@@ -27,6 +29,11 @@ describe("POST /api/ask/portfolio", () => {
     qaProviderMock.mockResolvedValue({
       answer: "Greenfield Lease and Acme NDA are both relevant.",
       citationChunkIds: ["lease-chunk", "nda-chunk"],
+    });
+    qaStreamProviderMock.mockImplementation(async function* () {
+      yield { type: "token", text: "Greenfield" };
+      yield { type: "token", text: " Lease" };
+      yield { type: "done" };
     });
   });
 
@@ -114,6 +121,42 @@ describe("POST /api/ask/portfolio", () => {
         },
       ],
     });
+    expect(db().usage_metrics).toHaveLength(1);
+    expect(db().usage_metrics[0]).toMatchObject({
+      user_id: userA.id,
+      document_id: null,
+      job_type: "qa_portfolio",
+      status: "completed",
+    });
+  });
+
+  it("streams portfolio citations, token frames, and done when requested", async () => {
+    const lease = seedDocument(userA, { id: "lease-doc", title: "Greenfield Lease" });
+    const nda = seedDocument(userA, { id: "nda-doc", title: "Acme NDA" });
+    seedDocumentChunk(lease.id, userA, {
+      id: "lease-chunk",
+      content: "Greenfield Lease expires on 2026-09-01 unless renewed.",
+      page_number: 2,
+    });
+    seedDocumentChunk(nda.id, userA, {
+      id: "nda-chunk",
+      content: "Acme NDA confidentiality obligations survive until 2027-01-01.",
+      page_number: 4,
+    });
+
+    const response = await POST(jsonRequest(
+      { question: "Which contracts expire soonest?" },
+      { headers: { Accept: "text/event-stream" } },
+    ));
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    expect(body).toContain("event: citations");
+    expect(body).toContain('"documentTitle":"Greenfield Lease"');
+    expect(body).toContain('"documentTitle":"Acme NDA"');
+    expect(body).toContain("event: token");
+    expect(body).toContain("event: done");
     expect(db().usage_metrics).toHaveLength(1);
     expect(db().usage_metrics[0]).toMatchObject({
       user_id: userA.id,

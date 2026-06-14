@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getEmbeddingModel, getEmbeddingProvider, getEmbeddingProviderName } from "@/lib/ai/embeddings/provider";
-import { getPortfolioQAProvider, type PortfolioQAChunk } from "@/lib/ai/qa/portfolio-provider";
+import { encodeSseFrame } from "@/lib/ai/qa/sse";
+import {
+  getPortfolioQAProvider,
+  getPortfolioQAStreamProvider,
+  type PortfolioQAChunk,
+} from "@/lib/ai/qa/portfolio-provider";
 import { createClient } from "@/lib/supabase/server";
 
 const questionSchema = z.object({
@@ -21,25 +26,19 @@ type DocumentTitle = {
 };
 
 export async function POST(request: Request) {
+  const wantsStream = request.headers.get("accept")?.includes("text/event-stream") ?? false;
+
   if (!hasSupabaseEnv()) {
+    if (wantsStream) {
+      return streamMockPortfolioResponse({
+        answer: "Portfolio Ask is running in demo mode. Connect Supabase to answer across indexed documents.",
+        citations: demoCitations(),
+      });
+    }
+
     return NextResponse.json({
       answer: "Portfolio Ask is running in demo mode. Connect Supabase to answer across indexed documents.",
-      citations: [
-        {
-          documentId: "demo-lease",
-          documentTitle: "Demo Lease",
-          chunkId: "demo-lease-chunk",
-          pageNumber: 2,
-          snippet: "The demo lease renews unless notice is sent before the deadline.",
-        },
-        {
-          documentId: "demo-nda",
-          documentTitle: "Demo NDA",
-          chunkId: "demo-nda-chunk",
-          pageNumber: 1,
-          snippet: "The demo NDA keeps confidentiality obligations active after termination.",
-        },
-      ],
+      citations: demoCitations(),
     });
   }
 
@@ -97,6 +96,23 @@ export async function POST(request: Request) {
     content: chunk.content,
     pageNumber: chunk.page_number,
   }));
+  const allCitations = chunks.map((chunk) => ({
+    documentId: chunk.documentId,
+    documentTitle: chunk.documentTitle,
+    chunkId: chunk.id,
+    pageNumber: chunk.pageNumber ?? null,
+    snippet: chunk.content.slice(0, 200),
+  }));
+
+  if (wantsStream) {
+    return streamPortfolioResponse({
+      supabase,
+      userId: user.id,
+      question: parsed.data.question,
+      chunks,
+      citations: allCitations,
+    });
+  }
 
   const qaResult = await getPortfolioQAProvider()({
     question: parsed.data.question,
@@ -125,9 +141,108 @@ export async function POST(request: Request) {
   });
 }
 
+function streamPortfolioResponse(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  question: string;
+  chunks: PortfolioQAChunk[];
+  citations: Array<{
+    documentId: string;
+    documentTitle: string;
+    chunkId: string;
+    pageNumber: number | null;
+    snippet: string;
+  }>;
+}) {
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      async start(controller) {
+        let answer = "";
+        controller.enqueue(encodeSseFrame("citations", { citations: input.citations }));
+
+        try {
+          for await (const event of getPortfolioQAStreamProvider()({
+            question: input.question,
+            chunks: input.chunks,
+          })) {
+            if (event.type === "token") {
+              answer += event.text;
+              controller.enqueue(encodeSseFrame("token", { text: event.text }));
+            } else if (event.type === "error") {
+              controller.enqueue(encodeSseFrame("error", { message: event.message }));
+              await recordPortfolioUsage(input.supabase, {
+                userId: input.userId,
+                inputChars: input.question.length + input.chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
+                outputChars: answer.length,
+                status: "failed",
+                errorMessage: event.message,
+              });
+              controller.close();
+              return;
+            } else {
+              await recordPortfolioUsage(input.supabase, {
+                userId: input.userId,
+                inputChars: input.question.length + input.chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
+                outputChars: answer.length,
+              });
+              controller.enqueue(encodeSseFrame("done", {}));
+              controller.close();
+              return;
+            }
+          }
+
+          controller.enqueue(encodeSseFrame("done", {}));
+          controller.close();
+        } catch (error) {
+          controller.enqueue(encodeSseFrame("error", {
+            message: error instanceof Error ? error.message : "Portfolio Ask streaming failed.",
+          }));
+          controller.close();
+        }
+      },
+    }),
+    {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    },
+  );
+}
+
+function streamMockPortfolioResponse(input: { answer: string; citations: ReturnType<typeof demoCitations> }) {
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(encodeSseFrame("citations", { citations: input.citations }));
+        for (const [index, word] of input.answer.split(/\s+/).filter(Boolean).entries()) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          controller.enqueue(encodeSseFrame("token", { text: index === 0 ? word : ` ${word}` }));
+        }
+        controller.enqueue(encodeSseFrame("done", {}));
+        controller.close();
+      },
+    }),
+    {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    },
+  );
+}
+
 async function recordPortfolioUsage(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  input: { userId: string; inputChars: number; outputChars: number },
+  input: {
+    userId: string;
+    inputChars: number;
+    outputChars: number;
+    status?: "completed" | "failed";
+    errorMessage?: string | null;
+  },
 ) {
   const embeddingProvider = getEmbeddingProviderName();
   const embeddingModel = embeddingProvider === "openai" ? getEmbeddingModel() : "mock";
@@ -141,8 +256,8 @@ async function recordPortfolioUsage(
       model: `embedding=${embeddingProvider}/${embeddingModel}`,
       input_token_count: Math.ceil(input.inputChars / 4),
       output_token_count: Math.ceil(input.outputChars / 4),
-      status: "completed",
-      error_message: null,
+      status: input.status ?? "completed",
+      error_message: input.errorMessage ?? null,
     });
   } catch (error) {
     console.warn("Portfolio Q&A usage metric insert failed.", {
@@ -150,6 +265,25 @@ async function recordPortfolioUsage(
       message: error instanceof Error ? error.message : "Unknown usage metric error.",
     });
   }
+}
+
+function demoCitations() {
+  return [
+    {
+      documentId: "demo-lease",
+      documentTitle: "Demo Lease",
+      chunkId: "demo-lease-chunk",
+      pageNumber: 2,
+      snippet: "The demo lease renews unless notice is sent before the deadline.",
+    },
+    {
+      documentId: "demo-nda",
+      documentTitle: "Demo NDA",
+      chunkId: "demo-nda-chunk",
+      pageNumber: 1,
+      snippet: "The demo NDA keeps confidentiality obligations active after termination.",
+    },
+  ];
 }
 
 function hasSupabaseEnv() {

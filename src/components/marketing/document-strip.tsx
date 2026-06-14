@@ -1,6 +1,7 @@
 "use client";
 
 import { Container } from "@/components/ui/primitives";
+import { Reveal } from "@/components/ui/reveal";
 
 const docs = [
   "Apartment leases",
@@ -24,12 +25,16 @@ export function DocumentStrip() {
   return (
     <section className="relative py-10 md:py-14 border-y border-[var(--border)] bg-[var(--surface)]">
       <Container className="mb-6">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--faint)] text-center">
-          Built for the documents that quietly run your life
-        </p>
+        <Reveal y={10}>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-[var(--faint)] text-center">
+            Built for the documents that quietly run your life
+          </p>
+        </Reveal>
       </Container>
 
-      <div
+      <Reveal
+        delay={0.08}
+        y={10}
         className="relative overflow-hidden"
         style={{
           maskImage:
@@ -49,7 +54,7 @@ export function DocumentStrip() {
             </span>
           ))}
         </div>
-      </div>
+      </Reveal>
     </section>
   );
 }

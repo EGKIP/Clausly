@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { formatSchemaError, qaSystemPrompt, qaUserPrompt } from "./prompts";
 
 export type QAChunk = {
   id: string;
@@ -103,8 +104,8 @@ async function postOpenAI(
       body: JSON.stringify({
         model,
         input: [
-          { role: "system", content: systemPrompt(schemaError) },
-          { role: "user", content: userPrompt(input) },
+          { role: "system", content: qaSystemPrompt(schemaError) },
+          { role: "user", content: qaUserPrompt(input) },
         ],
         text: { format: { type: "json_object" } },
       }),
@@ -125,29 +126,6 @@ async function postOpenAI(
   }
 }
 
-function systemPrompt(schemaError?: string): string {
-  return [
-    "You answer questions about ONE contract document using ONLY the provided excerpts.",
-    "Cite the excerpt IDs you used in citationChunkIds.",
-    "If the excerpts do not contain the answer, say so plainly and return an empty citationChunkIds array.",
-    "Clausly provides contract intelligence and reminders, not legal advice.",
-    "Return only JSON with answer and citationChunkIds.",
-    schemaError ? `Previous JSON failed validation. Correct this schema error: ${schemaError}` : "",
-  ].filter(Boolean).join("\n");
-}
-
-function userPrompt(input: QAInput): string {
-  return [
-    `Question: ${input.question}`,
-    "Excerpts:",
-    ...input.chunks.map((chunk) => [
-      `Excerpt ID: ${chunk.id}`,
-      `Page: ${chunk.pageNumber ?? "unknown"}`,
-      chunk.content,
-    ].join("\n")),
-  ].join("\n\n");
-}
-
 function extractText(response: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }): string {
   if (response.output_text) return response.output_text;
 
@@ -166,12 +144,4 @@ function parseJson(value: string): unknown {
   } catch {
     throw new Error("OpenAI QA response was not valid JSON.");
   }
-}
-
-function formatSchemaError(error: z.ZodError): string {
-  return error.issues
-    .slice(0, 8)
-    .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
-    .join("; ")
-    .slice(0, 500);
 }

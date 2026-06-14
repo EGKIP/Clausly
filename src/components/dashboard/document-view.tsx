@@ -360,6 +360,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
     answer: string;
     citations: Array<{ chunkId: string; pageNumber: number | null; snippet: string }>;
   } | null>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   async function askQuestion(event?: React.FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -368,22 +369,81 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
 
     setLoading(true);
     setError(null);
+    setResult({ answer: "", citations: [] });
     try {
       const response = await fetch(`/api/documents/${docId}/ask`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
         body: JSON.stringify({ question: trimmed }),
       });
-      const body = await response.json();
+
       if (!response.ok) {
+        const body = await response.json().catch(() => null);
         setError(body?.error ?? "Ask Clausly could not answer that yet.");
         return;
       }
-      setResult(body);
+
+      if (!response.body) {
+        setError("Ask Clausly could not start streaming.");
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let done = false;
+
+      while (!done) {
+        const chunk = await reader.read();
+        done = chunk.done;
+        buffer += decoder.decode(chunk.value, { stream: !done });
+        const frames = buffer.split(/\n\n/);
+        buffer = frames.pop() ?? "";
+
+        for (const frame of frames) {
+          const event = parseSseFrame(frame);
+          if (!event) continue;
+
+          if (event.name === "citations") {
+            setResult((current) => ({
+              answer: current?.answer ?? "",
+              citations: Array.isArray(event.data.citations) ? event.data.citations : [],
+            }));
+          } else if (event.name === "token" && typeof event.data.text === "string") {
+            setResult((current) => ({
+              answer: `${current?.answer ?? ""}${event.data.text}`,
+              citations: current?.citations ?? [],
+            }));
+          } else if (event.name === "error") {
+            setError(typeof event.data.message === "string" ? event.data.message : "Ask Clausly could not answer that yet.");
+          }
+        }
+      }
     } catch {
       setError("Ask Clausly could not answer that yet.");
     } finally {
       setLoading(false);
+      inputRef.current?.focus();
+    }
+  }
+
+  function parseSseFrame(frame: string): { name: string; data: Record<string, unknown> } | null {
+    const name = frame
+      .split(/\n/)
+      .find((line) => line.startsWith("event:"))
+      ?.slice("event:".length)
+      .trim();
+    const rawData = frame
+      .split(/\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice("data:".length).trim())
+      .join("\n");
+
+    if (!name || !rawData) return null;
+    try {
+      return { name, data: JSON.parse(rawData) };
+    } catch {
+      return null;
     }
   }
 
@@ -423,6 +483,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
         className="mt-5 flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background)] p-2"
       >
         <input
+          ref={inputRef}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder="Ask anything about this document…"
@@ -437,7 +498,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
         </Button>
       </form>
 
-      {loading && (
+      {loading && !result?.answer && result?.citations.length === 0 && (
         <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
           <div className="h-3 w-24 rounded-full bg-[var(--border)]" />
           <div className="mt-4 space-y-2">
@@ -461,11 +522,14 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
         </div>
       )}
 
-      {!loading && result && (
+      {result && (result.answer || result.citations.length > 0) && (
         <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
-            Answer
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+              Answer
+            </p>
+            {loading && <span className="size-1.5 rounded-full bg-[var(--accent)] motion-safe:animate-pulse" />}
+          </div>
           <p className="mt-2 text-[14px] leading-relaxed">{result.answer}</p>
 
           {result.citations.length > 0 && (

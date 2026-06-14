@@ -123,3 +123,31 @@ Push branch after each commit. Open the PR after commit 4.
 - `npm test`, `npm run lint`, `npx tsc --noEmit`, `npx next build` all clean
 - Migration applies cleanly to a fresh local Supabase
 - PR description includes QA hook + screenshot of Portfolio Ask answering with multi-doc citations
+
+## Verification
+
+After Augment applies `20260614000100_portfolio_ask_rpc.sql` and deploys the branch, smoke the endpoint with:
+
+```bash
+curl -s -X POST "$BASE_URL/api/ask/portfolio" \
+  -H "Content-Type: application/json" \
+  -H "Cookie: <authenticated browser session cookie>" \
+  -d '{"question":"Which contracts expire soonest?"}'
+```
+
+Confirm the RPC exists and can be called for an authenticated user with indexed chunks:
+
+```sql
+select routine_name
+from information_schema.routines
+where routine_schema = 'public'
+  and routine_name = 'match_portfolio_chunks';
+
+select *
+from public.match_portfolio_chunks(
+  array_fill(0.001::float8, array[1536])::vector(1536),
+  12,
+  3
+)
+limit 12;
+```

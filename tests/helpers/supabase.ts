@@ -32,6 +32,7 @@ const storage = {
 let currentUser: TestUser | null = null;
 let failure: Failure | null = null;
 let uuidCounter = 0;
+const rpcCallsList: { name: string; args: Row }[] = [];
 
 export function installSupabaseMock() {
   vi.mock("@/lib/supabase/server", () => ({
@@ -49,6 +50,7 @@ export function resetSupabaseMock(user: TestUser | null = userA) {
   currentUser = user;
   failure = null;
   uuidCounter = 0;
+  rpcCallsList.length = 0;
   vi.spyOn(crypto, "randomUUID").mockImplementation(() => nextUuid() as any);
   setSupabaseEnv(true);
 }
@@ -77,6 +79,10 @@ export function db() {
 
 export function storageCalls() {
   return storage;
+}
+
+export function rpcCalls() {
+  return rpcCallsList;
 }
 
 export function seedStoredPdf(path: string, bytes: BlobPart = "%PDF-1.7") {
@@ -235,12 +241,30 @@ export function createSupabaseClient() {
       }),
     },
     rpc: vi.fn(async (name: string, args: Row = {}) => {
+      rpcCallsList.push({ name, args });
       if (name === "match_document_chunks") {
         const targetDocumentId = args.target_document_id;
         const limit = Number(args.match_count ?? 5);
         const data = tables.document_chunks
           .filter((row) => isVisible("document_chunks", row) && row.document_id === targetDocumentId)
           .slice(0, limit)
+          .map((row, index) => ({ ...row, similarity: 0.9 - index * 0.01 }));
+        return { data: clone(data), error: null };
+      }
+
+      if (name === "match_portfolio_chunks") {
+        const matchCount = Number(args.match_count ?? 12);
+        const perDocCap = Number(args.per_doc_cap ?? 3);
+        const counts = new Map<string, number>();
+        const data = tables.document_chunks
+          .filter((row) => isVisible("document_chunks", row))
+          .filter((row) => {
+            const count = counts.get(row.document_id) ?? 0;
+            if (count >= perDocCap) return false;
+            counts.set(row.document_id, count + 1);
+            return true;
+          })
+          .slice(0, matchCount)
           .map((row, index) => ({ ...row, similarity: 0.9 - index * 0.01 }));
         return { data: clone(data), error: null };
       }

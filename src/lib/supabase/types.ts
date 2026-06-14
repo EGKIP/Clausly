@@ -284,6 +284,22 @@ export type Database = {
           similarity: number;
         }>;
       };
+      match_portfolio_chunks: {
+        Args: {
+          query_embedding: number[];
+          match_count?: number;
+          per_doc_cap?: number;
+        };
+        Returns: Array<{
+          id: string;
+          document_id: string;
+          user_id: string;
+          chunk_index: number;
+          content: string;
+          page_number: number | null;
+          similarity: number;
+        }>;
+      };
     };
     Enums: {
       document_type: "lease" | "auto" | "employment" | "service" | "nda" | "other";

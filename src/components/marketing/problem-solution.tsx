@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import {
   AlertTriangle,
   CalendarX,
@@ -29,6 +29,21 @@ const solutions = [
 ];
 
 export function ProblemSolution() {
+  const reduce = useReducedMotion();
+  const listVariants: Variants = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+    },
+  };
+  const itemVariants: Variants = {
+    hidden: { opacity: 0, y: reduce ? 0 : 10 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: [0.165, 0.84, 0.44, 1] },
+    },
+  };
   return (
     <section className="relative py-24 md:py-32">
       <Container>
@@ -69,18 +84,28 @@ export function ProblemSolution() {
             <h3 className="mt-3 font-serif text-[26px] leading-tight tracking-[-0.01em]">
               A folder full of things you forgot.
             </h3>
-            <ul className="mt-7 space-y-3.5">
+            <motion.ul
+              variants={listVariants}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-80px" }}
+              className="mt-7 space-y-3.5"
+            >
               {problems.map(({ icon: Icon, label }) => (
-                <li key={label} className="flex items-start gap-3">
+                <motion.li
+                  key={label}
+                  variants={itemVariants}
+                  className="flex items-start gap-3"
+                >
                   <IconBadge tone="coral" size="sm">
                     <Icon />
                   </IconBadge>
                   <span className="text-[14.5px] leading-relaxed text-[var(--ink-soft,var(--foreground))] pt-1.5">
                     {label}
                   </span>
-                </li>
+                </motion.li>
               ))}
-            </ul>
+            </motion.ul>
 
             {/* faint failed-document doodle */}
             <div
@@ -107,18 +132,28 @@ export function ProblemSolution() {
             <h3 className="mt-3 font-serif text-[26px] leading-tight tracking-[-0.01em]">
               A portfolio that reads itself.
             </h3>
-            <ul className="mt-7 space-y-3.5">
+            <motion.ul
+              variants={listVariants}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-80px" }}
+              className="mt-7 space-y-3.5"
+            >
               {solutions.map(({ icon: Icon, label }) => (
-                <li key={label} className="flex items-start gap-3">
+                <motion.li
+                  key={label}
+                  variants={itemVariants}
+                  className="flex items-start gap-3"
+                >
                   <IconBadge tone="clause" size="sm">
                     <Icon />
                   </IconBadge>
                   <span className="text-[14.5px] leading-relaxed text-[var(--foreground)] pt-1.5">
                     {label}
                   </span>
-                </li>
+                </motion.li>
               ))}
-            </ul>
+            </motion.ul>
 
             <div
               aria-hidden

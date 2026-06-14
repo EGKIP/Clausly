@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion, type Variants } from "framer-motion";
 import { Plus } from "lucide-react";
 import { Container, Eyebrow, Headline } from "@/components/ui/primitives";
 import { Reveal } from "@/components/ui/reveal";
@@ -44,6 +44,19 @@ const faqs = [
 
 export function FAQ() {
   const [open, setOpen] = React.useState<number | null>(0);
+  const reduce = useReducedMotion();
+  const listVariants: Variants = {
+    hidden: {},
+    show: { transition: { staggerChildren: 0.05, delayChildren: 0.08 } },
+  };
+  const rowVariants: Variants = {
+    hidden: { opacity: 0, y: reduce ? 0 : 10 },
+    show: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: [0.165, 0.84, 0.44, 1] },
+    },
+  };
   return (
     <section id="faq" className="relative py-24 md:py-32">
       <Container>
@@ -67,11 +80,17 @@ export function FAQ() {
           </div>
 
           <div className="lg:col-span-8">
-            <ul className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+            <motion.ul
+              variants={listVariants}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: "-80px" }}
+              className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden"
+            >
               {faqs.map((f, i) => {
                 const isOpen = open === i;
                 return (
-                  <li key={f.q}>
+                  <motion.li key={f.q} variants={rowVariants}>
                     <button
                       onClick={() => setOpen(isOpen ? null : i)}
                       aria-expanded={isOpen}
@@ -109,10 +128,10 @@ export function FAQ() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </li>
+                  </motion.li>
                 );
               })}
-            </ul>
+            </motion.ul>
           </div>
         </div>
       </Container>

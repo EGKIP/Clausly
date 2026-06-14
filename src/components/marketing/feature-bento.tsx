@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Container, Eyebrow, Headline, IconBadge, Badge } from "@/components/ui/primitives";
 import { RiskPill } from "@/components/ui/risk-pill";
-import { Reveal } from "@/components/ui/reveal";
+import { Reveal, Stagger, StaggerItem } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
 
 /* ── Card frame ───────────────────────────────────────────────────────── */
@@ -274,93 +274,109 @@ export function FeatureBento() {
           </Reveal>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-5">
+        <Stagger stagger={0.08} className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-5">
           {/* Summary — wide */}
-          <FeatureCard className="md:col-span-7 flex flex-col">
-            <CardCopy
-              icon={Sparkles}
-              eyebrow="01 · AI Summary"
-              title="Plain-English summary, ready in seconds."
-              description="Upload the PDF. Clausly returns a tight, readable summary plus the key terms so you know what you actually signed."
-              tone="clause"
-            />
-            <SummaryVisual />
-          </FeatureCard>
+          <StaggerItem className="md:col-span-7">
+            <FeatureCard className="h-full flex flex-col">
+              <CardCopy
+                icon={Sparkles}
+                eyebrow="01 · AI Summary"
+                title="Plain-English summary, ready in seconds."
+                description="Upload the PDF. Clausly returns a tight, readable summary plus the key terms so you know what you actually signed."
+                tone="clause"
+              />
+              <SummaryVisual />
+            </FeatureCard>
+          </StaggerItem>
 
           {/* Clauses — tall */}
-          <FeatureCard className="md:col-span-5 md:row-span-2 flex flex-col">
-            <CardCopy
-              icon={FileSearch}
-              eyebrow="02 · Clause library"
-              title="Every important clause, surfaced and categorised."
-              description="Late fees, auto-renewal, termination, indemnity — pulled from the document with page references, in language you can read."
-              tone="iris"
-            />
-            <ClauseVisual />
-          </FeatureCard>
+          <StaggerItem className="md:col-span-5 md:row-span-2">
+            <FeatureCard className="h-full flex flex-col">
+              <CardCopy
+                icon={FileSearch}
+                eyebrow="02 · Clause library"
+                title="Every important clause, surfaced and categorised."
+                description="Late fees, auto-renewal, termination, indemnity — pulled from the document with page references, in language you can read."
+                tone="iris"
+              />
+              <ClauseVisual />
+            </FeatureCard>
+          </StaggerItem>
 
           {/* Risk */}
-          <FeatureCard className="md:col-span-4 flex flex-col">
-            <CardCopy
-              icon={ShieldAlert}
-              eyebrow="03 · Risk awareness"
-              title="Risk you can actually act on."
-              description="Calibrated labels with explanations. Never alarmist, never vague."
-              tone="coral"
-            />
-            <RiskVisual />
-          </FeatureCard>
+          <StaggerItem className="md:col-span-4">
+            <FeatureCard className="h-full flex flex-col">
+              <CardCopy
+                icon={ShieldAlert}
+                eyebrow="03 · Risk awareness"
+                title="Risk you can actually act on."
+                description="Calibrated labels with explanations. Never alarmist, never vague."
+                tone="coral"
+              />
+              <RiskVisual />
+            </FeatureCard>
+          </StaggerItem>
 
           {/* Deadlines */}
-          <FeatureCard className="md:col-span-3 flex flex-col">
-            <CardCopy
-              icon={CalendarClock}
-              eyebrow="04 · Deadlines"
-              title="A timeline of what's coming."
-              description="Notice windows, renewals, expirations — found, dated, surfaced."
-              tone="ember"
-            />
-            <DeadlineVisual />
-          </FeatureCard>
+          <StaggerItem className="md:col-span-3">
+            <FeatureCard className="h-full flex flex-col">
+              <CardCopy
+                icon={CalendarClock}
+                eyebrow="04 · Deadlines"
+                title="A timeline of what's coming."
+                description="Notice windows, renewals, expirations — found, dated, surfaced."
+                tone="ember"
+              />
+              <DeadlineVisual />
+            </FeatureCard>
+          </StaggerItem>
 
           {/* Reminders */}
-          <FeatureCard className="md:col-span-6 flex flex-col">
-            <CardCopy
-              icon={BellRing}
-              eyebrow="05 · Reminders you approve"
-              title="Suggested by AI. Activated by you."
-              description="Nothing reminds you of anything until you approve it. Edit timing, ignore noise, keep what matters."
-              tone="ember"
-            />
-            <ReminderVisual />
-          </FeatureCard>
+          <StaggerItem className="md:col-span-6">
+            <FeatureCard className="h-full flex flex-col">
+              <CardCopy
+                icon={BellRing}
+                eyebrow="05 · Reminders you approve"
+                title="Suggested by AI. Activated by you."
+                description="Nothing reminds you of anything until you approve it. Edit timing, ignore noise, keep what matters."
+                tone="ember"
+              />
+              <ReminderVisual />
+            </FeatureCard>
+          </StaggerItem>
 
           {/* Q&A */}
-          <FeatureCard className="md:col-span-6 flex flex-col">
-            <CardCopy
-              icon={MessageSquareText}
-              eyebrow="06 · Ask Clausly"
-              title="Ask the document a question."
-              description="Grounded in the file you uploaded, with page references. Says so clearly when it isn't sure."
-              tone="clause"
-            />
-            <QAVisual />
-          </FeatureCard>
-        </div>
+          <StaggerItem className="md:col-span-6">
+            <FeatureCard className="h-full flex flex-col">
+              <CardCopy
+                icon={MessageSquareText}
+                eyebrow="06 · Ask Clausly"
+                title="Ask the document a question."
+                description="Grounded in the file you uploaded, with page references. Says so clearly when it isn't sure."
+                tone="clause"
+              />
+              <QAVisual />
+            </FeatureCard>
+          </StaggerItem>
+        </Stagger>
 
         {/* Pro insight teaser strip */}
-        <div className="mt-14 grid md:grid-cols-2 gap-5">
-          <ProTeaserCard
-            icon={TrendingUp}
-            title="Weekly insights — Pro"
-            body="A short Monday brief: what's expiring, what's risky, what needs review."
-          />
-          <ProTeaserCard
-            icon={FolderOpen}
-            title="A portfolio that scales"
-            body="Filter by jurisdiction, risk, end date, type. Free for 5 documents, unlimited on Pro."
-          />
-        </div>
+        <Stagger stagger={0.08} className="mt-14 grid md:grid-cols-2 gap-5">
+          <StaggerItem>
+            <ProTeaserCard
+              icon={TrendingUp}
+              title="Weekly insights — Pro"
+              body="A short Monday brief: what's expiring, what's risky, what needs review."
+            />
+          </StaggerItem>
+          <StaggerItem>
+            <ProTeaserCard
+              icon={FolderOpen}
+              title="A portfolio that scales"
+              body="Filter by jurisdiction, risk, end date, type. Free for 5 documents, unlimited on Pro."
+            />
+          </StaggerItem>
+        </Stagger>
       </Container>
     </section>
   );

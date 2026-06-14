@@ -103,6 +103,38 @@ describe("POST /api/documents/[id]/ask", () => {
     });
   });
 
+  it("streams citations, token frames, and done when requested", async () => {
+    const document = seedDocument(userA, { status: "ready" });
+    seedDocumentChunk(document.id, userA, {
+      id: "chunk-1",
+      content: "The tenant may terminate by giving 60 days written notice before the renewal date.",
+      page_number: 4,
+    });
+
+    const response = await POST(
+      jsonRequest(
+        { question: "What is the termination clause?" },
+        { headers: { Accept: "text/event-stream" } },
+      ),
+      routeContext(document.id),
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/event-stream");
+    expect(body).toContain("event: citations");
+    expect(body).toContain('"chunkId":"chunk-1"');
+    expect(body).toContain("event: token");
+    expect(body).toContain("event: done");
+    expect(db().usage_metrics).toHaveLength(1);
+    expect(db().usage_metrics[0]).toMatchObject({
+      user_id: userA.id,
+      document_id: document.id,
+      job_type: "qa_question",
+      status: "completed",
+    });
+  });
+
   it("keeps tenant isolation for cross-tenant ask attempts", async () => {
     const documentA = seedDocument(userA, { status: "ready" });
     seedDocumentChunk(documentA.id, userA, { id: "chunk-a" });

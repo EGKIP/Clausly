@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getEmbeddingModel, getEmbeddingProvider, getEmbeddingProviderName } from "@/lib/ai/embeddings/provider";
 import { getQAModel, getQAProvider, getQAProviderName } from "@/lib/ai/qa/provider";
+import { encodeSseFrame } from "@/lib/ai/qa/sse";
+import { getQAStreamProvider } from "@/lib/ai/qa/stream";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -18,10 +20,36 @@ type MatchChunk = {
   page_number: number | null;
 };
 
+type AskChunk = {
+  id: string;
+  content: string;
+  pageNumber: number | null;
+};
+
+type AskCitation = {
+  chunkId: string;
+  pageNumber: number | null;
+  snippet: string;
+};
+
 export async function POST(request: Request, context: RouteContext) {
   const { id } = await context.params;
+  const wantsStream = request.headers.get("accept")?.includes("text/event-stream") ?? false;
 
   if (!hasSupabaseEnv()) {
+    if (wantsStream) {
+      return streamMockResponse({
+        citations: [
+          {
+            chunkId: "demo-chunk",
+            pageNumber: 1,
+            snippet: "Demo citation excerpt from this contract.",
+          },
+        ],
+        answer: "Ask Clausly is running in demo mode. Connect Supabase to answer from indexed document text.",
+      });
+    }
+
     return NextResponse.json({
       answer: "Ask Clausly is running in demo mode. Connect Supabase to answer from indexed document text.",
       citations: [
@@ -97,6 +125,23 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  if (wantsStream) {
+    const citations = chunks.map((chunk) => ({
+      chunkId: chunk.id,
+      pageNumber: chunk.pageNumber ?? null,
+      snippet: chunk.content.slice(0, 200),
+    }));
+
+    return streamAskResponse({
+      supabase,
+      userId: user.id,
+      documentId: document.id,
+      question: parsed.data.question,
+      chunks,
+      citations,
+    });
+  }
+
   const qaResult = await getQAProvider()({
     question: parsed.data.question,
     chunks,
@@ -123,9 +168,106 @@ export async function POST(request: Request, context: RouteContext) {
   });
 }
 
+function streamAskResponse(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  userId: string;
+  documentId: string;
+  question: string;
+  chunks: AskChunk[];
+  citations: AskCitation[];
+}) {
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      async start(controller) {
+        let answer = "";
+        controller.enqueue(encodeSseFrame("citations", { citations: input.citations }));
+
+        try {
+          for await (const event of getQAStreamProvider()({
+            question: input.question,
+            chunks: input.chunks,
+          })) {
+            if (event.type === "token") {
+              answer += event.text;
+              controller.enqueue(encodeSseFrame("token", { text: event.text }));
+            } else if (event.type === "error") {
+              controller.enqueue(encodeSseFrame("error", { message: event.message }));
+              await recordQAUsage(input.supabase, {
+                userId: input.userId,
+                documentId: input.documentId,
+                inputChars: input.question.length + input.chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
+                outputChars: answer.length,
+                status: "failed",
+                errorMessage: event.message,
+              });
+              controller.close();
+              return;
+            } else {
+              await recordQAUsage(input.supabase, {
+                userId: input.userId,
+                documentId: input.documentId,
+                inputChars: input.question.length + input.chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
+                outputChars: answer.length,
+              });
+              controller.enqueue(encodeSseFrame("done", {}));
+              controller.close();
+              return;
+            }
+          }
+
+          controller.enqueue(encodeSseFrame("done", {}));
+          controller.close();
+        } catch (error) {
+          controller.enqueue(encodeSseFrame("error", {
+            message: error instanceof Error ? error.message : "Ask Clausly streaming failed.",
+          }));
+          controller.close();
+        }
+      },
+    }),
+    {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    },
+  );
+}
+
+function streamMockResponse(input: { citations: AskCitation[]; answer: string }) {
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      async start(controller) {
+        controller.enqueue(encodeSseFrame("citations", { citations: input.citations }));
+        for (const [index, word] of input.answer.split(/\s+/).filter(Boolean).entries()) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          controller.enqueue(encodeSseFrame("token", { text: index === 0 ? word : ` ${word}` }));
+        }
+        controller.enqueue(encodeSseFrame("done", {}));
+        controller.close();
+      },
+    }),
+    {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    },
+  );
+}
+
 async function recordQAUsage(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  input: { userId: string; documentId: string; inputChars: number; outputChars: number },
+  input: {
+    userId: string;
+    documentId: string;
+    inputChars: number;
+    outputChars: number;
+    status?: "completed" | "failed";
+    errorMessage?: string | null;
+  },
 ) {
   const provider = getQAProviderName();
   const model = provider === "openai" ? getQAModel() : "mock";
@@ -141,8 +283,8 @@ async function recordQAUsage(
       model: `${model}; embedding=${embeddingProvider}/${embeddingModel}`,
       input_token_count: Math.ceil(input.inputChars / 4),
       output_token_count: Math.ceil(input.outputChars / 4),
-      status: "completed",
-      error_message: null,
+      status: input.status ?? "completed",
+      error_message: input.errorMessage ?? null,
     });
   } catch (error) {
     console.warn("Q&A usage metric insert failed.", {

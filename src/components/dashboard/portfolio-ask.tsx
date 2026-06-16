@@ -17,6 +17,14 @@ type PortfolioAskResult = {
   }>;
 };
 
+type QaUsage = {
+  used: number;
+  limit: number;
+  remaining: number;
+  plan: "free" | "pro";
+  resetsAt: string;
+};
+
 const suggestions = [
   "Which contracts expire in the next 90 days?",
   "Which of my leases have auto-renewal clauses?",
@@ -28,8 +36,25 @@ export function PortfolioAsk() {
   const [question, setQuestion] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [usage, setUsage] = React.useState<QaUsage | null>(null);
   const [result, setResult] = React.useState<PortfolioAskResult | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadUsage() {
+      const response = await fetch("/api/ask/usage").catch(() => null);
+      if (!response?.ok) return;
+      const body = await response.json().catch(() => null);
+      if (!cancelled && isQaUsage(body)) setUsage(body);
+    }
+
+    void loadUsage();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function askPortfolio(event?: React.FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -50,7 +75,8 @@ export function PortfolioAsk() {
         const body = await response.json().catch(() => null);
         setError(body?.code === "PORTFOLIO_EMPTY"
           ? "Upload your first document to use Portfolio Ask."
-          : body?.error ?? "Portfolio Ask could not answer that yet.");
+          : formatAskError(body, "Portfolio Ask could not answer that yet."));
+        syncUsageFromLimit(body, setUsage);
         return;
       }
 
@@ -63,6 +89,7 @@ export function PortfolioAsk() {
       const decoder = new TextDecoder();
       let buffer = "";
       let done = false;
+      let completed = false;
 
       while (!done) {
         const chunk = await reader.read();
@@ -87,9 +114,13 @@ export function PortfolioAsk() {
             }));
           } else if (event.name === "error") {
             setError(typeof event.data.message === "string" ? event.data.message : "Portfolio Ask could not answer that yet.");
+          } else if (event.name === "done") {
+            completed = true;
           }
         }
       }
+
+      if (completed) decrementUsage(setUsage);
     } catch {
       setError("Portfolio Ask could not answer that yet.");
     } finally {
@@ -175,6 +206,12 @@ export function PortfolioAsk() {
         </div>
       </form>
 
+      {usage && (
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
+          {usage.remaining} of {usage.limit} questions remaining today
+        </p>
+      )}
+
       {loading && !result?.answer && result?.citations.length === 0 && (
         <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
           <div className="h-3 w-28 rounded-full bg-[var(--border)]" />
@@ -194,13 +231,20 @@ export function PortfolioAsk() {
               Go to documents
             </Button>
           ) : (
-            <button
-              type="button"
-              onClick={() => void askPortfolio()}
-              className="mt-3 text-[12px] font-medium text-[var(--color-coral-ink)] underline underline-offset-4"
-            >
-              Try again
-            </button>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              {usage?.plan === "free" && usage.remaining === 0 && (
+                <Button href="/upgrade" variant="outline" size="sm">
+                  Upgrade to Pro
+                </Button>
+              )}
+              <button
+                type="button"
+                onClick={() => void askPortfolio()}
+                className="text-[12px] font-medium text-[var(--color-coral-ink)] underline underline-offset-4"
+              >
+                Try again
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -265,4 +309,51 @@ export function PortfolioAskUpgradeTeaser() {
       </div>
     </Card>
   );
+}
+
+function isQaUsage(value: unknown): value is QaUsage {
+  if (!value || typeof value !== "object") return false;
+  const usage = value as Partial<QaUsage>;
+  return (
+    typeof usage.used === "number" &&
+    typeof usage.limit === "number" &&
+    typeof usage.remaining === "number" &&
+    (usage.plan === "free" || usage.plan === "pro") &&
+    typeof usage.resetsAt === "string"
+  );
+}
+
+function syncUsageFromLimit(body: unknown, setUsage: React.Dispatch<React.SetStateAction<QaUsage | null>>) {
+  if (!body || typeof body !== "object") return;
+  const errorBody = body as Partial<QaUsage> & { code?: string };
+  const nextUsage = { ...errorBody, remaining: 0 };
+  if (errorBody.code !== "QA_RATE_LIMIT" || !isQaUsage(nextUsage)) return;
+  setUsage(nextUsage);
+}
+
+function decrementUsage(setUsage: React.Dispatch<React.SetStateAction<QaUsage | null>>) {
+  setUsage((current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      used: current.used + 1,
+      remaining: Math.max(current.remaining - 1, 0),
+    };
+  });
+}
+
+function formatAskError(body: unknown, fallback: string) {
+  if (!body || typeof body !== "object") return fallback;
+  const errorBody = body as { code?: unknown; error?: unknown; limit?: unknown; resetsAt?: unknown };
+  if (errorBody.code === "QA_RATE_LIMIT" && typeof errorBody.limit === "number") {
+    return `You've used all ${errorBody.limit} questions for today. Resets ${formatResetTime(errorBody.resetsAt)}.`;
+  }
+  return typeof errorBody.error === "string" ? errorBody.error : fallback;
+}
+
+function formatResetTime(value: unknown) {
+  if (typeof value !== "string") return "soon";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "soon";
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }

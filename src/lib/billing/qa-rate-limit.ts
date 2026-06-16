@@ -10,10 +10,27 @@ type UsageRow = {
   created_at: string;
 };
 
-type SupabaseLike = {
-  from(table: string): {
-    select(columns?: string, options?: { count?: string; head?: boolean }): any;
-  };
+type SupabaseError = {
+  message: string;
+  code?: string;
+};
+
+type QueryResult<T = unknown> = {
+  data: T | null;
+  error: SupabaseError | null;
+  count: number | null;
+};
+
+type QueryBuilder<T = unknown> = PromiseLike<QueryResult<T>> & {
+  eq(column: string, value: unknown): QueryBuilder<T>;
+  in(column: string, value: unknown[]): QueryBuilder<T>;
+  gte(column: string, value: unknown): QueryBuilder<T>;
+  order(column: string, options?: { ascending?: boolean }): QueryBuilder<T>;
+  limit(count: number): QueryBuilder<T>;
+};
+
+type UsageMetricsTable = {
+  select<T = unknown>(columns?: string, options?: { count?: string; head?: boolean }): QueryBuilder<T>;
 };
 
 export type QaUsage = {
@@ -28,14 +45,14 @@ export type QaGate = QaUsage & {
   allowed: boolean;
 };
 
-export async function getQaUsage(supabase: SupabaseLike, userId: string): Promise<QaUsage> {
-  const plan = await getUserPlan(supabase, userId);
+export async function getQaUsage(supabase: unknown, userId: string): Promise<QaUsage> {
+  const plan = await getUserPlan(supabase as Parameters<typeof getUserPlan>[0], userId);
   const limit = PLAN_LIMITS[plan].qaPerDay;
   const now = new Date();
   const windowStart = new Date(now.getTime() - DAY_IN_MS).toISOString();
+  const usageMetrics = (supabase as { from(table: "usage_metrics"): UsageMetricsTable }).from("usage_metrics");
 
-  const { count, error: countError } = await supabase
-    .from("usage_metrics")
+  const { count, error: countError } = await usageMetrics
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .in("job_type", [...QA_JOB_TYPES])
@@ -52,8 +69,7 @@ export async function getQaUsage(supabase: SupabaseLike, userId: string): Promis
   }
 
   const used = count ?? 0;
-  const { data: oldestRows } = await supabase
-    .from("usage_metrics")
+  const { data: oldestRows } = await usageMetrics
     .select("created_at")
     .eq("user_id", userId)
     .in("job_type", [...QA_JOB_TYPES])
@@ -75,7 +91,7 @@ export async function getQaUsage(supabase: SupabaseLike, userId: string): Promis
   };
 }
 
-export async function canAskQuestion(supabase: SupabaseLike, userId: string): Promise<QaGate> {
+export async function canAskQuestion(supabase: unknown, userId: string): Promise<QaGate> {
   const usage = await getQaUsage(supabase, userId);
   return {
     ...usage,

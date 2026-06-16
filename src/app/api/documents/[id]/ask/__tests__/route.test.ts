@@ -7,6 +7,7 @@ import {
   routeContext,
   seedDocument,
   seedDocumentChunk,
+  seedUsageMetric,
   setSupabaseUser,
   userA,
   userB,
@@ -68,6 +69,36 @@ describe("POST /api/documents/[id]/ask", () => {
       error: "Document text is still being indexed, try again shortly.",
       code: "DOC_NOT_INDEXED",
     });
+  });
+
+  it("returns JSON 429 before opening a stream when the daily Q&A limit is reached", async () => {
+    for (let index = 0; index < 25; index += 1) {
+      seedUsageMetric(userA, {
+        id: `usage-${index}`,
+        job_type: "qa_question",
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    const response = await POST(
+      jsonRequest(
+        { question: "What is the termination clause?" },
+        { headers: { Accept: "text/event-stream" } },
+      ),
+      routeContext("any-document"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(body).toMatchObject({
+      error: "You've reached your 25-question daily limit on the free plan.",
+      code: "QA_RATE_LIMIT",
+      limit: 25,
+      used: 25,
+      plan: "free",
+    });
+    expect(body.resetsAt).toBeTruthy();
   });
 
   it("answers from indexed chunks with citations and logs usage", async () => {

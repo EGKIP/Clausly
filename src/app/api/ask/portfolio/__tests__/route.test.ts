@@ -7,6 +7,7 @@ import {
   rpcCalls,
   seedDocument,
   seedDocumentChunk,
+  seedUsageMetric,
   setSupabaseUser,
   userA,
 } from "@/../tests/helpers/supabase";
@@ -63,6 +64,34 @@ describe("POST /api/ask/portfolio", () => {
       name: "match_portfolio_chunks",
       args: { match_count: 12, per_doc_cap: 3 },
     });
+  });
+
+  it("returns JSON 429 before opening a stream when the daily Q&A limit is reached", async () => {
+    for (let index = 0; index < 25; index += 1) {
+      seedUsageMetric(userA, {
+        id: `usage-${index}`,
+        job_type: index % 2 === 0 ? "qa_question" : "qa_portfolio",
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    const response = await POST(jsonRequest(
+      { question: "Which contracts expire soonest?" },
+      { headers: { Accept: "text/event-stream" } },
+    ));
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(body).toMatchObject({
+      error: "You've reached your 25-question daily limit on the free plan.",
+      code: "QA_RATE_LIMIT",
+      limit: 25,
+      used: 25,
+      plan: "free",
+    });
+    expect(body.resetsAt).toBeTruthy();
+    expect(rpcCalls()).toHaveLength(0);
   });
 
   it("answers across documents with citations and logs usage", async () => {

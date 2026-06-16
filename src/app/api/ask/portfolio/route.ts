@@ -7,6 +7,7 @@ import {
   getPortfolioQAStreamProvider,
   type PortfolioQAChunk,
 } from "@/lib/ai/qa/portfolio-provider";
+import { canAskQuestion } from "@/lib/billing/qa-rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 const questionSchema = z.object({
@@ -60,6 +61,21 @@ export async function POST(request: Request) {
         })),
       },
       { status: 400 }
+    );
+  }
+
+  const gate = await canAskQuestion(supabase, user.id);
+  if (!gate.allowed) {
+    return NextResponse.json(
+      {
+        error: `You've reached your ${gate.limit}-question daily limit on the ${gate.plan} plan.`,
+        code: "QA_RATE_LIMIT",
+        limit: gate.limit,
+        used: gate.used,
+        resetsAt: gate.resetsAt,
+        plan: gate.plan,
+      },
+      { status: 429 }
     );
   }
 

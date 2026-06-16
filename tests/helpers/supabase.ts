@@ -1,6 +1,14 @@
 import { vi } from "vitest";
 
-type TableName = "users" | "documents" | "clauses" | "dates" | "reminders" | "document_chunks" | "usage_metrics";
+type TableName =
+  | "users"
+  | "billing_customers"
+  | "documents"
+  | "clauses"
+  | "dates"
+  | "reminders"
+  | "document_chunks"
+  | "usage_metrics";
 type Row = Record<string, any>;
 type TableStore = Record<TableName, Row[]>;
 type TestUser = { id: string; email?: string | null };
@@ -14,6 +22,7 @@ type Failure = {
 
 const tables: TableStore = {
   users: [],
+  billing_customers: [],
   documents: [],
   clauses: [],
   dates: [],
@@ -136,6 +145,17 @@ export function seedDocument(user = userA, overrides: Row = {}) {
     ...overrides,
   };
   tables.documents.push(row);
+  return row;
+}
+
+export function seedBillingCustomer(user = userA, overrides: Row = {}) {
+  const row = {
+    user_id: user.id,
+    stripe_customer_id: "cus_test_" + user.id.slice(0, 8),
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.billing_customers.push(row);
   return row;
 }
 

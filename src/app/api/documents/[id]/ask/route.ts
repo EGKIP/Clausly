@@ -4,6 +4,7 @@ import { getEmbeddingModel, getEmbeddingProvider, getEmbeddingProviderName } fro
 import { getQAModel, getQAProvider, getQAProviderName } from "@/lib/ai/qa/provider";
 import { encodeSseFrame } from "@/lib/ai/qa/sse";
 import { getQAStreamProvider } from "@/lib/ai/qa/stream";
+import { canAskQuestion } from "@/lib/billing/qa-rate-limit";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -80,6 +81,21 @@ export async function POST(request: Request, context: RouteContext) {
         })),
       },
       { status: 400 }
+    );
+  }
+
+  const gate = await canAskQuestion(supabase, user.id);
+  if (!gate.allowed) {
+    return NextResponse.json(
+      {
+        error: `You've reached your ${gate.limit}-question daily limit on the ${gate.plan} plan.`,
+        code: "QA_RATE_LIMIT",
+        limit: gate.limit,
+        used: gate.used,
+        resetsAt: gate.resetsAt,
+        plan: gate.plan,
+      },
+      { status: 429 }
     );
   }
 

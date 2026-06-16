@@ -26,6 +26,13 @@ import { DocumentRemindersSection } from "./reminders/document-reminders-section
 import { cn } from "@/lib/utils";
 
 type Tab = "summary" | "clauses" | "dates" | "reminders" | "ask";
+type QaUsage = {
+  used: number;
+  limit: number;
+  remaining: number;
+  plan: "free" | "pro";
+  resetsAt: string;
+};
 
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "summary", label: "Summary", icon: FileText },
@@ -356,11 +363,28 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
   const [question, setQuestion] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [usage, setUsage] = React.useState<QaUsage | null>(null);
   const [result, setResult] = React.useState<{
     answer: string;
     citations: Array<{ chunkId: string; pageNumber: number | null; snippet: string }>;
   } | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadUsage() {
+      const response = await fetch("/api/ask/usage").catch(() => null);
+      if (!response?.ok) return;
+      const body = await response.json().catch(() => null);
+      if (!cancelled && isQaUsage(body)) setUsage(body);
+    }
+
+    void loadUsage();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function askQuestion(event?: React.FormEvent<HTMLFormElement>) {
     event?.preventDefault();
@@ -379,7 +403,8 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.error ?? "Ask Clausly could not answer that yet.");
+        setError(formatAskError(body, "Ask Clausly could not answer that yet."));
+        syncUsageFromLimit(body, setUsage);
         return;
       }
 
@@ -392,6 +417,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
       const decoder = new TextDecoder();
       let buffer = "";
       let done = false;
+      let completed = false;
 
       while (!done) {
         const chunk = await reader.read();
@@ -416,9 +442,13 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
             }));
           } else if (event.name === "error") {
             setError(typeof event.data.message === "string" ? event.data.message : "Ask Clausly could not answer that yet.");
+          } else if (event.name === "done") {
+            completed = true;
           }
         }
       }
+
+      if (completed) decrementUsage(setUsage);
     } catch {
       setError("Ask Clausly could not answer that yet.");
     } finally {
@@ -498,6 +528,12 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
         </Button>
       </form>
 
+      {usage && (
+        <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
+          {usage.remaining} of {usage.limit} questions remaining today
+        </p>
+      )}
+
       {loading && !result?.answer && result?.citations.length === 0 && (
         <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
           <div className="h-3 w-24 rounded-full bg-[var(--border)]" />
@@ -512,13 +548,20 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
       {error && (
         <div className="mt-5 rounded-[var(--radius-md)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] p-4">
           <p className="text-[13px] leading-relaxed text-[var(--color-coral-ink)]">{error}</p>
-          <button
-            type="button"
-            onClick={() => void askQuestion()}
-            className="mt-3 text-[12px] font-medium text-[var(--color-coral-ink)] underline underline-offset-4"
-          >
-            Try again
-          </button>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {usage?.plan === "free" && usage.remaining === 0 && (
+              <Button href="/upgrade" variant="outline" size="sm">
+                Upgrade to Pro
+              </Button>
+            )}
+            <button
+              type="button"
+              onClick={() => void askQuestion()}
+              className="text-[12px] font-medium text-[var(--color-coral-ink)] underline underline-offset-4"
+            >
+              Try again
+            </button>
+          </div>
         </div>
       )}
 
@@ -551,4 +594,51 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
       )}
     </div>
   );
+}
+
+function isQaUsage(value: unknown): value is QaUsage {
+  if (!value || typeof value !== "object") return false;
+  const usage = value as Partial<QaUsage>;
+  return (
+    typeof usage.used === "number" &&
+    typeof usage.limit === "number" &&
+    typeof usage.remaining === "number" &&
+    (usage.plan === "free" || usage.plan === "pro") &&
+    typeof usage.resetsAt === "string"
+  );
+}
+
+function syncUsageFromLimit(body: unknown, setUsage: React.Dispatch<React.SetStateAction<QaUsage | null>>) {
+  if (!body || typeof body !== "object") return;
+  const errorBody = body as Partial<QaUsage> & { code?: string };
+  const nextUsage = { ...errorBody, remaining: 0 };
+  if (errorBody.code !== "QA_RATE_LIMIT" || !isQaUsage(nextUsage)) return;
+  setUsage(nextUsage);
+}
+
+function decrementUsage(setUsage: React.Dispatch<React.SetStateAction<QaUsage | null>>) {
+  setUsage((current) => {
+    if (!current) return current;
+    return {
+      ...current,
+      used: current.used + 1,
+      remaining: Math.max(current.remaining - 1, 0),
+    };
+  });
+}
+
+function formatAskError(body: unknown, fallback: string) {
+  if (!body || typeof body !== "object") return fallback;
+  const errorBody = body as { code?: unknown; error?: unknown; limit?: unknown; resetsAt?: unknown };
+  if (errorBody.code === "QA_RATE_LIMIT" && typeof errorBody.limit === "number") {
+    return `You've used all ${errorBody.limit} questions for today. Resets ${formatResetTime(errorBody.resetsAt)}.`;
+  }
+  return typeof errorBody.error === "string" ? errorBody.error : fallback;
+}
+
+function formatResetTime(value: unknown) {
+  if (typeof value !== "string") return "soon";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "soon";
+  return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }

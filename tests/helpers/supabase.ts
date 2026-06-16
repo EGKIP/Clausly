@@ -218,6 +218,25 @@ export function seedDocumentChunk(documentId: string, user = userA, overrides: R
   return row;
 }
 
+export function seedUsageMetric(user = userA, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    user_id: user.id,
+    document_id: overrides.document_id ?? null,
+    job_type: "qa_question",
+    provider: "mock",
+    model: "mock",
+    input_token_count: 10,
+    output_token_count: 10,
+    status: "completed",
+    error_message: null,
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.usage_metrics.push(row);
+  return row;
+}
+
 export function jsonRequest(body: unknown, init: RequestInit = {}) {
   return new Request("http://localhost.test", {
     method: init.method ?? "POST",
@@ -320,7 +339,9 @@ export function createSupabaseClient() {
 }
 
 class Query {
-  private filters: { column: string; value: unknown; op: "eq" | "neq" | "in" }[] = [];
+  private filters: { column: string; value: unknown; op: "eq" | "neq" | "in" | "gte" }[] = [];
+  private orderBy: { column: string; ascending: boolean } | null = null;
+  private limitCount: number | null = null;
   private head = false;
   private wantsCount = false;
   private action: "select" | "insert" | "update" | "delete" = "select";
@@ -363,10 +384,21 @@ class Query {
 
   in(column: string, value: unknown[]) {
     this.filters.push({ column, value, op: "in" });
-    return this.execute();
+    return this;
   }
 
-  order() {
+  gte(column: string, value: unknown) {
+    this.filters.push({ column, value, op: "gte" });
+    return this;
+  }
+
+  order(column: string, options?: { ascending?: boolean }) {
+    this.orderBy = { column, ascending: options?.ascending ?? true };
+    return this;
+  }
+
+  limit(count: number) {
+    this.limitCount = count;
     return this;
   }
 
@@ -389,8 +421,9 @@ class Query {
   }
 
   private async executeSelect(single: boolean) {
-    const rows = this.filteredRows();
-    if (this.head) return { data: null, error: null, count: rows.length };
+    const filtered = this.filteredRows();
+    const rows = this.orderedAndLimitedRows(filtered);
+    if (this.head) return { data: null, error: null, count: filtered.length };
     if (single) {
       const row = rows[0];
       return row ? { data: clone(row), error: null, count: null } : { data: null, error: notFound(), count: null };
@@ -433,8 +466,24 @@ class Query {
       if (filter.op === "eq") rows = rows.filter((row) => row[filter.column] === filter.value);
       if (filter.op === "neq") rows = rows.filter((row) => row[filter.column] !== filter.value);
       if (filter.op === "in") rows = rows.filter((row) => Array.isArray(filter.value) && filter.value.includes(row[filter.column]));
+      if (filter.op === "gte") rows = rows.filter((row) => String(row[filter.column]) >= String(filter.value));
     }
     return rows;
+  }
+
+  private orderedAndLimitedRows(rows: Row[]) {
+    let nextRows = rows;
+    if (this.orderBy) {
+      const { column, ascending } = this.orderBy;
+      nextRows = [...nextRows].sort((a, b) => {
+        if (a[column] === b[column]) return 0;
+        if (a[column] == null) return ascending ? -1 : 1;
+        if (b[column] == null) return ascending ? 1 : -1;
+        return a[column] > b[column] ? (ascending ? 1 : -1) : (ascending ? -1 : 1);
+      });
+    }
+    if (this.limitCount !== null) return nextRows.slice(0, this.limitCount);
+    return nextRows;
   }
 }
 

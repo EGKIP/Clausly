@@ -47,6 +47,8 @@ export default function SettingsPage() {
   const [confirmEmail, setConfirmEmail] = React.useState("");
   const [deleteStatus, setDeleteStatus] = React.useState<"idle" | "deleting" | "error">("idle");
   const [deleteMessage, setDeleteMessage] = React.useState<string | null>(null);
+  const [billingStatus, setBillingStatus] = React.useState<"idle" | "loading" | "error">("idle");
+  const [billingMessage, setBillingMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -61,6 +63,15 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  React.useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("upgraded") !== "1") return;
+
+    toast.success("Welcome to Pro!");
+    url.searchParams.delete("upgraded");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
@@ -113,6 +124,31 @@ export default function SettingsPage() {
     }
 
     window.location.assign("/?account=deleted");
+  }
+
+  async function startCheckout() {
+    await startBillingRedirect("/api/billing/checkout", "Checkout could not be started.");
+  }
+
+  async function startPortal() {
+    await startBillingRedirect("/api/billing/portal", "Billing portal could not be opened.");
+  }
+
+  async function startBillingRedirect(endpoint: string, fallback: string) {
+    setBillingStatus("loading");
+    setBillingMessage(null);
+
+    const response = await fetch(endpoint, { method: "POST" });
+    const payload = await response.json().catch(() => ({ error: fallback }));
+    if (!response.ok || typeof payload.url !== "string") {
+      const error = payload.error ?? fallback;
+      setBillingStatus("error");
+      setBillingMessage(error);
+      toast.error(error);
+      return;
+    }
+
+    window.location.assign(payload.url);
   }
 
   return (
@@ -218,12 +254,37 @@ export default function SettingsPage() {
                   Pro unlocks unlimited documents, portfolio insights, and priority processing.
                 </p>
               </div>
-              {profile.plan === "free" && (
-                <Button href="/upgrade" variant="primary" size="md" className="w-full md:w-auto">
+              <div className="flex w-full flex-col gap-2 md:w-auto md:items-end">
+                {profile.plan === "free" ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  className="w-full md:w-auto"
+                  onClick={() => void startCheckout()}
+                  disabled={billingStatus === "loading"}
+                >
                   <Sparkles className="size-3.5" />
-                  Upgrade to Pro
+                  {billingStatus === "loading" ? "Opening checkout..." : "Upgrade to Pro"}
                 </Button>
-              )}
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="md"
+                    className="w-full md:w-auto"
+                    onClick={() => void startPortal()}
+                    disabled={billingStatus === "loading"}
+                  >
+                    {billingStatus === "loading" ? "Opening portal..." : "Manage subscription"}
+                  </Button>
+                )}
+                {billingMessage && (
+                  <p className="max-w-[260px] text-right text-[12px] text-[var(--color-coral-ink)]">
+                    {billingMessage}
+                  </p>
+                )}
+              </div>
             </div>
           </Card>
         </section>

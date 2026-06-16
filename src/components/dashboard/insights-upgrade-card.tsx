@@ -1,3 +1,6 @@
+"use client";
+
+import * as React from "react";
 import { BarChart3, CalendarClock, FileSearch, Sparkles } from "lucide-react";
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
@@ -21,6 +24,24 @@ const benefits = [
 ];
 
 export function InsightsUpgradeCard() {
+  const [status, setStatus] = React.useState<"idle" | "loading" | "error">("idle");
+  const [message, setMessage] = React.useState<string | null>(null);
+
+  async function startCheckout() {
+    setStatus("loading");
+    setMessage(null);
+
+    const response = await fetch("/api/billing/checkout", { method: "POST" });
+    const payload = await response.json().catch(() => ({ error: "Checkout could not be started." }));
+    if (!response.ok || typeof payload.url !== "string") {
+      setStatus("error");
+      setMessage(payload.error ?? "Checkout could not be started.");
+      return;
+    }
+
+    window.location.assign(payload.url);
+  }
+
   return (
     <Card className="mt-10 overflow-hidden p-7 md:p-9">
       <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
@@ -36,9 +57,22 @@ export function InsightsUpgradeCard() {
             and notice windows. Clausly keeps it informational only, never legal advice.
           </p>
         </div>
-        <Button href="/upgrade" variant="primary" size="md">
-          Upgrade to Pro
-        </Button>
+        <div className="flex flex-col gap-2 md:items-end">
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={() => void startCheckout()}
+            disabled={status === "loading"}
+          >
+            {status === "loading" ? "Opening checkout..." : "Upgrade to Pro"}
+          </Button>
+          {status === "error" && message && (
+            <p className="max-w-[260px] text-right text-[12px] text-[var(--color-coral-ink)]">
+              {message}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="mt-8 grid gap-3 md:grid-cols-3">

@@ -1,3 +1,6 @@
+"use client";
+
+import * as React from "react";
 import { BarChart3, CalendarClock, FileText, Sparkles, Zap } from "lucide-react";
 import { Badge, Container, Eyebrow, Headline } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
@@ -26,6 +29,24 @@ const benefits = [
 ];
 
 export default function UpgradePage() {
+  const [status, setStatus] = React.useState<"idle" | "loading" | "error">("idle");
+  const [message, setMessage] = React.useState<string | null>(null);
+
+  async function startCheckout() {
+    setStatus("loading");
+    setMessage(null);
+
+    const response = await fetch("/api/billing/checkout", { method: "POST" });
+    const payload = await response.json().catch(() => ({ error: "Checkout could not be started." }));
+    if (!response.ok || typeof payload.url !== "string") {
+      setStatus("error");
+      setMessage(payload.error ?? "Checkout could not be started.");
+      return;
+    }
+
+    window.location.assign(payload.url);
+  }
+
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <Container className="py-20 md:py-28">
@@ -40,10 +61,21 @@ export default function UpgradePage() {
             Pro is for portfolios that have outgrown the free plan: unlimited
             documents, weekly contract intelligence, and priority processing.
           </p>
-          <div className="mt-8 flex justify-center">
-            <Button type="button" variant="primary" size="lg" disabled>
-              Coming soon — Stripe checkout opens in Track BB
+          <div className="mt-8 flex flex-col items-center gap-3">
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              onClick={() => void startCheckout()}
+              disabled={status === "loading"}
+            >
+              {status === "loading" ? "Opening checkout..." : "Upgrade with Stripe"}
             </Button>
+            {status === "error" && message && (
+              <p className="max-w-md text-center text-[13px] text-[var(--color-coral-ink)]">
+                {message}
+              </p>
+            )}
           </div>
         </div>
 

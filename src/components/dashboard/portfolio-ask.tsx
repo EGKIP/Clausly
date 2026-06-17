@@ -25,6 +25,21 @@ type QaUsage = {
   resetsAt: string;
 };
 
+type ConversationSummary = {
+  id: string;
+  title: string;
+  documentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PortfolioChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  citations?: PortfolioAskResult["citations"];
+};
+
 const suggestions = [
   "Which contracts expire in the next 90 days?",
   "Which of my leases have auto-renewal clauses?",
@@ -37,6 +52,9 @@ export function PortfolioAsk() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [usage, setUsage] = React.useState<QaUsage | null>(null);
+  const [conversationId, setConversationId] = React.useState<string | null>(null);
+  const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
+  const [messages, setMessages] = React.useState<PortfolioChatMessage[]>([]);
   const [result, setResult] = React.useState<PortfolioAskResult | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -56,6 +74,53 @@ export function PortfolioAsk() {
     };
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadConversations() {
+      const response = await fetch("/api/conversations").catch(() => null);
+      if (!response?.ok) return;
+      const body = await response.json().catch(() => null);
+      if (!cancelled && Array.isArray(body?.conversations)) {
+        setConversations(body.conversations);
+      }
+    }
+
+    void loadConversations();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function selectConversation(id: string) {
+    setConversationId(id);
+    setError(null);
+    const response = await fetch(`/api/conversations/${id}/messages`).catch(() => null);
+    if (!response?.ok) return;
+    const body = await response.json().catch(() => null);
+    if (!Array.isArray(body?.messages)) return;
+    setMessages(body.messages.map((message: {
+      id: string;
+      role: "user" | "assistant";
+      content: string;
+      citations?: PortfolioAskResult["citations"];
+    }) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      citations: message.citations ?? [],
+    })));
+    setResult(null);
+  }
+
+  function startNewChat() {
+    setConversationId(null);
+    setMessages([]);
+    setResult(null);
+    setError(null);
+    textareaRef.current?.focus();
+  }
+
   async function askPortfolio(event?: React.FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     const trimmed = question.trim();
@@ -64,11 +129,18 @@ export function PortfolioAsk() {
     setLoading(true);
     setError(null);
     setResult({ answer: "", citations: [] });
+    const userMessageId = `local-user-${Date.now()}`;
+    const assistantMessageId = `local-assistant-${Date.now()}`;
+    setMessages((current) => [
+      ...current,
+      { id: userMessageId, role: "user", content: trimmed },
+      { id: assistantMessageId, role: "assistant", content: "", citations: [] },
+    ]);
     try {
       const response = await fetch("/api/ask/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-        body: JSON.stringify({ question: trimmed }),
+        body: JSON.stringify({ question: trimmed, ...(conversationId ? { conversationId } : {}) }),
       });
 
       if (!response.ok) {
@@ -77,6 +149,7 @@ export function PortfolioAsk() {
           ? "Upload your first document to use Portfolio Ask."
           : formatAskError(body, "Portfolio Ask could not answer that yet."));
         syncUsageFromLimit(body, setUsage);
+        setMessages((current) => current.filter((message) => message.id !== assistantMessageId));
         return;
       }
 
@@ -102,16 +175,29 @@ export function PortfolioAsk() {
           const event = parseSseFrame(frame);
           if (!event) continue;
 
-          if (event.name === "citations") {
+          if (event.name === "conversation") {
+            const conversation = parseConversationEvent(event.data);
+            if (conversation) {
+              setConversationId(conversation.id);
+              setConversations((current) => [conversation, ...current.filter((item) => item.id !== conversation.id)].slice(0, 10));
+            }
+          } else if (event.name === "citations") {
+            const citations = Array.isArray(event.data.citations) ? event.data.citations : [];
             setResult((current) => ({
               answer: current?.answer ?? "",
-              citations: Array.isArray(event.data.citations) ? event.data.citations : [],
+              citations,
             }));
+            setMessages((current) => current.map((message) => message.id === assistantMessageId
+              ? { ...message, citations: citations as PortfolioAskResult["citations"] }
+              : message));
           } else if (event.name === "token" && typeof event.data.text === "string") {
             setResult((current) => ({
               answer: `${current?.answer ?? ""}${event.data.text}`,
               citations: current?.citations ?? [],
             }));
+            setMessages((current) => current.map((message) => message.id === assistantMessageId
+              ? { ...message, content: `${message.content}${event.data.text}` }
+              : message));
           } else if (event.name === "error") {
             setError(typeof event.data.message === "string" ? event.data.message : "Portfolio Ask could not answer that yet.");
           } else if (event.name === "done") {
@@ -177,6 +263,39 @@ export function PortfolioAsk() {
             {suggestion}
           </button>
         ))}
+      </div>
+
+      <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            Conversations
+          </p>
+          <button
+            type="button"
+            onClick={startNewChat}
+            className="text-[12px] font-medium text-[var(--accent-ink)] underline underline-offset-4"
+          >
+            + New chat
+          </button>
+        </div>
+        {conversations.length > 0 ? (
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                type="button"
+                onClick={() => void selectConversation(conversation.id)}
+                className={conversation.id === conversationId
+                  ? "shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[12px] text-[var(--accent-ink)]"
+                  : "shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12px] text-[var(--muted)] hover:border-[var(--border-strong)]"}
+              >
+                {conversation.title}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-[12.5px] text-[var(--muted)]">No saved portfolio chats yet.</p>
+        )}
       </div>
 
       <form
@@ -249,7 +368,47 @@ export function PortfolioAsk() {
         </div>
       )}
 
-      {result && (result.answer || result.citations.length > 0) && (
+      {messages.length > 0 && (
+        <div className="mt-6 space-y-3">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={message.role === "user"
+                ? "ml-auto max-w-[86%] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background)] p-4"
+                : "mr-auto max-w-[92%] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4"}
+            >
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+                {message.role === "user" ? "You" : "Clausly"}
+              </p>
+              <p className="mt-2 text-[14px] leading-relaxed">{message.content || "Thinking..."}</p>
+              {message.role === "assistant" && message.citations && message.citations.length > 0 && (
+                <div className="mt-5 grid gap-2 md:grid-cols-2">
+                  {message.citations.map((citation) => (
+                    <Link
+                      key={citation.chunkId}
+                      href={`/dashboard/documents/${citation.documentId}`}
+                      className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] p-3 hover:border-[var(--border-strong)]"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-[13px] font-medium line-clamp-1">{citation.documentTitle}</p>
+                        <ArrowUpRight className="size-3.5 shrink-0 text-[var(--muted)]" />
+                      </div>
+                      <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--accent-ink)]">
+                        {citation.pageNumber ? `Page ${citation.pageNumber}` : "Indexed excerpt"}
+                      </p>
+                      <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--muted)] line-clamp-3">
+                        {citation.snippet}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {messages.length === 0 && result && (result.answer || result.citations.length > 0) && (
         <div className="mt-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
           <div className="flex items-center gap-2">
             <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
@@ -285,6 +444,20 @@ export function PortfolioAsk() {
       )}
     </Card>
   );
+}
+
+function parseConversationEvent(data: Record<string, unknown>): ConversationSummary | null {
+  const conversation = data.conversation;
+  if (!conversation || typeof conversation !== "object") return null;
+  const value = conversation as { id?: unknown; title?: unknown };
+  if (typeof value.id !== "string" || typeof value.title !== "string") return null;
+  return {
+    id: value.id,
+    title: value.title,
+    documentId: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export function PortfolioAskUpgradeTeaser() {

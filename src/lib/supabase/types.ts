@@ -12,6 +12,7 @@ export type Database = {
           subscription_tier: "free" | "pro";
           notification_preferences: Json;
           onboarded_at: string | null;
+          onboarding_tour_completed_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -23,6 +24,7 @@ export type Database = {
           subscription_tier?: "free" | "pro";
           notification_preferences?: Json;
           onboarded_at?: string | null;
+          onboarding_tour_completed_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

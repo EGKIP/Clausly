@@ -57,24 +57,26 @@ export function Topbar({ onOpenSidebar, onOpenUpload, onOpenSearch }: TopbarProp
       </button>
 
       <div className="ml-auto flex items-center gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={onOpenUpload}
-          className="hidden sm:inline-flex"
-        >
-          <Upload className="size-3.5" />
-          Upload
-        </Button>
-        <Button
-          variant="primary"
-          size="icon"
-          onClick={onOpenUpload}
-          aria-label="Upload document"
-          className="sm:hidden"
-        >
-          <Upload className="size-4" />
-        </Button>
+        <div data-tour="upload" className="inline-flex">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onOpenUpload}
+            className="hidden sm:inline-flex"
+          >
+            <Upload className="size-3.5" />
+            Upload
+          </Button>
+          <Button
+            variant="primary"
+            size="icon"
+            onClick={onOpenUpload}
+            aria-label="Upload document"
+            className="sm:hidden"
+          >
+            <Upload className="size-4" />
+          </Button>
+        </div>
 
         {/* Theme */}
         <ThemeToggleButton className="hidden sm:inline-flex" />

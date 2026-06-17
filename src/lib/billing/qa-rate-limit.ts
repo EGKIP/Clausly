@@ -3,7 +3,7 @@ import "server-only";
 import { PLAN_LIMITS, type PlanName } from "./limits";
 import { getUserPlan } from "./plan";
 
-const QA_JOB_TYPES = ["qa_question", "qa_portfolio"] as const;
+const QA_JOB_TYPES = ["qa_question", "qa_portfolio", "qa_suggest"] as const;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 type UsageRow = {

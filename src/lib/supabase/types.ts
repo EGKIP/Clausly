@@ -51,6 +51,62 @@ export type Database = {
           },
         ];
       };
+      qa_conversations: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string | null;
+          title: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id?: string | null;
+          title: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["qa_conversations"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "qa_conversations_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      qa_messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          role: "user" | "assistant";
+          content: string;
+          citations: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          role: "user" | "assistant";
+          content: string;
+          citations?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["qa_messages"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "qa_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "qa_conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       documents: {
         Row: {
           id: string;

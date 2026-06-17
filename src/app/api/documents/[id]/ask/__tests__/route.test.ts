@@ -5,8 +5,10 @@ import {
   jsonRequest,
   resetSupabaseMock,
   routeContext,
+  seedConversation,
   seedDocument,
   seedDocumentChunk,
+  seedMessage,
   seedUsageMetric,
   setSupabaseUser,
   userA,
@@ -132,6 +134,65 @@ describe("POST /api/documents/[id]/ask", () => {
       provider: "mock",
       status: "completed",
     });
+    expect(body.conversation).toMatchObject({
+      title: "What is the termination clause?",
+      documentId: document.id,
+      isNew: true,
+    });
+    expect(db().qa_messages).toEqual([
+      expect.objectContaining({ conversation_id: body.conversation.id, role: "user" }),
+      expect.objectContaining({ conversation_id: body.conversation.id, role: "assistant" }),
+    ]);
+  });
+
+  it("continues an existing document conversation and appends the new turn", async () => {
+    const document = seedDocument(userA, { status: "ready" });
+    seedDocumentChunk(document.id, userA, {
+      id: "chunk-1",
+      content: "The tenant may terminate by giving 60 days written notice before renewal.",
+    });
+    const conversation = seedConversation(userA, {
+      id: "33333333-3333-4333-8333-333333333333",
+      document_id: document.id,
+      title: "Termination clause",
+    });
+    seedMessage(conversation.id, {
+      id: "message-1",
+      role: "user",
+      content: "What is the termination clause?",
+      created_at: "2026-06-01T10:00:00.000Z",
+    });
+    seedMessage(conversation.id, {
+      id: "message-2",
+      role: "assistant",
+      content: "It allows termination with written notice.",
+      created_at: "2026-06-01T10:01:00.000Z",
+    });
+
+    const response = await POST(
+      jsonRequest({
+        question: "And what is the notice period?",
+        conversationId: conversation.id,
+      }),
+      routeContext(document.id),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.conversation).toMatchObject({
+      id: conversation.id,
+      isNew: false,
+    });
+    expect(db().qa_messages.map((message) => message.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+    ]);
+    expect(db().qa_messages[2]).toMatchObject({
+      conversation_id: conversation.id,
+      content: "And what is the notice period?",
+    });
   });
 
   it("streams citations, token frames, and done when requested", async () => {
@@ -154,6 +215,7 @@ describe("POST /api/documents/[id]/ask", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     expect(body).toContain("event: citations");
+    expect(body).toContain("event: conversation");
     expect(body).toContain('"chunkId":"chunk-1"');
     expect(body).toContain("event: token");
     expect(body).toContain("event: done");

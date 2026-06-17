@@ -1,9 +1,10 @@
 import { z } from "zod";
-import type { QAInput } from "./provider";
+import type { QAInput, QAMessage } from "./provider";
 
 export function qaSystemPrompt(schemaError?: string): string {
   return [
     "You answer questions about ONE contract document using ONLY the provided excerpts.",
+    "You may reference prior turns in the conversation when relevant, but always ground answers in the provided excerpts.",
     "Cite the excerpt IDs you used in citationChunkIds.",
     "If the excerpts do not contain the answer, say so plainly and return an empty citationChunkIds array.",
     "Clausly provides contract intelligence and reminders, not legal advice.",
@@ -13,7 +14,12 @@ export function qaSystemPrompt(schemaError?: string): string {
 }
 
 export function qaUserPrompt(input: QAInput): string {
+  return qaUserPromptWithHistory(input);
+}
+
+export function qaUserPromptWithHistory(input: QAInput & { history?: QAMessage[] }): string {
   return [
+    formatHistory(input.history ?? []),
     `Question: ${input.question}`,
     "Excerpts:",
     ...input.chunks.map((chunk) => [
@@ -21,7 +27,32 @@ export function qaUserPrompt(input: QAInput): string {
       `Page: ${chunk.pageNumber ?? "unknown"}`,
       chunk.content,
     ].join("\n")),
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
+}
+
+export function compactHistory(messages: QAMessage[]): QAMessage[] {
+  const recent = messages.slice(-12);
+  const selected: QAMessage[] = [];
+  let approxChars = 0;
+
+  for (const message of recent.slice().reverse()) {
+    const nextChars = message.content.length;
+    if (selected.length >= 12 || approxChars + nextChars > 16_000) break;
+    selected.unshift(message);
+    approxChars += nextChars;
+  }
+
+  return selected;
+}
+
+function formatHistory(history: QAMessage[]) {
+  const compact = compactHistory(history);
+  if (compact.length === 0) return "";
+
+  return [
+    "Prior conversation turns:",
+    ...compact.map((message) => `${message.role === "assistant" ? "Assistant" : "User"}: ${message.content}`),
+  ].join("\n");
 }
 
 export function formatSchemaError(error: z.ZodError): string {

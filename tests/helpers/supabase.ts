@@ -3,6 +3,8 @@ import { vi } from "vitest";
 type TableName =
   | "users"
   | "billing_customers"
+  | "qa_conversations"
+  | "qa_messages"
   | "documents"
   | "clauses"
   | "dates"
@@ -23,6 +25,8 @@ type Failure = {
 const tables: TableStore = {
   users: [],
   billing_customers: [],
+  qa_conversations: [],
+  qa_messages: [],
   documents: [],
   clauses: [],
   dates: [],
@@ -156,6 +160,34 @@ export function seedBillingCustomer(user = userA, overrides: Row = {}) {
     ...overrides,
   };
   tables.billing_customers.push(row);
+  return row;
+}
+
+export function seedConversation(user = userA, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    user_id: user.id,
+    document_id: overrides.document_id ?? null,
+    title: "Termination clause",
+    created_at: "2026-06-01T00:00:00.000Z",
+    updated_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.qa_conversations.push(row);
+  return row;
+}
+
+export function seedMessage(conversationId: string, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    conversation_id: conversationId,
+    role: "user",
+    content: "What is the termination clause?",
+    citations: [],
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.qa_messages.push(row);
   return row;
 }
 
@@ -510,13 +542,21 @@ class Query {
 function isVisible(table: TableName, row: Row) {
   if (!currentUser) return false;
   if (table === "users") return row.id === currentUser.id;
+  if (table === "qa_messages") {
+    const conversation = tables.qa_conversations.find((item) => item.id === row.conversation_id);
+    return conversation?.user_id === currentUser.id;
+  }
   return row.user_id === currentUser.id;
 }
 
 function cascadeDocuments(ids: Set<string>) {
-  for (const table of ["clauses", "dates", "reminders", "document_chunks"] as TableName[]) {
+  const conversationIds = new Set(
+    tables.qa_conversations.filter((row) => ids.has(row.document_id)).map((row) => row.id)
+  );
+  for (const table of ["clauses", "dates", "reminders", "document_chunks", "qa_conversations"] as TableName[]) {
     tables[table] = tables[table].filter((row) => !ids.has(row.document_id));
   }
+  tables.qa_messages = tables.qa_messages.filter((row) => !conversationIds.has(row.conversation_id));
 }
 
 function consumeFailure(operation: Failure["operation"], table: TableName) {

@@ -7,9 +7,15 @@ export type QAChunk = {
   pageNumber?: number | null;
 };
 
+export type QAMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type QAInput = {
   question: string;
   chunks: QAChunk[];
+  history?: QAMessage[];
 };
 
 export type QAResult = {

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { QAResult } from "./provider";
+import type { QAMessage, QAResult } from "./provider";
+import { compactHistory } from "./prompts";
 import { parseOpenAISse, type QAStreamEvent } from "./stream";
 
 export type PortfolioQAChunk = {
@@ -13,6 +14,7 @@ export type PortfolioQAChunk = {
 export type PortfolioQAInput = {
   question: string;
   chunks: PortfolioQAChunk[];
+  history?: QAMessage[];
 };
 
 export type PortfolioQAProvider = (input: PortfolioQAInput) => Promise<QAResult>;
@@ -189,6 +191,7 @@ async function postOpenAIJson(
 function systemPrompt(schemaError?: string): string {
   return [
     "You answer questions across MULTIPLE contract documents using ONLY the provided excerpts.",
+    "You may reference prior turns in the conversation when relevant, but always ground answers in the provided excerpts.",
     "Each excerpt includes an excerpt ID, document title, optional page number, and excerpt text.",
     "Cite every excerpt ID you used in citationChunkIds.",
     "If the excerpts do not contain the answer, say so plainly and return an empty citationChunkIds array.",
@@ -200,6 +203,7 @@ function systemPrompt(schemaError?: string): string {
 
 function userPrompt(input: PortfolioQAInput): string {
   return [
+    formatHistory(input.history ?? []),
     `Question: ${input.question}`,
     "Portfolio excerpts:",
     ...input.chunks.map((chunk) => [
@@ -209,7 +213,16 @@ function userPrompt(input: PortfolioQAInput): string {
       `Page: ${chunk.pageNumber ?? "unknown"}`,
       chunk.content,
     ].join("\n")),
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
+}
+
+function formatHistory(history: QAMessage[]) {
+  const compact = compactHistory(history);
+  if (compact.length === 0) return "";
+  return [
+    "Prior conversation turns:",
+    ...compact.map((message) => `${message.role === "assistant" ? "Assistant" : "User"}: ${message.content}`),
+  ].join("\n");
 }
 
 function extractText(response: { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }): string {

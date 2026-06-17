@@ -40,13 +40,6 @@ type PortfolioChatMessage = {
   citations?: PortfolioAskResult["citations"];
 };
 
-const suggestions = [
-  "Which contracts expire in the next 90 days?",
-  "Which of my leases have auto-renewal clauses?",
-  "Where is my highest monthly cost?",
-  "Do any of my contracts have indemnity?",
-];
-
 export function PortfolioAsk() {
   const [question, setQuestion] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -55,8 +48,12 @@ export function PortfolioAsk() {
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
   const [messages, setMessages] = React.useState<PortfolioChatMessage[]>([]);
+  const [suggestions, setSuggestions] = React.useState<string[]>([]);
+  const [suggestionsPending, setSuggestionsPending] = React.useState(false);
+  const [suggestionsLoaded, setSuggestionsLoaded] = React.useState(false);
   const [result, setResult] = React.useState<PortfolioAskResult | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const showSuggestions = !conversationId && messages.length === 0;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -92,6 +89,32 @@ export function PortfolioAsk() {
     };
   }, []);
 
+  React.useEffect(() => {
+    if (!showSuggestions || suggestionsLoaded || question.trim().length > 0) return;
+    let cancelled = false;
+
+    async function loadSuggestions() {
+      setSuggestionsLoaded(true);
+      setSuggestionsPending(true);
+      const response = await fetch("/api/ask/portfolio/suggested-questions").catch(() => null);
+      if (!response?.ok) {
+        if (!cancelled) setSuggestionsPending(false);
+        return;
+      }
+      const body = await response.json().catch(() => null);
+      if (cancelled) return;
+      if (Array.isArray(body?.suggestions)) {
+        setSuggestions(body.suggestions.filter((item: unknown): item is string => typeof item === "string"));
+      }
+      setSuggestionsPending(Boolean(body?.pending));
+    }
+
+    void loadSuggestions();
+    return () => {
+      cancelled = true;
+    };
+  }, [question, showSuggestions, suggestionsLoaded]);
+
   async function selectConversation(id: string) {
     setConversationId(id);
     setError(null);
@@ -118,14 +141,18 @@ export function PortfolioAsk() {
     setMessages([]);
     setResult(null);
     setError(null);
+    setSuggestions([]);
+    setSuggestionsPending(false);
+    setSuggestionsLoaded(false);
     textareaRef.current?.focus();
   }
 
-  async function askPortfolio(event?: React.FormEvent<HTMLFormElement>) {
+  async function askPortfolio(event?: React.FormEvent<HTMLFormElement>, suggestedQuestion?: string) {
     event?.preventDefault();
-    const trimmed = question.trim();
+    const trimmed = (suggestedQuestion ?? question).trim();
     if (trimmed.length < 3 || loading) return;
 
+    if (suggestedQuestion) setQuestion(trimmed);
     setLoading(true);
     setError(null);
     setResult({ answer: "", citations: [] });
@@ -252,19 +279,6 @@ export function PortfolioAsk() {
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {suggestions.map((suggestion) => (
-          <button
-            key={suggestion}
-            type="button"
-            onClick={() => setQuestion(suggestion)}
-            className="text-left text-[13px] rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
-          >
-            {suggestion}
-          </button>
-        ))}
-      </div>
-
       <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
         <div className="flex items-center justify-between gap-3">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
@@ -297,6 +311,42 @@ export function PortfolioAsk() {
           <p className="mt-2 text-[12.5px] text-[var(--muted)]">No saved portfolio chats yet.</p>
         )}
       </div>
+
+      {showSuggestions && (
+        <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            Suggested portfolio questions
+          </p>
+          {suggestions.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => void askPortfolio(undefined, suggestion)}
+                  disabled={loading}
+                  className="text-left text-[13px] rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {suggestionsPending ? (
+                <>
+                  <div className="h-3 w-56 rounded-full bg-[var(--border)]" />
+                  <div className="h-3 w-44 rounded-full bg-[var(--border)]" />
+                </>
+              ) : (
+                <p className="text-[12.5px] text-[var(--muted)]">
+                  Suggestions are being prepared for your portfolio.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={askPortfolio}

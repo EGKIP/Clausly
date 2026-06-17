@@ -99,6 +99,11 @@ describe("Q&A rate limit", () => {
       created_at: "2026-06-15T10:00:00.000Z",
     });
     seedUsageMetric(userA, {
+      id: "suggest-inside-window",
+      job_type: "qa_suggest",
+      created_at: "2026-06-15T11:00:00.000Z",
+    });
+    seedUsageMetric(userA, {
       id: "non-qa-job",
       job_type: "analysis",
       created_at: "2026-06-14T12:00:30.000Z",
@@ -106,7 +111,7 @@ describe("Q&A rate limit", () => {
 
     const usage = await getQaUsage(createSupabaseClient(), userA.id);
 
-    expect(usage.used).toBe(2);
+    expect(usage.used).toBe(3);
     expect(usage.resetsAt).toBe("2026-06-15T12:01:00.000Z");
   });
 });

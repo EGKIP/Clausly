@@ -369,12 +369,6 @@ function RemindersPanel({ reminders }: { reminders: Reminder[] }) {
 
 /* ── Ask Clausly ────────────────────────────────────────────────────── */
 function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
-  const suggestions = [
-    "What happens if I move out early?",
-    "When do I have to notify the landlord?",
-    "Are there any auto-renewal traps?",
-    "What's the worst-case financial outcome?",
-  ];
   const [question, setQuestion] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -382,11 +376,15 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [conversations, setConversations] = React.useState<ConversationSummary[]>([]);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [suggestions, setSuggestions] = React.useState<string[]>([]);
+  const [suggestionsPending, setSuggestionsPending] = React.useState(false);
+  const [suggestionsLoaded, setSuggestionsLoaded] = React.useState(false);
   const [result, setResult] = React.useState<{
     answer: string;
     citations: Array<{ chunkId: string; pageNumber: number | null; snippet: string }>;
   } | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const showSuggestions = !conversationId && messages.length === 0;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -422,6 +420,32 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
     };
   }, [docId]);
 
+  React.useEffect(() => {
+    if (!showSuggestions || suggestionsLoaded || question.trim().length > 0) return;
+    let cancelled = false;
+
+    async function loadSuggestions() {
+      setSuggestionsLoaded(true);
+      setSuggestionsPending(true);
+      const response = await fetch(`/api/documents/${docId}/suggested-questions`).catch(() => null);
+      if (!response?.ok) {
+        if (!cancelled) setSuggestionsPending(false);
+        return;
+      }
+      const body = await response.json().catch(() => null);
+      if (cancelled) return;
+      if (Array.isArray(body?.suggestions)) {
+        setSuggestions(body.suggestions.filter((item: unknown): item is string => typeof item === "string"));
+      }
+      setSuggestionsPending(Boolean(body?.pending));
+    }
+
+    void loadSuggestions();
+    return () => {
+      cancelled = true;
+    };
+  }, [docId, question, showSuggestions, suggestionsLoaded]);
+
   async function selectConversation(id: string) {
     setConversationId(id);
     setError(null);
@@ -448,14 +472,18 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
     setMessages([]);
     setResult(null);
     setError(null);
+    setSuggestions([]);
+    setSuggestionsPending(false);
+    setSuggestionsLoaded(false);
     inputRef.current?.focus();
   }
 
-  async function askQuestion(event?: React.FormEvent<HTMLFormElement>) {
+  async function askQuestion(event?: React.FormEvent<HTMLFormElement>, suggestedQuestion?: string) {
     event?.preventDefault();
-    const trimmed = question.trim();
+    const trimmed = (suggestedQuestion ?? question).trim();
     if (trimmed.length < 3 || loading) return;
 
+    if (suggestedQuestion) setQuestion(trimmed);
     setLoading(true);
     setError(null);
     setResult({ answer: "", citations: [] });
@@ -578,22 +606,6 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
         <Sparkles className="mt-1 size-4 shrink-0 text-[var(--accent)]" />
       </div>
 
-      <p className="mt-6 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
-        Suggested questions
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {suggestions.map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setQuestion(s)}
-            className="text-left text-[13px] rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
-          >
-            {s}
-          </button>
-        ))}
-      </div>
-
       <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
         <div className="flex items-center justify-between gap-3">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
@@ -629,6 +641,42 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
           <p className="mt-2 text-[12.5px] text-[var(--muted)]">No saved chats yet.</p>
         )}
       </div>
+
+      {showSuggestions && (
+        <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            Suggested questions
+          </p>
+          {suggestions.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => void askQuestion(undefined, s)}
+                  disabled={loading}
+                  className="text-left text-[13px] rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {suggestionsPending ? (
+                <>
+                  <div className="h-3 w-52 rounded-full bg-[var(--border)]" />
+                  <div className="h-3 w-40 rounded-full bg-[var(--border)]" />
+                </>
+              ) : (
+                <p className="text-[12.5px] text-[var(--muted)]">
+                  Suggestions are being prepared for this document.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <form
         onSubmit={askQuestion}

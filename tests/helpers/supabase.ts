@@ -119,6 +119,7 @@ export function seedUser(user = userA, overrides: Row = {}) {
     email: user.email,
     full_name: user.email?.split("@")[0] ?? "Test User",
     onboarded_at: null,
+    onboarding_tour_completed_at: null,
     ...overrides,
   };
   tables.users.push(row);

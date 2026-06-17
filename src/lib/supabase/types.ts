@@ -107,6 +107,52 @@ export type Database = {
           },
         ];
       };
+      document_suggestions: {
+        Row: {
+          document_id: string;
+          suggestions: Json;
+          generated_at: string;
+        };
+        Insert: {
+          document_id: string;
+          suggestions?: Json;
+          generated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_suggestions"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "document_suggestions_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: true;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      portfolio_suggestions: {
+        Row: {
+          user_id: string;
+          suggestions: Json;
+          document_count: number;
+          generated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          suggestions?: Json;
+          document_count?: number;
+          generated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["portfolio_suggestions"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "portfolio_suggestions_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       documents: {
         Row: {
           id: string;

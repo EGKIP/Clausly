@@ -5,6 +5,8 @@ type TableName =
   | "billing_customers"
   | "qa_conversations"
   | "qa_messages"
+  | "document_suggestions"
+  | "portfolio_suggestions"
   | "documents"
   | "clauses"
   | "dates"
@@ -27,6 +29,8 @@ const tables: TableStore = {
   billing_customers: [],
   qa_conversations: [],
   qa_messages: [],
+  document_suggestions: [],
+  portfolio_suggestions: [],
   documents: [],
   clauses: [],
   dates: [],
@@ -188,6 +192,39 @@ export function seedMessage(conversationId: string, overrides: Row = {}) {
     ...overrides,
   };
   tables.qa_messages.push(row);
+  return row;
+}
+
+export function seedDocumentSuggestion(documentId: string, overrides: Row = {}) {
+  const row = {
+    document_id: documentId,
+    suggestions: [
+      "What's the termination clause?",
+      "When does this auto-renew?",
+      "What notice period applies?",
+      "Which fees could surprise me?",
+    ],
+    generated_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.document_suggestions.push(row);
+  return row;
+}
+
+export function seedPortfolioSuggestion(user = userA, overrides: Row = {}) {
+  const row = {
+    user_id: user.id,
+    suggestions: [
+      "Which contracts renew soon?",
+      "Where is my highest monthly cost?",
+      "Which agreements need notice?",
+      "Which risks appear across documents?",
+    ],
+    document_count: 0,
+    generated_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.portfolio_suggestions.push(row);
   return row;
 }
 
@@ -542,6 +579,10 @@ class Query {
 function isVisible(table: TableName, row: Row) {
   if (!currentUser) return false;
   if (table === "users") return row.id === currentUser.id;
+  if (table === "document_suggestions") {
+    const document = tables.documents.find((item) => item.id === row.document_id);
+    return document?.user_id === currentUser.id;
+  }
   if (table === "qa_messages") {
     const conversation = tables.qa_conversations.find((item) => item.id === row.conversation_id);
     return conversation?.user_id === currentUser.id;
@@ -553,7 +594,7 @@ function cascadeDocuments(ids: Set<string>) {
   const conversationIds = new Set(
     tables.qa_conversations.filter((row) => ids.has(row.document_id)).map((row) => row.id)
   );
-  for (const table of ["clauses", "dates", "reminders", "document_chunks", "qa_conversations"] as TableName[]) {
+  for (const table of ["clauses", "dates", "reminders", "document_chunks", "qa_conversations", "document_suggestions"] as TableName[]) {
     tables[table] = tables[table].filter((row) => !ids.has(row.document_id));
   }
   tables.qa_messages = tables.qa_messages.filter((row) => !conversationIds.has(row.conversation_id));

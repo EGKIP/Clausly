@@ -204,7 +204,7 @@ export default async function DashboardHomePage() {
             </Link>
           }
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div data-tour="documents" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {recent.map((d) => (
             <DocumentCard key={d.id} doc={d} />
           ))}

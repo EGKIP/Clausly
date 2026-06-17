@@ -201,7 +201,7 @@ export default function RemindersPage() {
                   <p className="font-mono text-[11px] text-[var(--muted)] mt-1 tabular-nums">{r.fireOn}</p>
                 </div>
                 {tab === "suggested" && (
-                  <div className="flex items-center gap-1.5">
+                  <div data-tour="reminders" className="flex items-center gap-1.5">
                     <Button
                       variant="primary"
                       size="sm"

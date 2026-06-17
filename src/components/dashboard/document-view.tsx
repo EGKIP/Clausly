@@ -88,6 +88,7 @@ export function DocumentView({
               return (
                 <button
                   key={t.id}
+                  data-tour={t.id === "clauses" ? "clauses" : undefined}
                   onClick={() => setTab(t.id)}
                   className={cn(
                     "relative inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
@@ -236,7 +237,7 @@ function ClausesPanel({
 }) {
   const current = clauses.find((c) => c.id === active) ?? clauses[0];
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4">
+    <div data-tour="clauses" className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-4">
       <ul className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] max-h-[560px] overflow-y-auto">
         {clauses.map((c) => {
           const isActive = c.id === current.id;

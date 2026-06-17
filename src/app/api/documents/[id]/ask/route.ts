@@ -5,6 +5,14 @@ import { getQAModel, getQAProvider, getQAProviderName } from "@/lib/ai/qa/provid
 import { encodeSseFrame } from "@/lib/ai/qa/sse";
 import { getQAStreamProvider } from "@/lib/ai/qa/stream";
 import { canAskQuestion } from "@/lib/billing/qa-rate-limit";
+import {
+  appendMessage,
+  getOrCreateConversation,
+  loadConversationMessages,
+  touchConversation,
+  type ConversationMessage,
+  type ConversationRef,
+} from "@/lib/db/conversations";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
@@ -13,6 +21,7 @@ type RouteContext = {
 
 const questionSchema = z.object({
   question: z.string().trim().min(3).max(500),
+  conversationId: z.string().uuid().optional(),
 }).strict();
 
 type MatchChunk = {
@@ -119,6 +128,28 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 
+  let conversation: ConversationRef;
+  let history: ConversationMessage[];
+  try {
+    conversation = await getOrCreateConversation(
+      supabase,
+      user.id,
+      document.id,
+      parsed.data.question,
+      parsed.data.conversationId
+    );
+    history = await loadConversationMessages(supabase, user.id, conversation.id, 10);
+    await appendMessage(supabase, conversation.id, "user", parsed.data.question);
+  } catch (error) {
+    if (error instanceof Error && error.name === "ConversationNotFoundError") {
+      return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+    }
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Conversation could not be loaded." },
+      { status: 500 }
+    );
+  }
+
   const [questionEmbedding] = await getEmbeddingProvider()([parsed.data.question]);
   const { data: matches, error: matchError } = await supabase.rpc("match_document_chunks", {
     target_document_id: document.id,
@@ -152,16 +183,16 @@ export async function POST(request: Request, context: RouteContext) {
       supabase,
       userId: user.id,
       documentId: document.id,
+      conversation,
       question: parsed.data.question,
       chunks,
       citations,
+      history,
     });
   }
 
-  const qaResult = await getQAProvider()({
-    question: parsed.data.question,
-    chunks,
-  });
+  const qaInput = buildQAInput(parsed.data.question, chunks, history);
+  const qaResult = await getQAProvider()(qaInput);
   const cited = new Set(qaResult.citationChunkIds);
   const citations = chunks
     .filter((chunk) => cited.has(chunk.id))
@@ -177,10 +208,13 @@ export async function POST(request: Request, context: RouteContext) {
     inputChars: parsed.data.question.length + chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
     outputChars: qaResult.answer.length,
   });
+  await appendMessage(supabase, conversation.id, "assistant", qaResult.answer, citations);
+  await touchConversation(supabase, conversation.id);
 
   return NextResponse.json({
     answer: qaResult.answer,
     citations,
+    conversation,
   });
 }
 
@@ -188,21 +222,29 @@ function streamAskResponse(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
   documentId: string;
+  conversation: ConversationRef;
   question: string;
   chunks: AskChunk[];
   citations: AskCitation[];
+  history: ConversationMessage[];
 }) {
   return new Response(
     new ReadableStream<Uint8Array>({
       async start(controller) {
         let answer = "";
+        if (input.conversation.isNew) {
+          controller.enqueue(encodeSseFrame("conversation", {
+            conversation: {
+              id: input.conversation.id,
+              title: input.conversation.title,
+              isNew: true,
+            },
+          }));
+        }
         controller.enqueue(encodeSseFrame("citations", { citations: input.citations }));
 
         try {
-          for await (const event of getQAStreamProvider()({
-            question: input.question,
-            chunks: input.chunks,
-          })) {
+          for await (const event of getQAStreamProvider()(buildQAInput(input.question, input.chunks, input.history))) {
             if (event.type === "token") {
               answer += event.text;
               controller.enqueue(encodeSseFrame("token", { text: event.text }));
@@ -225,6 +267,8 @@ function streamAskResponse(input: {
                 inputChars: input.question.length + input.chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
                 outputChars: answer.length,
               });
+              await appendMessage(input.supabase, input.conversation.id, "assistant", answer, input.citations);
+              await touchConversation(input.supabase, input.conversation.id);
               controller.enqueue(encodeSseFrame("done", {}));
               controller.close();
               return;
@@ -249,6 +293,17 @@ function streamAskResponse(input: {
       },
     },
   );
+}
+
+function buildQAInput(question: string, chunks: AskChunk[], history: ConversationMessage[]) {
+  const qaInput: { question: string; chunks: AskChunk[]; history?: Array<{ role: "user" | "assistant"; content: string }> } = {
+    question,
+    chunks,
+  };
+  if (history.length > 0) {
+    qaInput.history = history.map((message) => ({ role: message.role, content: message.content }));
+  }
+  return qaInput;
 }
 
 function streamMockResponse(input: { citations: AskCitation[]; answer: string }) {

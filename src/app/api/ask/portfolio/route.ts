@@ -8,10 +8,19 @@ import {
   type PortfolioQAChunk,
 } from "@/lib/ai/qa/portfolio-provider";
 import { canAskQuestion } from "@/lib/billing/qa-rate-limit";
+import {
+  appendMessage,
+  getOrCreateConversation,
+  loadConversationMessages,
+  touchConversation,
+  type ConversationMessage,
+  type ConversationRef,
+} from "@/lib/db/conversations";
 import { createClient } from "@/lib/supabase/server";
 
 const questionSchema = z.object({
   question: z.string().trim().min(3).max(500),
+  conversationId: z.string().uuid().optional(),
 }).strict();
 
 type MatchChunk = {
@@ -79,6 +88,28 @@ export async function POST(request: Request) {
     );
   }
 
+  let conversation: ConversationRef;
+  let history: ConversationMessage[];
+  try {
+    conversation = await getOrCreateConversation(
+      supabase,
+      user.id,
+      null,
+      parsed.data.question,
+      parsed.data.conversationId
+    );
+    history = await loadConversationMessages(supabase, user.id, conversation.id, 10);
+    await appendMessage(supabase, conversation.id, "user", parsed.data.question);
+  } catch (error) {
+    if (error instanceof Error && error.name === "ConversationNotFoundError") {
+      return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+    }
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Conversation could not be loaded." },
+      { status: 500 }
+    );
+  }
+
   const [questionEmbedding] = await getEmbeddingProvider()([parsed.data.question]);
   const { data: matches, error: matchError } = await supabase.rpc("match_portfolio_chunks", {
     query_embedding: questionEmbedding,
@@ -124,16 +155,15 @@ export async function POST(request: Request) {
     return streamPortfolioResponse({
       supabase,
       userId: user.id,
+      conversation,
       question: parsed.data.question,
       chunks,
       citations: allCitations,
+      history,
     });
   }
 
-  const qaResult = await getPortfolioQAProvider()({
-    question: parsed.data.question,
-    chunks,
-  });
+  const qaResult = await getPortfolioQAProvider()(buildPortfolioQAInput(parsed.data.question, chunks, history));
   const cited = new Set(qaResult.citationChunkIds);
   const citations = chunks
     .filter((chunk) => cited.has(chunk.id))
@@ -150,16 +180,20 @@ export async function POST(request: Request) {
     inputChars: parsed.data.question.length + chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
     outputChars: qaResult.answer.length,
   });
+  await appendMessage(supabase, conversation.id, "assistant", qaResult.answer, citations);
+  await touchConversation(supabase, conversation.id);
 
   return NextResponse.json({
     answer: qaResult.answer,
     citations,
+    conversation,
   });
 }
 
 function streamPortfolioResponse(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
   userId: string;
+  conversation: ConversationRef;
   question: string;
   chunks: PortfolioQAChunk[];
   citations: Array<{
@@ -169,18 +203,25 @@ function streamPortfolioResponse(input: {
     pageNumber: number | null;
     snippet: string;
   }>;
+  history: ConversationMessage[];
 }) {
   return new Response(
     new ReadableStream<Uint8Array>({
       async start(controller) {
         let answer = "";
+        if (input.conversation.isNew) {
+          controller.enqueue(encodeSseFrame("conversation", {
+            conversation: {
+              id: input.conversation.id,
+              title: input.conversation.title,
+              isNew: true,
+            },
+          }));
+        }
         controller.enqueue(encodeSseFrame("citations", { citations: input.citations }));
 
         try {
-          for await (const event of getPortfolioQAStreamProvider()({
-            question: input.question,
-            chunks: input.chunks,
-          })) {
+          for await (const event of getPortfolioQAStreamProvider()(buildPortfolioQAInput(input.question, input.chunks, input.history))) {
             if (event.type === "token") {
               answer += event.text;
               controller.enqueue(encodeSseFrame("token", { text: event.text }));
@@ -201,6 +242,8 @@ function streamPortfolioResponse(input: {
                 inputChars: input.question.length + input.chunks.reduce((sum, chunk) => sum + chunk.content.length, 0),
                 outputChars: answer.length,
               });
+              await appendMessage(input.supabase, input.conversation.id, "assistant", answer, input.citations);
+              await touchConversation(input.supabase, input.conversation.id);
               controller.enqueue(encodeSseFrame("done", {}));
               controller.close();
               return;
@@ -225,6 +268,21 @@ function streamPortfolioResponse(input: {
       },
     },
   );
+}
+
+function buildPortfolioQAInput(question: string, chunks: PortfolioQAChunk[], history: ConversationMessage[]) {
+  const qaInput: {
+    question: string;
+    chunks: PortfolioQAChunk[];
+    history?: Array<{ role: "user" | "assistant"; content: string }>;
+  } = {
+    question,
+    chunks,
+  };
+  if (history.length > 0) {
+    qaInput.history = history.map((message) => ({ role: message.role, content: message.content }));
+  }
+  return qaInput;
 }
 
 function streamMockPortfolioResponse(input: { answer: string; citations: ReturnType<typeof demoCitations> }) {

@@ -52,11 +52,11 @@ function ReadyDocumentRemindersSection({ doc }: { doc: ContractDoc }) {
   return (
     <section className="mb-5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 md:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 items-start gap-2 sm:items-center">
           <span className="inline-flex size-8 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)]">
             <BellRing className="size-4" />
           </span>
-          <h2 className="text-[14px] font-medium">
+          <h2 className="text-[14px] font-medium leading-snug">
             Reminders <span className="text-[var(--faint)]">·</span>{" "}
             <span className="tabular-nums">{suggestedForDocument.length}</span> suggested{" "}
             <span className="text-[var(--faint)]">·</span>{" "}
@@ -198,9 +198,9 @@ function ReminderRow({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap md:justify-end">
         {onApprove && (
-          <Button variant="primary" size="sm" disabled={pending} onClick={onApprove}>
+          <Button variant="primary" size="sm" disabled={pending} onClick={onApprove} className="min-h-11 w-full sm:min-h-0 sm:w-auto">
             <Check className="size-3.5" /> Approve
           </Button>
         )}
@@ -210,12 +210,13 @@ function ReminderRow({
           disabled={pending}
           aria-label={onApprove ? "Edit reminder" : undefined}
           onClick={onEdit}
+          className="min-h-11 w-full sm:min-h-0 sm:w-auto"
         >
           <Clock className="size-3.5" />
           {!onApprove && "Edit"}
         </Button>
         {onDismiss && (
-          <Button variant="ghost" size="sm" disabled={pending} aria-label="Ignore reminder" onClick={onDismiss}>
+          <Button variant="ghost" size="sm" disabled={pending} aria-label="Ignore reminder" onClick={onDismiss} className="min-h-11 w-full sm:min-h-0 sm:w-auto">
             <X className="size-3.5" />
           </Button>
         )}

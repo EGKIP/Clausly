@@ -94,13 +94,13 @@ export default function RemindersPage() {
         title="Reminders"
         description="Everything is suggested first. Clausly never fires a reminder without your nod."
         actions={
-          <Button variant="secondary" size="md">
+          <Button variant="secondary" size="md" className="min-h-11 w-full sm:w-auto">
             <Calendar className="size-3.5" /> Calendar view
           </Button>
         }
       />
 
-      <div className="mt-8 flex items-center gap-1 p-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] w-fit overflow-x-auto scrollbar-none">
+      <div className="mt-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 scrollbar-none sm:w-fit">
         {tabs.map((t) => {
           const active = t.id === tab;
           return (
@@ -108,7 +108,7 @@ export default function RemindersPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "relative inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
+                "relative inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-[var(--radius-sm)] px-3.5 py-2 text-[13px] font-medium transition-colors sm:min-h-0",
                 active ? "text-[var(--foreground)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
               )}
             >
@@ -152,7 +152,7 @@ export default function RemindersPage() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.28, delay: Math.min(i, 8) * 0.04, ease: [0.165, 0.84, 0.44, 1] }}
-              className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 grid grid-cols-1 md:grid-cols-[1fr_auto] items-start md:items-center gap-4"
+              className="grid grid-cols-1 items-start gap-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 md:grid-cols-[1fr_auto] md:items-center"
             >
               <div className="flex items-start gap-4 min-w-0">
                 <span
@@ -184,8 +184,8 @@ export default function RemindersPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between md:justify-end gap-3">
-                <div className="text-right">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between md:justify-end">
+                <div className="text-left sm:text-right">
                   {tab === "sent" ? (
                     <DeliveryBadge status={r.deliveryStatus ?? "pending"} />
                   ) : (
@@ -201,12 +201,13 @@ export default function RemindersPage() {
                   <p className="font-mono text-[11px] text-[var(--muted)] mt-1 tabular-nums">{r.fireOn}</p>
                 </div>
                 {tab === "suggested" && (
-                  <div data-tour="reminders" className="flex items-center gap-1.5">
+                  <div data-tour="reminders" className="grid w-full grid-cols-1 gap-1.5 sm:w-auto sm:grid-cols-[auto_auto_auto]">
                     <Button
                       variant="primary"
                       size="sm"
                       disabled={isPending}
                       onClick={() => void handleApprove(r.id)}
+                      className="min-h-11 w-full sm:min-h-0 sm:w-auto"
                     >
                       <Check className="size-3.5" /> Approve
                     </Button>
@@ -216,6 +217,7 @@ export default function RemindersPage() {
                       aria-label="Edit timing"
                       disabled={isPending}
                       onClick={() => setEditingReminder(r)}
+                      className="min-h-11 w-full sm:min-h-0 sm:w-auto"
                     >
                       <Clock className="size-3.5" />
                     </Button>
@@ -225,6 +227,7 @@ export default function RemindersPage() {
                       aria-label="Ignore"
                       disabled={isPending}
                       onClick={() => void handleDismiss(r.id)}
+                      className="min-h-11 w-full sm:min-h-0 sm:w-auto"
                     >
                       <X className="size-3.5" />
                     </Button>
@@ -236,12 +239,13 @@ export default function RemindersPage() {
                     size="sm"
                     disabled={isPending}
                     onClick={() => setEditingReminder(r)}
+                    className="min-h-11 w-full sm:min-h-0 sm:w-auto"
                   >
                     <Clock className="size-3.5" /> Edit
                   </Button>
                 )}
                 {tab === "sent" && (
-                  <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--muted)]">
+                  <span className="inline-flex min-h-11 items-center gap-1.5 text-[12px] text-[var(--muted)] sm:min-h-0">
                     <Send className="size-3" />
                     Email · {r.channel.toLowerCase()}
                   </span>
@@ -279,8 +283,8 @@ function LoadingState() {
             </div>
           </div>
           <div className="flex items-center gap-2 justify-end">
-            <Skeleton variant="pill" className="w-20 h-8" />
-            <Skeleton variant="pill" className="w-20 h-8" />
+            <Skeleton variant="pill" className="h-11 w-20 sm:h-8" />
+            <Skeleton variant="pill" className="h-11 w-20 sm:h-8" />
           </div>
         </div>
       ))}

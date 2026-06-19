@@ -50,9 +50,9 @@ export function PDFPreview({
   const canRenderReal = Boolean(signedUrl) && !viewerError;
 
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] overflow-hidden flex flex-col h-[680px]">
+    <div className="flex h-[560px] min-w-0 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] sm:h-[680px]">
       {/* Chrome */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 sm:px-4">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
             PDF preview
@@ -83,7 +83,7 @@ export function PDFPreview({
               href={signedUrl ?? "#"}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex size-7 items-center justify-center rounded-[var(--radius-xs)] text-[var(--faint)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+              className="inline-flex size-10 items-center justify-center rounded-[var(--radius-xs)] text-[var(--faint)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] sm:size-7"
               aria-label="Download"
             >
               <Download className="size-3.5" />
@@ -93,7 +93,7 @@ export function PDFPreview({
       </div>
 
       {/* Document body */}
-      <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 bg-[var(--surface-2)]">
+      <div className="flex-1 overflow-auto bg-[var(--surface-2)] px-3 py-5 sm:px-6 sm:py-8 md:px-10">
         {canRenderReal ? (
           <PDFViewer
             url={signedUrl!}
@@ -109,7 +109,7 @@ export function PDFPreview({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-[var(--border)] bg-[var(--surface)] font-mono text-[10.5px] text-[var(--faint)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 font-mono text-[10.5px] text-[var(--faint)] sm:gap-3 sm:px-4">
         <div className="flex items-center gap-1">
           <IconButton
             disabled={page <= 1}
@@ -129,7 +129,7 @@ export function PDFPreview({
             <ChevronRight className="size-3.5" />
           </IconButton>
         </div>
-        <span className="truncate">
+        <span className="min-w-0 truncate">
           {viewerError
             ? viewerError
             : canRenderReal
@@ -159,7 +159,7 @@ function IconButton({
       disabled={disabled}
       aria-label={label}
       className={cn(
-        "inline-flex size-7 items-center justify-center rounded-[var(--radius-xs)] text-[var(--faint)] transition-colors",
+        "inline-flex size-10 items-center justify-center rounded-[var(--radius-xs)] text-[var(--faint)] transition-colors sm:size-7",
         "hover:text-[var(--foreground)] hover:bg-[var(--surface-2)]",
         "disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[var(--faint)]"
       )}
@@ -187,7 +187,7 @@ function FauxPaper({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className="relative mx-auto max-w-[520px] rounded-[6px] bg-white shadow-[0_1px_0_oklch(0%_0_0/0.04),0_24px_60px_-24px_oklch(20%_0.03_260/0.18)] aspect-[8.5/11] p-10 text-[#1a1d24]"
+      className="relative mx-auto aspect-[8.5/11] w-full max-w-[520px] rounded-[6px] bg-white p-6 text-[#1a1d24] shadow-[0_1px_0_oklch(0%_0_0/0.04),0_24px_60px_-24px_oklch(20%_0.03_260/0.18)] sm:p-10"
     >
       <p className="text-center font-serif text-[14px] tracking-[0.18em] uppercase text-[#1a1d24]/60">
         {docTitle}

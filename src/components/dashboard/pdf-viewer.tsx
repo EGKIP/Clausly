@@ -46,7 +46,7 @@ export function PDFViewer({ url, page, zoom, activeClause, onLoad, onError }: Vi
   const showOverlay = activeClause && activeClause.page === page;
 
   return (
-    <div ref={containerRef} className="relative mx-auto w-full max-w-[640px]">
+    <div ref={containerRef} className="relative mx-auto w-full max-w-[640px] overflow-x-auto">
       <Document
         file={file}
         options={documentOptions}

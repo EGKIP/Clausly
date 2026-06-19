@@ -45,10 +45,12 @@ export function DocumentCard({
         <Badge tone="outline">{doc.pages} pages</Badge>
       </div>
 
-      <div className="mt-5 pt-4 border-t border-[var(--border)] flex items-center justify-between text-[11.5px] font-mono text-[var(--muted)]">
-        <span className="inline-flex items-center gap-1.5">
-          <CalendarClock className="size-3" />
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4 text-[11.5px] font-mono text-[var(--muted)]">
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <CalendarClock className="size-3 shrink-0" />
+          <span className="truncate">
           Ends {doc.ends}
+          </span>
         </span>
         <span
           className="size-7 inline-flex items-center justify-center rounded-[var(--radius-xs)] opacity-0 group-hover:opacity-100 transition-opacity"

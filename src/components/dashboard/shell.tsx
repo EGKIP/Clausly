@@ -12,6 +12,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [cmdOpen, setCmdOpen] = React.useState(false);
+  const drawerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -31,6 +32,36 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const focusable = getFocusableElements(drawer);
+    (focusable[0] ?? drawer).focus();
+  }, [mobileOpen]);
+
+  function handleDrawerKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "Tab") return;
+    const drawer = drawerRef.current;
+    if (!drawer) return;
+    const focusable = getFocusableElements(drawer);
+    if (focusable.length === 0) {
+      event.preventDefault();
+      drawer.focus();
+      return;
+    }
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[var(--background)] flex">
       {/* Desktop sidebar */}
@@ -47,14 +78,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
+              aria-hidden="true"
+              data-testid="sidebar-overlay"
               className="lg:hidden fixed inset-0 z-40 bg-[oklch(15%_0.02_260/0.4)] backdrop-blur-sm"
             />
             <motion.div
+              ref={drawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Dashboard navigation"
+              tabIndex={-1}
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", stiffness: 340, damping: 36 }}
-              className="lg:hidden fixed inset-y-0 left-0 z-50 w-[280px] shadow-[var(--shadow-float)]"
+              onKeyDown={handleDrawerKeyDown}
+              className="lg:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,calc(100vw-24px))] shadow-[var(--shadow-float)] outline-none"
             >
               <Sidebar onNavigate={() => setMobileOpen(false)} />
             </motion.div>
@@ -82,6 +121,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </React.Suspense>
     </div>
   );
+}
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
 }
 
 function UploadDeepLink({ onOpen }: { onOpen: () => void }) {

@@ -165,7 +165,7 @@ export default function SettingsPage() {
             title="Profile"
             description="Your display name appears in workspace greetings. Email is managed by your sign-in provider."
           />
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <form onSubmit={saveProfile} className="grid gap-5">
               <label className="grid gap-2">
                 <span className="inline-flex items-center gap-2 text-[12.5px] font-medium">
@@ -203,11 +203,12 @@ export default function SettingsPage() {
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <Button
                   type="submit"
                   variant="primary"
                   size="md"
+                  className="min-h-11 w-full sm:w-auto"
                   disabled={profile.mockMode || status === "saving" || displayName.trim().length === 0}
                 >
                   <Save className="size-3.5" />
@@ -228,7 +229,7 @@ export default function SettingsPage() {
             title="Plan"
             description="Your plan sets portfolio limits and unlocks portfolio-level intelligence."
           />
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -260,7 +261,7 @@ export default function SettingsPage() {
                   type="button"
                   variant="primary"
                   size="md"
-                  className="w-full md:w-auto"
+                  className="min-h-11 w-full sm:w-auto"
                   onClick={() => void startCheckout()}
                   disabled={billingStatus === "loading"}
                 >
@@ -272,7 +273,7 @@ export default function SettingsPage() {
                     type="button"
                     variant="outline"
                     size="md"
-                    className="w-full md:w-auto"
+                    className="min-h-11 w-full sm:w-auto"
                     onClick={() => void startPortal()}
                     disabled={billingStatus === "loading"}
                   >
@@ -280,7 +281,7 @@ export default function SettingsPage() {
                   </Button>
                 )}
                 {billingMessage && (
-                  <p className="max-w-[260px] text-right text-[12px] text-[var(--color-coral-ink)]">
+                  <p className="max-w-[260px] text-left text-[12px] text-[var(--color-coral-ink)] md:text-right">
                     {billingMessage}
                   </p>
                 )}
@@ -295,7 +296,7 @@ export default function SettingsPage() {
             description="Control notification delivery, theme, and default reminder timing."
           />
           <div className="grid gap-4">
-            <Card className="p-6">
+            <Card className="p-4 sm:p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-[12.5px] font-medium">Appearance</p>
@@ -317,9 +318,9 @@ export default function SettingsPage() {
 
         <section>
           <SectionHeader title="Account" description="Session controls for this workspace." />
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <form action={signOut}>
-              <Button type="submit" variant="secondary" size="md">
+              <Button type="submit" variant="secondary" size="md" className="min-h-11 w-full sm:w-auto">
                 <LogOut className="size-3.5" />
                 Sign out
               </Button>
@@ -332,11 +333,11 @@ export default function SettingsPage() {
             title="Danger zone"
             description="Sensitive account actions need a deliberate confirmation step."
           />
-          <Card className="p-6">
+          <Card className="p-4 sm:p-6">
             <Button
               variant="outline"
               size="md"
-              className="border-[color-mix(in_oklch,var(--color-coral)_30%,var(--border))] text-[var(--color-coral-ink)]"
+              className="min-h-11 w-full border-[color-mix(in_oklch,var(--color-coral)_30%,var(--border))] text-[var(--color-coral-ink)] sm:w-auto"
               onClick={() => setConfirmOpen(true)}
             >
               <ShieldAlert className="size-3.5" />
@@ -350,7 +351,7 @@ export default function SettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm">
           <form
             onSubmit={deleteAccount}
-            className="w-full max-w-[460px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-float)]"
+            className="max-h-[calc(100vh-2rem)] w-full max-w-[460px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-float)] sm:p-6"
           >
             <div className="inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)]">
               <AlertTriangle className="size-4" />
@@ -379,11 +380,12 @@ export default function SettingsPage() {
                 {deleteMessage}
               </p>
             )}
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="min-h-11 w-full sm:min-h-0 sm:w-auto"
                 onClick={() => {
                   setConfirmOpen(false);
                   setConfirmEmail("");
@@ -398,7 +400,7 @@ export default function SettingsPage() {
                 type="submit"
                 variant="outline"
                 size="sm"
-                className="border-[color-mix(in_oklch,var(--color-coral)_42%,var(--border))] text-[var(--color-coral-ink)] hover:bg-[var(--color-coral-soft)]"
+                className="min-h-11 w-full border-[color-mix(in_oklch,var(--color-coral)_42%,var(--border))] text-[var(--color-coral-ink)] hover:bg-[var(--color-coral-soft)] sm:min-h-0 sm:w-auto"
                 disabled={profile.mockMode || confirmEmail !== profile.email || deleteStatus === "deleting"}
               >
                 {deleteStatus === "deleting" ? "Deleting..." : "Delete permanently"}

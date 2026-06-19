@@ -76,7 +76,7 @@ export default async function InsightsPage() {
         }
         description="A calm, weekly read on what you're spending, what's coming due, and where Clausly thinks you should look. Generated Mondays at 9am."
         actions={
-          <Button variant="secondary" size="md">
+          <Button variant="secondary" size="md" className="min-h-11 w-full sm:w-auto">
             <ArrowUpRight className="size-3.5" /> Email me this
           </Button>
         }
@@ -85,13 +85,13 @@ export default async function InsightsPage() {
       <PortfolioAsk />
 
       {/* Hero insight */}
-      <div className="mt-10 relative overflow-hidden rounded-[var(--radius-2xl)] border border-[color-mix(in_oklch,var(--accent)_28%,var(--border))] bg-gradient-to-br from-[var(--accent-soft)] via-[var(--surface)] to-[var(--surface)] p-7 md:p-10">
+      <div className="mt-10 relative overflow-hidden rounded-[var(--radius-2xl)] border border-[color-mix(in_oklch,var(--accent)_28%,var(--border))] bg-gradient-to-br from-[var(--accent-soft)] via-[var(--surface)] to-[var(--surface)] p-5 sm:p-7 md:p-10">
         <div
           aria-hidden
           className="absolute -top-24 -right-24 size-72 rounded-full opacity-40"
           style={{ background: "radial-gradient(circle, color-mix(in oklch, var(--accent) 40%, transparent), transparent 70%)" }}
         />
-        <div className="relative grid md:grid-cols-2 gap-10 items-end">
+        <div className="relative grid gap-6 md:grid-cols-2 md:items-end md:gap-10">
           <div>
             <Badge tone="clause">
               <TrendingUp className="size-2.5" /> Headline
@@ -107,7 +107,7 @@ export default async function InsightsPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
               { i: PiggyBank, v: `$${monthlySpend.toLocaleString()}`, l: "Monthly spend" },
               { i: Hourglass, v: noticeWindows.length, l: "Notice windows" },
@@ -144,11 +144,11 @@ export default async function InsightsPage() {
               const pct = (amount / max) * 100;
               return (
                 <div key={d.id} className="px-5 py-4 border-b border-[var(--border)] last:border-0">
-                  <div className="flex items-center gap-4 justify-between">
-                    <Link href={`/dashboard/documents/${d.id}`} className="text-[13.5px] font-medium hover:underline truncate">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <Link href={`/dashboard/documents/${d.id}`} className="min-w-0 text-[13.5px] font-medium hover:underline sm:truncate">
                       {d.title}
                     </Link>
-                    <span className="font-serif text-[18px] tabular-nums tracking-[-0.005em] shrink-0">
+                    <span className="shrink-0 font-serif text-[18px] tabular-nums tracking-[-0.005em]">
                       {d.monthly}
                     </span>
                   </div>
@@ -177,7 +177,7 @@ export default async function InsightsPage() {
               href={`/dashboard/documents/${r.docId}`}
               className="group rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--border-strong)] transition-colors"
             >
-              <div className="flex items-center justify-between mb-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <Badge tone="ember">
                   <CalendarClock className="size-2.5" /> {r.type}
                 </Badge>
@@ -210,7 +210,7 @@ export default async function InsightsPage() {
               href={`/dashboard/documents/${d.id}`}
               className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 hover:border-[var(--border-strong)]"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <RiskPill level={d.risk} size="sm" />
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
                   {d.type}

@@ -263,7 +263,7 @@ export function PortfolioAsk() {
   }
 
   return (
-    <Card className="mt-10 overflow-hidden p-6 md:p-7">
+    <Card className="mt-10 overflow-hidden p-4 sm:p-6 md:p-7">
       <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="max-w-2xl">
           <Badge tone="iris">
@@ -287,7 +287,7 @@ export function PortfolioAsk() {
           <button
             type="button"
             onClick={startNewChat}
-            className="text-[12px] font-medium text-[var(--accent-ink)] underline underline-offset-4"
+            className="min-h-11 text-[12px] font-medium text-[var(--accent-ink)] underline underline-offset-4 sm:min-h-0"
           >
             + New chat
           </button>
@@ -300,8 +300,8 @@ export function PortfolioAsk() {
                 type="button"
                 onClick={() => void selectConversation(conversation.id)}
                 className={conversation.id === conversationId
-                  ? "shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-[12px] text-[var(--accent-ink)]"
-                  : "shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12px] text-[var(--muted)] hover:border-[var(--border-strong)]"}
+                  ? "min-h-11 shrink-0 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-2 text-[12px] text-[var(--accent-ink)] sm:min-h-0 sm:py-1.5"
+                  : "min-h-11 shrink-0 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--muted)] hover:border-[var(--border-strong)] sm:min-h-0 sm:py-1.5"}
               >
                 {conversation.title}
               </button>
@@ -325,7 +325,7 @@ export function PortfolioAsk() {
                   type="button"
                   onClick={() => void askPortfolio(undefined, suggestion)}
                   disabled={loading}
-                  className="text-left text-[13px] rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-[13px] hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0 sm:py-1.5"
                 >
                   {suggestion}
                 </button>
@@ -360,11 +360,16 @@ export function PortfolioAsk() {
           rows={3}
           className="min-h-24 w-full resize-none bg-transparent px-2 py-2 text-[14px] leading-relaxed focus:outline-none placeholder:text-[var(--faint)]"
         />
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] px-2 pt-2">
+        <div className="flex flex-col gap-3 border-t border-[var(--border)] px-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[11.5px] leading-relaxed text-[var(--faint)]">
             Informational only. Not legal advice.
           </p>
-          <Button variant="primary" size="sm" disabled={loading || question.trim().length < 3}>
+          <Button
+            variant="primary"
+            size="sm"
+            className="min-h-11 w-full sm:min-h-0 sm:w-auto"
+            disabled={loading || question.trim().length < 3}
+          >
             {loading ? (
               <span className="size-3.5 rounded-full border border-current border-t-transparent motion-safe:animate-spin" />
             ) : (
@@ -396,20 +401,20 @@ export function PortfolioAsk() {
         <div className="mt-5 rounded-[var(--radius-md)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] p-4">
           <p className="text-[13px] leading-relaxed text-[var(--color-coral-ink)]">{error}</p>
           {error.includes("Upload your first document") ? (
-            <Button href="/dashboard/documents" variant="outline" size="sm" className="mt-3">
+            <Button href="/dashboard/documents" variant="outline" size="sm" className="mt-3 min-h-11 w-full sm:min-h-0 sm:w-auto">
               Go to documents
             </Button>
           ) : (
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               {usage?.plan === "free" && usage.remaining === 0 && (
-                <Button href="/upgrade" variant="outline" size="sm">
+                <Button href="/upgrade" variant="outline" size="sm" className="min-h-11 w-full sm:min-h-0 sm:w-auto">
                   Upgrade to Pro
                 </Button>
               )}
               <button
                 type="button"
                 onClick={() => void askPortfolio()}
-                className="text-[12px] font-medium text-[var(--color-coral-ink)] underline underline-offset-4"
+                className="min-h-11 text-left text-[12px] font-medium text-[var(--color-coral-ink)] underline underline-offset-4 sm:min-h-0"
               >
                 Try again
               </button>
@@ -424,8 +429,8 @@ export function PortfolioAsk() {
             <div
               key={message.id}
               className={message.role === "user"
-                ? "ml-auto max-w-[86%] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background)] p-4"
-                : "mr-auto max-w-[92%] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4"}
+                ? "ml-auto max-w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--background)] p-4 sm:max-w-[86%]"
+                : "mr-auto max-w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:max-w-[92%]"}
             >
               <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
                 {message.role === "user" ? "You" : "Clausly"}
@@ -512,7 +517,7 @@ function parseConversationEvent(data: Record<string, unknown>): ConversationSumm
 
 export function PortfolioAskUpgradeTeaser() {
   return (
-    <Card className="mt-10 overflow-hidden p-7 md:p-9">
+    <Card className="mt-10 overflow-hidden p-5 sm:p-7 md:p-9">
       <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
         <div className="max-w-2xl">
           <Badge tone="iris">
@@ -526,7 +531,7 @@ export function PortfolioAskUpgradeTeaser() {
             with citations back to the source documents.
           </p>
         </div>
-        <Button href="/upgrade" variant="primary" size="md">
+        <Button href="/upgrade" variant="primary" size="md" className="min-h-11 w-full sm:w-auto">
           Upgrade to Pro
         </Button>
       </div>

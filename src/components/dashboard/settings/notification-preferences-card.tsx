@@ -69,7 +69,7 @@ export function NotificationPreferencesCard({
   }
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6">
       <form onSubmit={savePreferences} className="grid gap-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -132,11 +132,12 @@ export function NotificationPreferencesCard({
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Button
             type="submit"
             variant="primary"
             size="md"
+            className="min-h-11 w-full sm:w-auto"
             disabled={profile.mockMode || status === "saving" || !changed}
           >
             <Save className="size-3.5" />

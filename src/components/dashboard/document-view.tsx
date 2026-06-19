@@ -76,13 +76,13 @@ export function DocumentView({
   return (
     <>
       {isDemo && <DemoNotice />}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-[1fr_minmax(0,520px)] gap-6">
+      <div className="mt-8 grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)]">
       {/* Left column: tabs */}
-      <div>
+      <div className="min-w-0">
         <DocumentRemindersSection doc={doc} />
 
         <div className="sticky top-16 z-20 -mx-1 px-1 py-2 bg-[color-mix(in_oklch,var(--background)_82%,transparent)] backdrop-blur-md">
-          <div className="flex items-center gap-1 p-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] overflow-x-auto scrollbar-none">
+          <div className="flex items-center gap-1 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-card)] scrollbar-none">
             {tabs.map((t) => {
               const active = t.id === tab;
               return (
@@ -91,7 +91,7 @@ export function DocumentView({
                   data-tour={t.id === "clauses" ? "clauses" : undefined}
                   onClick={() => setTab(t.id)}
                   className={cn(
-                    "relative inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
+                    "relative inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-sm)] px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors sm:min-h-0",
                     active ? "text-[var(--foreground)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
                   )}
                 >
@@ -132,7 +132,7 @@ export function DocumentView({
       </div>
 
       {/* Right column: PDF */}
-      <div className="lg:sticky lg:top-[88px] self-start">
+      <div className="min-w-0 self-start lg:sticky lg:top-[88px]">
         <PDFPreview
           docTitle={doc.title}
           pages={doc.pages}
@@ -163,7 +163,7 @@ function DemoNotice() {
       </div>
       <Link
         href="/dashboard/documents?upload=1"
-        className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12px] font-medium text-[var(--foreground)] hover:border-[var(--border-strong)]"
+        className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12px] font-medium text-[var(--foreground)] hover:border-[var(--border-strong)] sm:w-auto"
       >
         <Upload className="size-3.5" />
         Upload your own
@@ -191,7 +191,7 @@ function SummaryPanel({ doc, clauses }: { doc: ContractDoc; clauses: Clause[] })
         {doc.summary}
       </p>
 
-      <div className="mt-6 grid grid-cols-3 gap-2.5">
+      <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
         {(["high", "medium", "low"] as const).map((k) => (
           <div
             key={k}
@@ -319,7 +319,7 @@ function DatesPanel({ doc }: { doc: ContractDoc }) {
     <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6">
       <div className="space-y-3">
         {items.map((d) => (
-          <div key={d.label} className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-3 border-b border-[var(--border)] last:border-0">
+          <div key={d.label} className="grid grid-cols-1 gap-3 border-b border-[var(--border)] py-3 last:border-0 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-4">
             <div>
               <p className="text-[13px] font-medium">{d.label}</p>
               <p className="text-[11.5px] text-[var(--muted)]">{d.value}</p>
@@ -327,7 +327,7 @@ function DatesPanel({ doc }: { doc: ContractDoc }) {
             <span className="font-serif text-[20px] tabular-nums tracking-[-0.01em]">
               {d.days < 0 ? `${Math.abs(d.days)}d ago` : `${d.days}d`}
             </span>
-            <Button variant="ghost" size="sm">Add reminder</Button>
+            <Button variant="ghost" size="sm" className="min-h-11 w-full sm:min-h-0 sm:w-auto">Add reminder</Button>
           </div>
         ))}
       </div>
@@ -341,22 +341,22 @@ function RemindersPanel({ reminders }: { reminders: Reminder[] }) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] p-10 text-center">
         <p className="font-serif text-[18px]">No reminders yet for this document.</p>
-        <Button variant="primary" size="sm" className="mt-4">Suggest reminders</Button>
+        <Button variant="primary" size="sm" className="mt-4 min-h-11 w-full sm:min-h-0 sm:w-auto">Suggest reminders</Button>
       </div>
     );
   }
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
       {reminders.map((r) => (
-        <div key={r.id} className="flex items-center gap-4 px-5 py-4">
-          <span className="inline-flex size-9 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)]">
+        <div key={r.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)]">
             <BellRing className="size-4" />
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-[13.5px] font-medium">{r.title}</p>
             <p className="text-[12px] text-[var(--muted)] mt-0.5">{r.description}</p>
           </div>
-          <div className="text-right shrink-0">
+          <div className="shrink-0 text-left sm:text-right">
             <p className="font-mono text-[12px] text-[var(--foreground)] tabular-nums">{r.fireOn}</p>
             <p className="font-mono text-[10.5px] text-[var(--faint)] uppercase tracking-[0.12em] mt-1">
               {r.status}
@@ -593,7 +593,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
   }
 
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
@@ -656,7 +656,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
                   type="button"
                   onClick={() => void askQuestion(undefined, s)}
                   disabled={loading}
-                  className="text-left text-[13px] rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left text-[13px] hover:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-0 sm:py-1.5"
                 >
                   {s}
                 </button>
@@ -688,9 +688,9 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           placeholder="Ask anything about this document…"
-          className="flex-1 bg-transparent px-2 py-2 text-[14px] focus:outline-none placeholder:text-[var(--faint)]"
+          className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[14px] focus:outline-none placeholder:text-[var(--faint)]"
         />
-        <Button variant="primary" size="sm" aria-label="Send" disabled={loading || question.trim().length < 3}>
+        <Button variant="primary" size="sm" aria-label="Send" disabled={loading || question.trim().length < 3} className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0">
           {loading ? (
             <span className="size-3.5 rounded-full border border-current border-t-transparent motion-safe:animate-spin" />
           ) : (
@@ -724,8 +724,8 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
               className={cn(
                 "rounded-[var(--radius-md)] border p-4",
                 message.role === "user"
-                  ? "ml-auto max-w-[86%] border-[var(--border)] bg-[var(--background)]"
-                  : "mr-auto max-w-[92%] border-[var(--border)] bg-[var(--surface-2)]"
+                  ? "ml-auto max-w-full border-[var(--border)] bg-[var(--background)] sm:max-w-[86%]"
+                  : "mr-auto max-w-full border-[var(--border)] bg-[var(--surface-2)] sm:max-w-[92%]"
               )}
             >
               <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">

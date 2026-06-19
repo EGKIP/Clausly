@@ -112,11 +112,11 @@ export function PortfolioEmptyState({
             {c.description}
           </p>
 
-          <div className="mt-7 flex flex-wrap items-center gap-2">
-            <Button variant="primary" size="md" href="/dashboard/documents?upload=1">
+          <div className="mt-7 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button variant="primary" size="md" href="/dashboard/documents?upload=1" className="min-h-11 w-full sm:w-auto">
               <Upload className="size-3.5" /> Upload your first document
             </Button>
-            <Button variant="ghost" size="md" href="/dashboard/welcome">
+            <Button variant="ghost" size="md" href="/dashboard/welcome" className="min-h-11 w-full sm:w-auto">
               How it works <ArrowRight className="size-3.5" />
             </Button>
           </div>
@@ -127,6 +127,7 @@ export function PortfolioEmptyState({
               size="md"
               onClick={seedDemo}
               disabled={seedState === "loading"}
+              className="min-h-11 w-full sm:w-auto"
             >
               <Sparkles className="size-3.5" />
               {seedState === "loading" ? "Reading three sample contracts..." : "Try with sample data"}

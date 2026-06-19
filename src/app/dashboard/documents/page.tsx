@@ -82,7 +82,7 @@ export default function DocumentsPage() {
         title="Documents"
         description="Everything you've uploaded. Filter by type or risk, search by party or clause."
         actions={
-          <Button variant="primary" size="md" href="/dashboard/documents?upload=1">
+          <Button variant="primary" size="md" href="/dashboard/documents?upload=1" className="min-h-11">
             <Upload className="size-3.5" /> Upload
           </Button>
         }
@@ -90,13 +90,13 @@ export default function DocumentsPage() {
 
       {/* Toolbar */}
       <div className="mt-8 flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[200px] max-w-[420px]">
+        <div className="relative min-w-0 flex-[1_0_100%] sm:flex-1 sm:min-w-[200px] sm:max-w-[420px]">
           <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[var(--faint)]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search title, party, tag…"
-            className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13.5px] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--border-strong)]"
+            className="h-11 w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-[13.5px] placeholder:text-[var(--faint)] focus:outline-none focus:border-[var(--border-strong)]"
           />
         </div>
 
@@ -131,7 +131,7 @@ export default function DocumentsPage() {
               setType("All");
               setRisk("All risk");
             }}
-            className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)] px-2 py-1"
+            className="inline-flex min-h-11 items-center gap-1.5 px-2 text-[12.5px] text-[var(--muted)] hover:text-[var(--foreground)]"
           >
             <X className="size-3.5" /> Clear
           </button>
@@ -144,7 +144,7 @@ export default function DocumentsPage() {
               onClick={() => setView(v)}
               aria-label={v}
               className={cn(
-                "inline-flex size-8 items-center justify-center rounded-[var(--radius-xs)] transition-colors",
+                "inline-flex size-10 sm:size-8 items-center justify-center rounded-[var(--radius-xs)] transition-colors",
                 view === v
                   ? "bg-[var(--surface-2)] text-[var(--foreground)]"
                   : "text-[var(--faint)] hover:text-[var(--foreground)]"
@@ -272,22 +272,22 @@ function FilterChip({
     return () => document.removeEventListener("mousedown", close);
   }, []);
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative max-w-full">
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border h-10 px-3 text-[13px] font-medium transition-colors",
+          "inline-flex h-11 max-w-[calc(100vw-2rem)] items-center gap-1.5 rounded-[var(--radius-sm)] border px-3 text-[13px] font-medium transition-colors sm:h-10",
           open
             ? "border-[var(--border-strong)] bg-[var(--surface-2)]"
             : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
         )}
       >
         {Icon && <Icon className="size-3.5 text-[var(--muted)]" />}
-        {label}
+        <span className="truncate">{label}</span>
         <ChevronDown className="size-3.5 text-[var(--faint)]" />
       </button>
       {open && (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-20 min-w-[180px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)] p-1">
+        <div className="absolute left-0 top-[calc(100%+6px)] z-20 w-[min(220px,calc(100vw-2rem))] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)] sm:left-auto sm:right-0">
           {options.map((opt) => {
             const o = typeof opt === "string" ? { label: opt, value: opt } : opt;
             const active = o.value === value;
@@ -299,7 +299,7 @@ function FilterChip({
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex w-full items-center justify-between gap-3 rounded-[var(--radius-xs)] px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--surface-2)]",
+                  "flex min-h-11 w-full items-center justify-between gap-3 rounded-[var(--radius-xs)] px-2.5 py-2 text-left text-[13px] hover:bg-[var(--surface-2)] sm:min-h-0 sm:py-1.5",
                   active && "bg-[var(--surface-2)] text-[var(--foreground)]"
                 )}
               >
@@ -323,7 +323,7 @@ function EmptyState({ onClear }: { onClear: () => void }) {
       <p className="mt-2 text-[13px] text-[var(--muted)]">
         Try widening the filters, or clear them to see everything.
       </p>
-      <Button variant="secondary" size="sm" onClick={onClear} className="mt-5">
+      <Button variant="secondary" size="md" onClick={onClear} className="mt-5 min-h-11 w-full sm:w-auto">
         Clear filters
       </Button>
     </div>

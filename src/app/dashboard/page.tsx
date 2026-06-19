@@ -70,7 +70,7 @@ export default async function DashboardHomePage() {
       />
 
       {/* Stat strip */}
-      <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((s) => (
           <div
             key={s.label}
@@ -79,7 +79,7 @@ export default async function DashboardHomePage() {
             <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
               {s.label}
             </p>
-            <p className="mt-2 font-serif text-[32px] leading-none tracking-[-0.02em]">
+            <p className="mt-2 font-serif text-[32px] leading-none tracking-[-0.02em] tabular-nums">
               {s.value}
             </p>
             <p className="mt-1.5 text-[11.5px] text-[var(--muted)]">{s.hint}</p>
@@ -109,11 +109,11 @@ export default async function DashboardHomePage() {
                 <Link
                   key={r.id}
                   href={`/dashboard/documents/${r.docId}`}
-                  className="flex items-center gap-4 px-5 py-4 hover:bg-[var(--surface-2)] transition-colors"
+                  className="flex items-start gap-3 px-4 py-4 hover:bg-[var(--surface-2)] transition-colors sm:items-center sm:gap-4 sm:px-5"
                 >
                   <span
                     className={cn(
-                      "inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] border",
+                      "inline-flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-sm)] border",
                       tone === "coral" && "bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)] border-[color-mix(in_oklch,var(--color-coral)_22%,transparent)]",
                       tone === "ember" && "bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)] border-[color-mix(in_oklch,var(--color-ember)_22%,transparent)]",
                       tone === "iris" && "bg-[var(--color-iris-soft)] text-[var(--color-iris)] border-[color-mix(in_oklch,var(--color-iris)_22%,transparent)]"
@@ -129,7 +129,7 @@ export default async function DashboardHomePage() {
                   </span>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-medium leading-tight">{r.title}</p>
-                    <p className="mt-1 text-[12px] text-[var(--muted)]">
+                    <p className="mt-1 text-[12px] text-[var(--muted)] break-words">
                       <span className="font-mono tabular-nums">{r.fireOn}</span>
                       <span className="mx-1.5 text-[var(--faint)]">·</span>
                       {r.docTitle}
@@ -236,7 +236,7 @@ function ProInsightTeaser() {
         <p className="mt-2 text-[12.5px] text-[var(--accent-ink)] leading-relaxed">
           Two of them auto-renew within 90 days. Three have notice windows you should hit.
         </p>
-        <Button variant="ghost" size="sm" href="/dashboard/insights" className="mt-4 -ml-2">
+        <Button variant="ghost" size="sm" href="/dashboard/insights" className="mt-4 w-full sm:-ml-2 sm:w-auto">
           See full breakdown <ArrowRight className="size-3" />
         </Button>
       </div>

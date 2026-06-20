@@ -11,6 +11,7 @@ import {
   MessageSquare,
   Quote,
   ChevronRight,
+  ArrowUpRight,
   Send,
   Sparkles,
   Upload,
@@ -73,6 +74,13 @@ export function DocumentView({
   const activeClause = clauses.find((c) => c.id === activeClauseId);
   const isDemo = doc.tags.includes("Demo");
 
+  React.useEffect(() => {
+    const clauseId = new URLSearchParams(window.location.search).get("clause");
+    if (!clauseId || !clauses.some((clause) => clause.id === clauseId)) return;
+    setActiveClauseId(clauseId);
+    setTab("clauses");
+  }, [clauses]);
+
   return (
     <>
       {isDemo && <DemoNotice />}
@@ -121,7 +129,7 @@ export function DocumentView({
             >
               {tab === "summary" && <SummaryPanel doc={doc} clauses={clauses} />}
               {tab === "clauses" && (
-                <ClausesPanel clauses={clauses} active={activeClauseId} onSelect={setActiveClauseId} />
+                <ClausesPanel docId={doc.id} clauses={clauses} active={activeClauseId} onSelect={setActiveClauseId} />
               )}
               {tab === "dates" && <DatesPanel doc={doc} />}
               {tab === "reminders" && <RemindersPanel reminders={reminders} />}
@@ -227,10 +235,12 @@ function SummaryPanel({ doc, clauses }: { doc: ContractDoc; clauses: Clause[] })
 
 /* ── Clauses ────────────────────────────────────────────────────────── */
 function ClausesPanel({
+  docId,
   clauses,
   active,
   onSelect,
 }: {
+  docId: string;
   clauses: Clause[];
   active?: string;
   onSelect: (id: string) => void;
@@ -242,12 +252,11 @@ function ClausesPanel({
         {clauses.map((c) => {
           const isActive = c.id === current.id;
           return (
-            <li key={c.id}>
+            <li key={c.id} className={cn("flex items-stretch", isActive && "bg-[var(--surface-2)]")}>
               <button
                 onClick={() => onSelect(c.id)}
                 className={cn(
-                  "w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-[var(--surface-2)] transition-colors",
-                  isActive && "bg-[var(--surface-2)]"
+                  "min-w-0 flex-1 text-left px-4 py-3 flex items-start gap-3 hover:bg-[var(--surface-2)] transition-colors"
                 )}
               >
                 <span
@@ -267,6 +276,14 @@ function ClausesPanel({
                 </div>
                 {isActive && <ChevronRight className="size-3.5 text-[var(--faint)] mt-1" />}
               </button>
+              <Link
+                href={`/dashboard/clauses?documentId=${docId}`}
+                aria-label={`View ${c.title} in library`}
+                title="View in library"
+                className="flex w-11 shrink-0 items-center justify-center border-l border-[var(--border)] text-[var(--faint)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+              >
+                <ArrowUpRight className="size-3.5" />
+              </Link>
             </li>
           );
         })}

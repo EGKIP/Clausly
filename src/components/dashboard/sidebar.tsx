@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import {
   LayoutDashboard,
   FileText,
+  BookOpen,
   BellRing,
   Sparkles,
   Settings,
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 const primary = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/documents", label: "Documents", icon: FileText, count: 7 },
+  { href: "/dashboard/clauses", label: "Clauses", icon: BookOpen },
   { href: "/dashboard/reminders", label: "Reminders", icon: BellRing, count: 4, dot: true },
   { href: "/dashboard/insights", label: "Insights", icon: Sparkles, pro: true },
 ];

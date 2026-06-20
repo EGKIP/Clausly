@@ -429,7 +429,8 @@ export function createSupabaseClient() {
 }
 
 class Query {
-  private filters: { column: string; value: unknown; op: "eq" | "neq" | "in" | "gte" }[] = [];
+  private filters: { column: string; value: unknown; op: "eq" | "neq" | "in" | "gte" | "lt" }[] = [];
+  private orFilters: { column: string; term: string; op: "ilike" }[] = [];
   private orderBy: { column: string; ascending: boolean } | null = null;
   private limitCount: number | null = null;
   private head = false;
@@ -482,6 +483,23 @@ class Query {
     return this;
   }
 
+  lt(column: string, value: unknown) {
+    this.filters.push({ column, value, op: "lt" });
+    return this;
+  }
+
+  or(query: string) {
+    this.orFilters.push(...query
+      .split(",")
+      .map((part) => {
+        const match = part.match(/^([a-zA-Z0-9_]+)\.ilike\.%(.*)%$/);
+        if (!match) return null;
+        return { column: match[1], term: match[2].toLowerCase(), op: "ilike" as const };
+      })
+      .filter((filter): filter is { column: string; term: string; op: "ilike" } => Boolean(filter)));
+    return this;
+  }
+
   order(column: string, options?: { ascending?: boolean }) {
     this.orderBy = { column, ascending: options?.ascending ?? true };
     return this;
@@ -518,7 +536,7 @@ class Query {
       const row = rows[0];
       return row ? { data: clone(row), error: null, count: null } : { data: null, error: notFound(), count: null };
     }
-    return { data: clone(rows), error: null, count: this.wantsCount ? rows.length : null };
+    return { data: clone(rows), error: null, count: this.wantsCount ? filtered.length : null };
   }
 
   private async executeInsert(single: boolean) {
@@ -557,6 +575,12 @@ class Query {
       if (filter.op === "neq") rows = rows.filter((row) => row[filter.column] !== filter.value);
       if (filter.op === "in") rows = rows.filter((row) => Array.isArray(filter.value) && filter.value.includes(row[filter.column]));
       if (filter.op === "gte") rows = rows.filter((row) => String(row[filter.column]) >= String(filter.value));
+      if (filter.op === "lt") rows = rows.filter((row) => String(row[filter.column]) < String(filter.value));
+    }
+    if (this.orFilters.length > 0) {
+      rows = rows.filter((row) => this.orFilters.some((filter) =>
+        String(row[filter.column] ?? "").toLowerCase().includes(filter.term)
+      ));
     }
     return rows;
   }

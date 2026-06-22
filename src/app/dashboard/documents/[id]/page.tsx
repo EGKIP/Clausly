@@ -8,6 +8,7 @@ import { RiskPill } from "@/components/ui/risk-pill";
 import { getDocumentDetail, listDocuments } from "@/lib/db/documents";
 import { DocumentView } from "@/components/dashboard/document-view";
 import { AnalysisGate } from "@/components/dashboard/analysis-gate";
+import { CompareWithButton } from "@/components/dashboard/compare/compare-with-button";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ interface PageProps {
 
 export default async function DocumentDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const detail = await getDocumentDetail(id);
+  const [detail, documents] = await Promise.all([getDocumentDetail(id), listDocuments()]);
   if (!detail) notFound();
   const {
     document: doc,
@@ -82,6 +83,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           <Button variant="ghost" size="sm" aria-label="Share">
             <Share2 className="size-3.5" /> Share
           </Button>
+          <CompareWithButton currentDocument={doc} documents={documents} />
           <Button variant="ghost" size="sm" aria-label="Delete" className="text-[var(--color-coral-ink)]">
             <Trash2 className="size-3.5" /> Delete
           </Button>

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildDigestForUser,
+  sendWeeklyDigests,
 } from "../weekly-digest";
+import type { EmailMessage, EmailProvider } from "../email-provider";
 import type { ServiceSupabaseClient } from "../supabase-service";
 import {
   buildWeeklyDigestUnsubscribeUrl,
@@ -9,6 +11,7 @@ import {
 } from "../templates";
 import {
   createSupabaseClient,
+  db,
   resetSupabaseMock,
   seedClause,
   seedDocument,
@@ -21,6 +24,17 @@ import {
 vi.mock("server-only", () => ({}));
 
 const now = new Date("2026-06-22T14:00:00.000Z");
+
+class MockEmailProvider implements EmailProvider {
+  public sent: EmailMessage[] = [];
+  public shouldFail = false;
+
+  async send(message: EmailMessage) {
+    if (this.shouldFail) throw new Error("Resend unavailable.");
+    this.sent.push(message);
+    return { id: `email-${this.sent.length}` };
+  }
+}
 
 describe("weekly digest builder", () => {
   beforeEach(() => {
@@ -195,5 +209,138 @@ describe("weekly digest email template", () => {
     expect(template.html).toContain("Termination fee");
     expect(template.text).toContain("This digest is informational only and is not legal advice.");
     expect(template.text).toContain("Unsubscribe: https://clausly.test/api/notifications/unsubscribe");
+  });
+});
+
+describe("weekly digest send loop", () => {
+  beforeEach(() => {
+    resetSupabaseMock(userA);
+  });
+
+  it("sends a digest, inserts audit, and updates the user timestamp", async () => {
+    seedUser(userA, {
+      subscription_tier: "pro",
+      full_name: "Ada",
+      notification_preferences: { email: true, weekly_digest: true, version: 3 },
+      weekly_digest_sent_at: null,
+    });
+    const document = seedDocument(userA, { title: "Office Lease", created_at: "2026-06-20T12:00:00.000Z" });
+    seedReminder(document.id, userA, { status: "approved", fire_on: "2026-06-25" });
+    seedClause(document.id, userA, { risk_level: "high", created_at: "2026-06-20T12:00:00.000Z" });
+    const provider = new MockEmailProvider();
+
+    const result = await sendWeeklyDigests(testClient(), {
+      provider,
+      now,
+      baseUrl: "https://clausly.test",
+      from: "Clausly <digest@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+    });
+
+    expect(result).toEqual({ processed: 1, sent: 1, skipped: 0, failed: 0 });
+    expect(provider.sent).toHaveLength(1);
+    expect(provider.sent[0].html).toContain("type=weekly_digest");
+    expect(db().weekly_digests).toEqual([
+      expect.objectContaining({
+        user_id: userA.id,
+        deadline_count: 1,
+        upload_count: 1,
+        high_risk_count: 1,
+        status: "sent",
+      }),
+    ]);
+    expect(db().users[0].weekly_digest_sent_at).toBe(now.toISOString());
+  });
+
+  it("audits skipped digests when every section is empty", async () => {
+    seedUser(userA, {
+      subscription_tier: "pro",
+      email: userA.email,
+      notification_preferences: { email: true, weekly_digest: true },
+    });
+    const provider = new MockEmailProvider();
+
+    const result = await sendWeeklyDigests(testClient(), {
+      provider,
+      now,
+      baseUrl: "https://clausly.test",
+      from: "Clausly <digest@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+    });
+
+    expect(result).toEqual({ processed: 1, sent: 0, skipped: 1, failed: 0 });
+    expect(provider.sent).toHaveLength(0);
+    expect(db().weekly_digests[0]).toMatchObject({ user_id: userA.id, status: "skipped" });
+  });
+
+  it("audits failed sends without updating weekly_digest_sent_at", async () => {
+    seedUser(userA, {
+      subscription_tier: "pro",
+      notification_preferences: { email: true, weekly_digest: true },
+      weekly_digest_sent_at: null,
+    });
+    const document = seedDocument(userA, { created_at: "2026-06-20T12:00:00.000Z" });
+    seedReminder(document.id, userA, { status: "approved", fire_on: "2026-06-25" });
+    const provider = new MockEmailProvider();
+    provider.shouldFail = true;
+
+    const result = await sendWeeklyDigests(testClient(), {
+      provider,
+      now,
+      baseUrl: "https://clausly.test",
+      from: "Clausly <digest@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+    });
+
+    expect(result).toEqual({ processed: 1, sent: 0, skipped: 0, failed: 1 });
+    expect(db().weekly_digests[0]).toMatchObject({
+      user_id: userA.id,
+      status: "failed",
+      error_message: "Resend unavailable.",
+    });
+    expect(db().users[0].weekly_digest_sent_at).toBeNull();
+  });
+
+  it("skips free users through the shared plan helper", async () => {
+    seedUser(userA, {
+      subscription_tier: "free",
+      notification_preferences: { email: true, weekly_digest: true },
+    });
+    const document = seedDocument(userA, { created_at: "2026-06-20T12:00:00.000Z" });
+    seedReminder(document.id, userA, { status: "approved", fire_on: "2026-06-25" });
+    const provider = new MockEmailProvider();
+
+    const result = await sendWeeklyDigests(testClient(), {
+      provider,
+      now,
+      baseUrl: "https://clausly.test",
+      from: "Clausly <digest@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+    });
+
+    expect(result).toEqual({ processed: 0, sent: 0, skipped: 0, failed: 0 });
+    expect(provider.sent).toHaveLength(0);
+    expect(db().weekly_digests).toHaveLength(0);
+  });
+
+  it("respects weekly digest notification preference", async () => {
+    seedUser(userA, {
+      subscription_tier: "pro",
+      notification_preferences: { email: true, weekly_digest: false },
+    });
+    const document = seedDocument(userA, { created_at: "2026-06-20T12:00:00.000Z" });
+    seedReminder(document.id, userA, { status: "approved", fire_on: "2026-06-25" });
+    const provider = new MockEmailProvider();
+
+    const result = await sendWeeklyDigests(testClient(), {
+      provider,
+      now,
+      baseUrl: "https://clausly.test",
+      from: "Clausly <digest@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+    });
+
+    expect(result).toEqual({ processed: 0, sent: 0, skipped: 0, failed: 0 });
+    expect(provider.sent).toHaveLength(0);
   });
 });

@@ -13,6 +13,7 @@ type TableName =
   | "reminders"
   | "document_chunks"
   | "usage_metrics"
+  | "document_exports"
   | "weekly_digests";
 type Row = Record<string, any>;
 type TableStore = Record<TableName, Row[]>;
@@ -38,6 +39,7 @@ const tables: TableStore = {
   reminders: [],
   document_chunks: [],
   usage_metrics: [],
+  document_exports: [],
   weekly_digests: [],
 };
 
@@ -326,6 +328,19 @@ export function seedUsageMetric(user = userA, overrides: Row = {}) {
     ...overrides,
   };
   tables.usage_metrics.push(row);
+  return row;
+}
+
+export function seedDocumentExport(documentId: string, user = userA, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    user_id: user.id,
+    document_id: documentId,
+    format: "pdf",
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.document_exports.push(row);
   return row;
 }
 

@@ -13,6 +13,7 @@ export type Database = {
           notification_preferences: Json;
           onboarded_at: string | null;
           onboarding_tour_completed_at: string | null;
+          weekly_digest_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -25,6 +26,7 @@ export type Database = {
           notification_preferences?: Json;
           onboarded_at?: string | null;
           onboarding_tour_completed_at?: string | null;
+          weekly_digest_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -386,6 +388,38 @@ export type Database = {
         };
         Update: Partial<Database["public"]["Tables"]["usage_metrics"]["Insert"]>;
         Relationships: [];
+      };
+      weekly_digests: {
+        Row: {
+          id: string;
+          user_id: string;
+          sent_at: string;
+          deadline_count: number;
+          upload_count: number;
+          high_risk_count: number;
+          status: "sent" | "failed" | "skipped";
+          error_message: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          sent_at?: string;
+          deadline_count?: number;
+          upload_count?: number;
+          high_risk_count?: number;
+          status?: "sent" | "failed" | "skipped";
+          error_message?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["weekly_digests"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "weekly_digests_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: Record<string, never>;

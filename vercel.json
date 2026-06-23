@@ -4,6 +4,10 @@
     {
       "path": "/api/notifications/dispatch",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/notifications/weekly-digest",
+      "schedule": "0 14 * * 1"
     }
   ]
 }

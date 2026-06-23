@@ -12,7 +12,8 @@ type TableName =
   | "dates"
   | "reminders"
   | "document_chunks"
-  | "usage_metrics";
+  | "usage_metrics"
+  | "weekly_digests";
 type Row = Record<string, any>;
 type TableStore = Record<TableName, Row[]>;
 type TestUser = { id: string; email?: string | null };
@@ -37,6 +38,7 @@ const tables: TableStore = {
   reminders: [],
   document_chunks: [],
   usage_metrics: [],
+  weekly_digests: [],
 };
 
 const storage = {

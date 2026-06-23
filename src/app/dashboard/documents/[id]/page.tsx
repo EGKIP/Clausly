@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Download, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Share2, Trash2 } from "lucide-react";
 import { PageBody } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/primitives";
@@ -9,6 +9,9 @@ import { getDocumentDetail, listDocuments } from "@/lib/db/documents";
 import { DocumentView } from "@/components/dashboard/document-view";
 import { AnalysisGate } from "@/components/dashboard/analysis-gate";
 import { CompareWithButton } from "@/components/dashboard/compare/compare-with-button";
+import { ExportButton } from "@/components/dashboard/document-actions/export-button";
+import { getExportUsage, type ExportUsage } from "@/lib/exports/limits";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +27,11 @@ interface PageProps {
 
 export default async function DocumentDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [detail, documents] = await Promise.all([getDocumentDetail(id), listDocuments()]);
+  const [detail, documents, exportUsage] = await Promise.all([
+    getDocumentDetail(id),
+    listDocuments(),
+    getInitialExportUsage(),
+  ]);
   if (!detail) notFound();
   const {
     document: doc,
@@ -77,9 +84,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <Button variant="ghost" size="sm" aria-label="Download">
-            <Download className="size-3.5" /> Download
-          </Button>
+          <ExportButton documentId={doc.id} usage={serializableExportUsage(exportUsage)} />
           <Button variant="ghost" size="sm" aria-label="Share">
             <Share2 className="size-3.5" /> Share
           </Button>
@@ -105,6 +110,42 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       </p>
     </PageBody>
   );
+}
+
+async function getInitialExportUsage(): Promise<ExportUsage> {
+  if (!hasSupabaseEnv()) return mockExportUsage();
+
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return mockExportUsage();
+    return getExportUsage(supabase, user.id);
+  } catch {
+    return mockExportUsage();
+  }
+}
+
+function mockExportUsage(): ExportUsage {
+  return {
+    used: 0,
+    limit: 5,
+    remaining: 5,
+    plan: "free",
+    resetsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+function serializableExportUsage(usage: ExportUsage): ExportUsage {
+  if (Number.isFinite(usage.limit) && Number.isFinite(usage.remaining)) return usage;
+  return {
+    ...usage,
+    limit: Number.MAX_SAFE_INTEGER,
+    remaining: Number.MAX_SAFE_INTEGER,
+  };
+}
+
+function hasSupabaseEnv() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
 function statusLabel(status: "pending" | "analyzing" | "ready" | "failed") {

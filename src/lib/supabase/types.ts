@@ -389,6 +389,39 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["usage_metrics"]["Insert"]>;
         Relationships: [];
       };
+      document_exports: {
+        Row: {
+          id: string;
+          user_id: string;
+          document_id: string;
+          format: "pdf" | "csv";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          document_id: string;
+          format: "pdf" | "csv";
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_exports"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "document_exports_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "document_exports_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       weekly_digests: {
         Row: {
           id: string;

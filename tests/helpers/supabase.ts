@@ -14,6 +14,7 @@ type TableName =
   | "document_chunks"
   | "usage_metrics"
   | "document_exports"
+  | "document_shares"
   | "weekly_digests";
 type Row = Record<string, any>;
 type TableStore = Record<TableName, Row[]>;
@@ -40,6 +41,7 @@ const tables: TableStore = {
   document_chunks: [],
   usage_metrics: [],
   document_exports: [],
+  document_shares: [],
   weekly_digests: [],
 };
 
@@ -344,6 +346,22 @@ export function seedDocumentExport(documentId: string, user = userA, overrides: 
   return row;
 }
 
+export function seedDocumentShare(documentId: string, user = userA, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    document_id: documentId,
+    user_id: user.id,
+    token: "share-token-" + String(tables.document_shares.length + 1),
+    expires_at: null,
+    revoked_at: null,
+    view_count: 0,
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.document_shares.push(row);
+  return row;
+}
+
 export function jsonRequest(body: unknown, init: RequestInit = {}) {
   return new Request("http://localhost.test", {
     method: init.method ?? "POST",
@@ -358,6 +376,14 @@ export function routeContext(id: string) {
 }
 
 export function createSupabaseClient() {
+  return createSupabaseClientForRole(false);
+}
+
+export function createServiceSupabaseClientMock() {
+  return createSupabaseClientForRole(true);
+}
+
+function createSupabaseClientForRole(bypassRls: boolean) {
   return {
     auth: {
       getUser: vi.fn(async () => ({ data: { user: currentUser }, error: null })),
@@ -413,7 +439,7 @@ export function createSupabaseClient() {
       return { data: null, error: null };
     }),
     from(table: TableName) {
-      return new Query(table);
+      return new Query(table, bypassRls);
     },
     storage: {
       from() {
@@ -455,7 +481,7 @@ class Query {
   private action: "select" | "insert" | "update" | "delete" = "select";
   private payload: Row | Row[] | null = null;
 
-  constructor(private table: TableName) {}
+  constructor(private table: TableName, private bypassRls = false) {}
 
   select(_columns = "*", options?: { count?: string; head?: boolean }) {
     this.head = Boolean(options?.head);
@@ -586,7 +612,7 @@ class Query {
   }
 
   private filteredRows() {
-    let rows = tables[this.table].filter((row) => isVisible(this.table, row));
+    let rows = tables[this.table].filter((row) => isVisible(this.table, row, this.bypassRls));
     for (const filter of this.filters) {
       if (filter.op === "eq") rows = rows.filter((row) => row[filter.column] === filter.value);
       if (filter.op === "neq") rows = rows.filter((row) => row[filter.column] !== filter.value);
@@ -618,7 +644,8 @@ class Query {
   }
 }
 
-function isVisible(table: TableName, row: Row) {
+function isVisible(table: TableName, row: Row, bypassRls = false) {
+  if (bypassRls) return true;
   if (!currentUser) return false;
   if (table === "users") return row.id === currentUser.id;
   if (table === "document_suggestions") {
@@ -636,7 +663,7 @@ function cascadeDocuments(ids: Set<string>) {
   const conversationIds = new Set(
     tables.qa_conversations.filter((row) => ids.has(row.document_id)).map((row) => row.id)
   );
-  for (const table of ["clauses", "dates", "reminders", "document_chunks", "qa_conversations", "document_suggestions"] as TableName[]) {
+  for (const table of ["clauses", "dates", "reminders", "document_chunks", "qa_conversations", "document_suggestions", "document_shares"] as TableName[]) {
     tables[table] = tables[table].filter((row) => !ids.has(row.document_id));
   }
   tables.qa_messages = tables.qa_messages.filter((row) => !conversationIds.has(row.conversation_id));

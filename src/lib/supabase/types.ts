@@ -422,6 +422,45 @@ export type Database = {
           },
         ];
       };
+      document_shares: {
+        Row: {
+          id: string;
+          document_id: string;
+          user_id: string;
+          token: string;
+          expires_at: string | null;
+          revoked_at: string | null;
+          view_count: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          user_id: string;
+          token: string;
+          expires_at?: string | null;
+          revoked_at?: string | null;
+          view_count?: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_shares"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "document_shares_document_id_fkey";
+            columns: ["document_id"];
+            isOneToOne: false;
+            referencedRelation: "documents";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "document_shares_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       weekly_digests: {
         Row: {
           id: string;

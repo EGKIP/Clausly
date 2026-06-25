@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Share2, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { PageBody } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/primitives";
@@ -10,7 +10,9 @@ import { DocumentView } from "@/components/dashboard/document-view";
 import { AnalysisGate } from "@/components/dashboard/analysis-gate";
 import { CompareWithButton } from "@/components/dashboard/compare/compare-with-button";
 import { ExportButton } from "@/components/dashboard/document-actions/export-button";
+import { ShareDialog } from "@/components/dashboard/share/share-dialog";
 import { getExportUsage, type ExportUsage } from "@/lib/exports/limits";
+import { getUserPlan } from "@/lib/billing/plan";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +29,11 @@ interface PageProps {
 
 export default async function DocumentDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const [detail, documents, exportUsage] = await Promise.all([
+  const [detail, documents, exportUsage, sharePlan] = await Promise.all([
     getDocumentDetail(id),
     listDocuments(),
     getInitialExportUsage(),
+    getInitialSharePlan(),
   ]);
   if (!detail) notFound();
   const {
@@ -85,9 +88,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <ExportButton documentId={doc.id} usage={serializableExportUsage(exportUsage)} />
-          <Button variant="ghost" size="sm" aria-label="Share">
-            <Share2 className="size-3.5" /> Share
-          </Button>
+          <ShareDialog documentId={doc.id} plan={sharePlan} />
           <CompareWithButton currentDocument={doc} documents={documents} />
           <Button variant="ghost" size="sm" aria-label="Delete" className="text-[var(--color-coral-ink)]">
             <Trash2 className="size-3.5" /> Delete
@@ -110,6 +111,19 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       </p>
     </PageBody>
   );
+}
+
+async function getInitialSharePlan() {
+  if (!hasSupabaseEnv()) return "free" as const;
+
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return "free" as const;
+    return getUserPlan(supabase, user.id);
+  } catch {
+    return "free" as const;
+  }
 }
 
 async function getInitialExportUsage(): Promise<ExportUsage> {

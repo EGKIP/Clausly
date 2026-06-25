@@ -1,12 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, LogOut, Mail, Save, ShieldAlert, Sparkles, User } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle2, LogOut, Mail, Save, ShieldAlert, Sparkles, User } from "lucide-react";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
-import {
-  NotificationPreferencesCard,
-  type NotificationPreferences,
-} from "@/components/dashboard/settings/notification-preferences-card";
+import type { NotificationPreferences as NotificationPreferencesShape } from "@/components/dashboard/settings/notification-preferences-card";
+import { NotificationPreferences } from "@/components/dashboard/settings/notification-preferences";
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -19,7 +17,7 @@ type Profile = {
   displayName: string;
   email: string;
   mockMode: boolean;
-  notificationPreferences: NotificationPreferences;
+  notificationPreferences: NotificationPreferencesShape;
   plan: PlanName;
   usage: {
     documents: {
@@ -226,6 +224,14 @@ export default function SettingsPage() {
 
         <section>
           <SectionHeader
+            title="Email notifications"
+            description="Choose which Clausly emails should reach your inbox."
+          />
+          <NotificationPreferences initialPlan={profile.plan} />
+        </section>
+
+        <section id="billing">
+          <SectionHeader
             title="Plan"
             description="Your plan sets portfolio limits and unlocks portfolio-level intelligence."
           />
@@ -293,7 +299,7 @@ export default function SettingsPage() {
         <section>
           <SectionHeader
             title="Preferences"
-            description="Control notification delivery, theme, and default reminder timing."
+            description="Control theme and default reminder timing."
           />
           <div className="grid gap-4">
             <Card className="p-4 sm:p-6">
@@ -307,12 +313,16 @@ export default function SettingsPage() {
                 <ThemeToggle />
               </div>
             </Card>
-            <NotificationPreferencesCard
-              profile={profile}
-              onProfileSaved={(savedProfile) => {
-                setProfile((current) => ({ ...current, ...savedProfile }));
-              }}
-            />
+            <Card className="p-4 sm:p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Bell className="size-3.5 text-[var(--muted)]" />
+                <span className="text-[12.5px] font-medium">Reminder defaults</span>
+                <Badge tone="iris">Coming soon</Badge>
+              </div>
+              <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
+                Timing defaults for renewals, notice windows, payments, and reviews will live here.
+              </p>
+            </Card>
           </div>
         </section>
 

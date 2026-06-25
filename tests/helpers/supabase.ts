@@ -14,6 +14,7 @@ type TableName =
   | "document_chunks"
   | "usage_metrics"
   | "document_exports"
+  | "document_shares"
   | "weekly_digests";
 type Row = Record<string, any>;
 type TableStore = Record<TableName, Row[]>;
@@ -40,6 +41,7 @@ const tables: TableStore = {
   document_chunks: [],
   usage_metrics: [],
   document_exports: [],
+  document_shares: [],
   weekly_digests: [],
 };
 
@@ -344,6 +346,22 @@ export function seedDocumentExport(documentId: string, user = userA, overrides: 
   return row;
 }
 
+export function seedDocumentShare(documentId: string, user = userA, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    document_id: documentId,
+    user_id: user.id,
+    token: "share-token-" + String(tables.document_shares.length + 1),
+    expires_at: null,
+    revoked_at: null,
+    view_count: 0,
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.document_shares.push(row);
+  return row;
+}
+
 export function jsonRequest(body: unknown, init: RequestInit = {}) {
   return new Request("http://localhost.test", {
     method: init.method ?? "POST",
@@ -636,7 +654,7 @@ function cascadeDocuments(ids: Set<string>) {
   const conversationIds = new Set(
     tables.qa_conversations.filter((row) => ids.has(row.document_id)).map((row) => row.id)
   );
-  for (const table of ["clauses", "dates", "reminders", "document_chunks", "qa_conversations", "document_suggestions"] as TableName[]) {
+  for (const table of ["clauses", "dates", "reminders", "document_chunks", "qa_conversations", "document_suggestions", "document_shares"] as TableName[]) {
     tables[table] = tables[table].filter((row) => !ids.has(row.document_id));
   }
   tables.qa_messages = tables.qa_messages.filter((row) => !conversationIds.has(row.conversation_id));

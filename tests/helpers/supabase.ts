@@ -376,6 +376,14 @@ export function routeContext(id: string) {
 }
 
 export function createSupabaseClient() {
+  return createSupabaseClientForRole(false);
+}
+
+export function createServiceSupabaseClientMock() {
+  return createSupabaseClientForRole(true);
+}
+
+function createSupabaseClientForRole(bypassRls: boolean) {
   return {
     auth: {
       getUser: vi.fn(async () => ({ data: { user: currentUser }, error: null })),
@@ -431,7 +439,7 @@ export function createSupabaseClient() {
       return { data: null, error: null };
     }),
     from(table: TableName) {
-      return new Query(table);
+      return new Query(table, bypassRls);
     },
     storage: {
       from() {
@@ -473,7 +481,7 @@ class Query {
   private action: "select" | "insert" | "update" | "delete" = "select";
   private payload: Row | Row[] | null = null;
 
-  constructor(private table: TableName) {}
+  constructor(private table: TableName, private bypassRls = false) {}
 
   select(_columns = "*", options?: { count?: string; head?: boolean }) {
     this.head = Boolean(options?.head);
@@ -604,7 +612,7 @@ class Query {
   }
 
   private filteredRows() {
-    let rows = tables[this.table].filter((row) => isVisible(this.table, row));
+    let rows = tables[this.table].filter((row) => isVisible(this.table, row, this.bypassRls));
     for (const filter of this.filters) {
       if (filter.op === "eq") rows = rows.filter((row) => row[filter.column] === filter.value);
       if (filter.op === "neq") rows = rows.filter((row) => row[filter.column] !== filter.value);
@@ -636,7 +644,8 @@ class Query {
   }
 }
 
-function isVisible(table: TableName, row: Row) {
+function isVisible(table: TableName, row: Row, bypassRls = false) {
+  if (bypassRls) return true;
   if (!currentUser) return false;
   if (table === "users") return row.id === currentUser.id;
   if (table === "document_suggestions") {

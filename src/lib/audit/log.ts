@@ -36,6 +36,13 @@ export async function logAuditEvent(
   supabase: AuditSupabaseClient,
   input: AuditEventInput
 ): Promise<void> {
+  await recordAuditEvent(supabase, input);
+}
+
+export async function recordAuditEvent(
+  supabase: AuditSupabaseClient,
+  input: AuditEventInput
+): Promise<void> {
   if (!hasSupabaseEnv()) return;
 
   try {
@@ -55,6 +62,16 @@ export async function logAuditEvent(
       message: error instanceof Error ? error.message : "Unknown audit error.",
     });
   }
+}
+
+export function auditRequestMetadata(request: Request): Record<string, string | null> {
+  const headers = request.headers ?? new Headers();
+  const forwardedFor = headers.get("x-forwarded-for");
+  const ipAddress = forwardedFor?.split(",")[0]?.trim() || headers.get("x-real-ip");
+  return {
+    ipAddress: ipAddress || null,
+    userAgent: headers.get("user-agent"),
+  };
 }
 
 export function sanitizeMetadata(value: unknown): Json {

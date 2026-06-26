@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { getUserPlan } from "@/lib/billing/plan";
 import { createShare, listShares } from "@/lib/db/shares";
 import { createClient } from "@/lib/supabase/server";
@@ -69,6 +71,21 @@ export async function POST(request: Request, context: RouteContext) {
     userId: user.id,
     expiresInDays: parsed.data.expiresInDays,
   });
+  try {
+    await recordAuditEvent(supabase, {
+      userId: user.id,
+      action: AUDIT_ACTIONS.SHARE_CREATED,
+      resourceType: "document_share",
+      resourceId: share.id,
+      metadata: {
+        documentId: id,
+        expiresAt: share.expiresAt,
+        ...auditRequestMetadata(request),
+      },
+    });
+  } catch {
+    // Audit logging is best-effort; share creation remains the source of truth.
+  }
   const url = new URL(`/share/${share.token}`, publicBaseUrl(request)).toString();
 
   return NextResponse.json(

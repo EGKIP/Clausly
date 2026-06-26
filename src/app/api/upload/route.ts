@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { runAnalysis } from "@/lib/ai/run-analysis";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { boundedTextSchema, validationIssues } from "@/lib/validation";
 import { canUploadDocument } from "@/lib/billing/plan";
 
@@ -102,6 +104,23 @@ export async function POST(request: Request) {
   if (insertError) {
     await supabase.storage.from("documents").remove([storagePath]);
     return NextResponse.json({ error: insertError.message }, { status: 500 });
+  }
+
+  try {
+    await recordAuditEvent(supabase, {
+      userId: user.id,
+      action: AUDIT_ACTIONS.DOCUMENT_UPLOADED,
+      resourceType: "document",
+      resourceId: document.id,
+      metadata: {
+        title,
+        fileName: file.name,
+        fileSizeBytes: file.size,
+        ...auditRequestMetadata(request),
+      },
+    });
+  } catch {
+    // Audit logging is best-effort; upload success remains the source of truth.
   }
 
   void runAnalysis(supabase, document.id, user.id).catch((error) => {

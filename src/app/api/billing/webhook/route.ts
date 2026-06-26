@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { recordAuditEvent } from "@/lib/audit/log";
 import { getStripe } from "@/lib/billing/stripe";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 
@@ -24,13 +26,17 @@ export async function POST(request: Request) {
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const customerId = stripeCustomerId(session.customer);
-    if (customerId) await updatePlanForCustomer(supabase, customerId, "pro");
+    if (customerId) {
+      await updatePlanForCustomer(supabase, customerId, "pro", AUDIT_ACTIONS.SUBSCRIPTION_UPGRADED);
+    }
   }
 
   if (event.type === "customer.subscription.deleted") {
     const subscription = event.data.object as Stripe.Subscription;
     const customerId = stripeCustomerId(subscription.customer);
-    if (customerId) await updatePlanForCustomer(supabase, customerId, "free");
+    if (customerId) {
+      await updatePlanForCustomer(supabase, customerId, "free", AUDIT_ACTIONS.SUBSCRIPTION_CANCELLED);
+    }
   }
 
   return NextResponse.json({ received: true });
@@ -39,7 +45,8 @@ export async function POST(request: Request) {
 async function updatePlanForCustomer(
   supabase: ReturnType<typeof createServiceSupabaseClient>,
   stripeCustomerId: string,
-  plan: "free" | "pro"
+  plan: "free" | "pro",
+  action: typeof AUDIT_ACTIONS.SUBSCRIPTION_UPGRADED | typeof AUDIT_ACTIONS.SUBSCRIPTION_CANCELLED
 ) {
   const { data, error } = await supabase
     .from("billing_customers")
@@ -66,6 +73,22 @@ async function updatePlanForCustomer(
       plan,
       message: updateError.message,
     });
+    return;
+  }
+
+  try {
+    await recordAuditEvent(supabase, {
+      userId: data.user_id,
+      action,
+      resourceType: "subscription",
+      resourceId: data.user_id,
+      metadata: {
+        plan,
+        stripeCustomerId,
+      },
+    });
+  } catch {
+    // Audit logging is best-effort; subscription updates remain the source of truth.
   }
 }
 

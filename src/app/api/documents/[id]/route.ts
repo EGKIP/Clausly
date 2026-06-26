@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { getDocumentDetail } from "@/lib/db/documents";
 import { createClient } from "@/lib/supabase/server";
 
@@ -25,7 +27,7 @@ export async function GET(_request: Request, context: RouteContext) {
   return NextResponse.json(detail);
 }
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   if (!hasSupabaseEnv()) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   }
@@ -59,6 +61,18 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   const { error: deleteError } = await supabase.from("documents").delete().eq("id", id);
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+
+  try {
+    await recordAuditEvent(supabase, {
+      userId: user.id,
+      action: AUDIT_ACTIONS.DOCUMENT_DELETED,
+      resourceType: "document",
+      resourceId: id,
+      metadata: auditRequestMetadata(request),
+    });
+  } catch {
+    // Audit logging is best-effort; delete success remains the source of truth.
+  }
 
   return NextResponse.json({ ok: true });
 }

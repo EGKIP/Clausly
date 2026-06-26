@@ -461,6 +461,36 @@ export type Database = {
           },
         ];
       };
+      audit_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          action: string;
+          resource_type: string;
+          resource_id: string | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          action: string;
+          resource_type: string;
+          resource_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["audit_events"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       weekly_digests: {
         Row: {
           id: string;

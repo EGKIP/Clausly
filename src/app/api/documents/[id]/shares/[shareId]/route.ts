@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { createClient } from "@/lib/supabase/server";
 
 type RouteContext = {
   params: Promise<{ id: string; shareId: string }>;
 };
 
-export async function DELETE(_request: Request, context: RouteContext) {
+export async function DELETE(request: Request, context: RouteContext) {
   if (!hasSupabaseEnv()) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   }
@@ -29,6 +31,21 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  try {
+    await recordAuditEvent(supabase, {
+      userId: user.id,
+      action: AUDIT_ACTIONS.SHARE_REVOKED,
+      resourceType: "document_share",
+      resourceId: shareId,
+      metadata: {
+        documentId: id,
+        ...auditRequestMetadata(request),
+      },
+    });
+  } catch {
+    // Audit logging is best-effort; share revocation remains the source of truth.
   }
 
   return NextResponse.json({ ok: true });

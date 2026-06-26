@@ -1,5 +1,7 @@
 import "server-only";
 
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { recordAuditEvent } from "@/lib/audit/log";
 import type { Json } from "@/lib/supabase/types";
 import { createEmailProvider, type EmailProvider } from "./email-provider";
 import {
@@ -119,6 +121,20 @@ export async function dispatchDueReminderEmails(options: DispatchOptions = {}): 
         .is("sent_at", null);
 
       if (updateError) throw new Error(updateError.message);
+      try {
+        await recordAuditEvent(supabase, {
+          userId: reminder.user_id,
+          action: AUDIT_ACTIONS.REMINDER_FIRED,
+          resourceType: "reminder",
+          resourceId: reminder.id,
+          metadata: {
+            documentId: reminder.document_id,
+            fireOn: reminder.fire_on,
+          },
+        });
+      } catch {
+        // Audit logging is best-effort; reminder dispatch remains the source of truth.
+      }
       result.sent += 1;
     } catch (error) {
       result.failed += 1;

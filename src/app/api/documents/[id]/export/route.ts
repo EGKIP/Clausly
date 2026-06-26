@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { canExport } from "@/lib/exports/limits";
 import { clausesToCsv, datesToCsv } from "@/lib/exports/csv";
 import { renderDocumentPdf } from "@/lib/exports/pdf";
@@ -97,6 +99,20 @@ export async function GET(request: Request, context: RouteContext) {
       });
 
   await recordExportAudit(supabase, { userId: user.id, documentId: id, format });
+  try {
+    await recordAuditEvent(supabase, {
+      userId: user.id,
+      action: AUDIT_ACTIONS.EXPORT_CREATED,
+      resourceType: "document_export",
+      resourceId: id,
+      metadata: {
+        format,
+        ...auditRequestMetadata(request),
+      },
+    });
+  } catch {
+    // Audit logging is best-effort; export success remains the source of truth.
+  }
   return response;
 }
 

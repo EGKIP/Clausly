@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { createClient } from "@/lib/supabase/server";
 import { toUiReminder } from "@/lib/db/adapters";
 import type { ReminderRow } from "@/lib/db/types";
@@ -64,6 +66,20 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (wasSuggested) {
     await logReminderLifecycle(supabase, user.id, existing.document_id);
+    try {
+      await recordAuditEvent(supabase, {
+        userId: user.id,
+        action: AUDIT_ACTIONS.REMINDER_APPROVED,
+        resourceType: "reminder",
+        resourceId: id,
+        metadata: {
+          documentId: existing.document_id,
+          ...auditRequestMetadata(request),
+        },
+      });
+    } catch {
+      // Audit logging is best-effort; reminder approval remains the source of truth.
+    }
   }
 
   return NextResponse.json({ reminder: toUiReminder(data as ReminderRow) });

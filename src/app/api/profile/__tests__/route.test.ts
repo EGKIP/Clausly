@@ -159,7 +159,7 @@ describe("/api/profile", () => {
   it("returns 401 when deleting without a session", async () => {
     setSupabaseUser(null);
 
-    const response = await DELETE();
+    const response = await DELETE(new Request("http://localhost.test/api/profile", { method: "DELETE" }));
 
     expect(response.status).toBe(401);
   });
@@ -171,7 +171,7 @@ describe("/api/profile", () => {
     seedDate(document.id, userA);
     seedReminder(document.id, userA);
 
-    const response = await DELETE();
+    const response = await DELETE(new Request("http://localhost.test/api/profile", { method: "DELETE" }));
 
     expect(response.status).toBe(200);
     expect(storageCalls().removed).toEqual([document.storage_path]);
@@ -190,7 +190,7 @@ describe("/api/profile", () => {
     seedReminder(documentA.id, userA);
     seedReminder(documentB.id, userB);
 
-    const response = await DELETE();
+    const response = await DELETE(new Request("http://localhost.test/api/profile", { method: "DELETE" }));
 
     expect(response.status).toBe(200);
     expect(db().users).toEqual([expect.objectContaining({ id: userB.id })]);

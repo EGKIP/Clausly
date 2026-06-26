@@ -4,6 +4,8 @@ import { getEmbeddingModel, getEmbeddingProvider, getEmbeddingProviderName } fro
 import { getQAModel, getQAProvider, getQAProviderName } from "@/lib/ai/qa/provider";
 import { encodeSseFrame } from "@/lib/ai/qa/sse";
 import { getQAStreamProvider } from "@/lib/ai/qa/stream";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { canAskQuestion } from "@/lib/billing/qa-rate-limit";
 import {
   appendMessage,
@@ -140,6 +142,23 @@ export async function POST(request: Request, context: RouteContext) {
     );
     history = await loadConversationMessages(supabase, user.id, conversation.id, 10);
     await appendMessage(supabase, conversation.id, "user", parsed.data.question);
+    if (conversation.isNew) {
+      try {
+        await recordAuditEvent(supabase, {
+          userId: user.id,
+          action: AUDIT_ACTIONS.CONVERSATION_CREATED,
+          resourceType: "qa_conversation",
+          resourceId: conversation.id,
+          metadata: {
+            documentId: document.id,
+            scope: "document",
+            ...auditRequestMetadata(request),
+          },
+        });
+      } catch {
+        // Audit logging is best-effort; conversation creation remains the source of truth.
+      }
+    }
   } catch (error) {
     if (error instanceof Error && error.name === "ConversationNotFoundError") {
       return NextResponse.json({ error: "Conversation not found." }, { status: 404 });

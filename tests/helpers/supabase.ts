@@ -15,6 +15,7 @@ type TableName =
   | "usage_metrics"
   | "document_exports"
   | "document_shares"
+  | "audit_events"
   | "weekly_digests";
 type Row = Record<string, any>;
 type TableStore = Record<TableName, Row[]>;
@@ -42,6 +43,7 @@ const tables: TableStore = {
   usage_metrics: [],
   document_exports: [],
   document_shares: [],
+  audit_events: [],
   weekly_digests: [],
 };
 
@@ -359,6 +361,21 @@ export function seedDocumentShare(documentId: string, user = userA, overrides: R
     ...overrides,
   };
   tables.document_shares.push(row);
+  return row;
+}
+
+export function seedAuditEvent(user = userA, overrides: Row = {}) {
+  const row = {
+    id: overrides.id ?? nextUuid(),
+    user_id: user.id,
+    action: "document.uploaded",
+    resource_type: "document",
+    resource_id: overrides.resource_id ?? null,
+    metadata: {},
+    created_at: "2026-06-01T00:00:00.000Z",
+    ...overrides,
+  };
+  tables.audit_events.push(row);
   return row;
 }
 

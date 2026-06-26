@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
+import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
+import { canUploadDocument } from "@/lib/billing/plan";
 import { createClient } from "@/lib/supabase/server";
 import { notificationPreferencesSchema, validationIssues } from "@/lib/validation/schemas";
-import { canUploadDocument } from "@/lib/billing/plan";
 import type { PlanName } from "@/lib/billing/limits";
 
 const profileSchema = z.object({
@@ -116,7 +118,7 @@ export async function PATCH(request: Request) {
   });
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   if (!hasSupabaseEnv()) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   }
@@ -148,6 +150,22 @@ export async function DELETE() {
     if (storageError) {
       return NextResponse.json({ error: storageError.message }, { status: 500 });
     }
+  }
+
+  try {
+    await recordAuditEvent(supabase, {
+      userId: user.id,
+      action: AUDIT_ACTIONS.ACCOUNT_DELETED,
+      resourceType: "account",
+      resourceId: user.id,
+      metadata: {
+        documentCount: documents?.length ?? 0,
+        storageObjectCount: storagePaths.length,
+        ...auditRequestMetadata(request),
+      },
+    });
+  } catch {
+    // Audit logging is best-effort; account deletion remains the source of truth.
   }
 
   const { error: deletionError } = await supabase.rpc("delete_account", {

@@ -13,6 +13,7 @@ import {
   Settings,
   ChevronRight,
   HelpCircle,
+  History,
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/primitives";
@@ -28,6 +29,7 @@ const primary = [
 
 const secondary = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard/settings/activity", label: "Activity log", icon: History, pro: true },
 ];
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -115,6 +117,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 >
                   <item.icon className="size-4 shrink-0 text-[var(--faint)] group-hover:text-[var(--muted)]" />
                   <span className="font-medium">{item.label}</span>
+                  {item.pro && (
+                    <Badge tone="clause" className="ml-auto px-1.5 py-px text-[9.5px] font-mono">
+                      PRO
+                    </Badge>
+                  )}
                 </Link>
               </li>
             );

@@ -70,6 +70,22 @@ describe("notification dispatch", () => {
     expect(store.reminders[0].status).toBe("sent");
   });
 
+  it("loads public user preferences separately from reminder rows", async () => {
+    seedDueReminder();
+
+    const result = await dispatchDueReminderEmails({
+      supabase: createSupabaseMock(),
+      provider: new MockProvider(),
+      baseUrl: "https://clausly.test",
+      from: "Clausly <reminders@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+      now: new Date("2026-06-08T15:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ processed: 1, sent: 1, skipped: 0, failed: 0 });
+    expect(sentMessages[0].to).toBe("ada@clausly.test");
+  });
+
   it("skips users who disabled email notifications", async () => {
     seedDueReminder({ user: { notification_preferences: { email: false } } });
 
@@ -225,13 +241,16 @@ function createSupabaseMock(): NonNullable<DispatchOptions["supabase"]> {
 
 class Query {
   private filters: { column: string; op: "eq" | "is" | "lte"; value: unknown }[] = [];
+  private inFilters: { column: string; values: unknown[] }[] = [];
   private action: "select" | "update" | "insert" = "select";
   private payload: Row | null = null;
   private maxRows: number | null = null;
+  private columns = "";
 
   constructor(private table: TableName) {}
 
-  select() {
+  select(columns = "*") {
+    this.columns = columns;
     return this;
   }
 
@@ -262,6 +281,11 @@ class Query {
     return this;
   }
 
+  in(column: string, values: unknown[]) {
+    this.inFilters.push({ column, values });
+    return this;
+  }
+
   order() {
     return this;
   }
@@ -280,6 +304,15 @@ class Query {
   }
 
   private async execute(single = false) {
+    if (this.table === "reminders" && this.columns.includes("users(")) {
+      return {
+        data: null,
+        error: {
+          message: "Could not find a relationship between 'reminders' and 'users' in the schema cache",
+        },
+      };
+    }
+
     if (this.action === "insert") {
       store[this.table].push({ id: `${this.table}-${store[this.table].length + 1}`, ...this.payload });
       return { data: null, error: null };
@@ -302,7 +335,7 @@ class Query {
       if (filter.op === "is") return row[filter.column] === filter.value;
       if (filter.op === "lte") return String(row[filter.column]) <= String(filter.value);
       return true;
-    }));
+    }) && this.inFilters.every((filter) => filter.values.includes(row[filter.column])));
   }
 
   private withRelationships(row: Row) {
@@ -310,7 +343,6 @@ class Query {
 
     return {
       ...row,
-      users: store.users.find((user) => user.id === row.user_id) ?? null,
       documents: store.documents.find((document) => document.id === row.document_id) ?? null,
     };
   }

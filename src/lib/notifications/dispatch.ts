@@ -28,13 +28,12 @@ type DispatchReminderRow = {
   fire_on: string;
   sent_at: string | null;
   documents?: { title?: string | null } | { title?: string | null }[] | null;
-  users?: {
-    email?: string | null;
-    notification_preferences?: Json;
-  } | {
-    email?: string | null;
-    notification_preferences?: Json;
-  }[] | null;
+};
+
+type DispatchUserRow = {
+  id: string;
+  email?: string | null;
+  notification_preferences?: Json;
 };
 
 export type DispatchResult = {
@@ -66,7 +65,7 @@ export async function dispatchDueReminderEmails(options: DispatchOptions = {}): 
   const dueOn = (options.now ?? new Date()).toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("reminders")
-    .select("id,user_id,document_id,title,description,fire_on,sent_at,documents(title),users(email,notification_preferences)")
+    .select("id,user_id,document_id,title,description,fire_on,sent_at,documents(title)")
     .eq("status", "approved")
     .eq("channel", "email")
     .is("sent_at", null)
@@ -76,12 +75,14 @@ export async function dispatchDueReminderEmails(options: DispatchOptions = {}): 
 
   if (error) throw new Error(error.message);
 
+  const reminders = (data ?? []) as DispatchReminderRow[];
+  const usersById = await loadDispatchUsers(supabase, reminders);
   const result: DispatchResult = { processed: 0, sent: 0, skipped: 0, failed: 0 };
 
-  for (const reminder of ((data ?? []) as DispatchReminderRow[])) {
+  for (const reminder of reminders) {
     result.processed += 1;
 
-    const user = firstObject(reminder.users);
+    const user = usersById.get(reminder.user_id);
     const document = firstObject(reminder.documents);
 
     if (!user?.email || emailDisabled(user.notification_preferences)) {
@@ -143,6 +144,19 @@ export async function dispatchDueReminderEmails(options: DispatchOptions = {}): 
   }
 
   return result;
+}
+
+async function loadDispatchUsers(supabase: ServiceSupabaseClient, reminders: DispatchReminderRow[]) {
+  const userIds = Array.from(new Set(reminders.map((reminder) => reminder.user_id).filter(Boolean)));
+  if (userIds.length === 0) return new Map<string, DispatchUserRow>();
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("id,email,notification_preferences")
+    .in("id", userIds);
+
+  if (error) throw new Error(error.message);
+  return new Map(((data ?? []) as DispatchUserRow[]).map((user) => [user.id, user]));
 }
 
 export async function unsubscribeUserEmail(options: {

@@ -2,8 +2,6 @@ import { Suspense } from "react";
 import { MarketingNav } from "@/components/marketing/nav";
 import { MarketingFooter } from "@/components/marketing/footer";
 import { Hero } from "@/components/marketing/hero";
-import { DocumentStrip } from "@/components/marketing/document-strip";
-import { ProblemSolution } from "@/components/marketing/problem-solution";
 import { FeatureBento } from "@/components/marketing/feature-bento";
 import { ProductPreview } from "@/components/marketing/product-preview";
 import { HowItWorks } from "@/components/marketing/how-it-works";
@@ -21,8 +19,6 @@ export default function HomePage() {
           <AccountDeletedBanner />
         </Suspense>
         <Hero />
-        <DocumentStrip />
-        <ProblemSolution />
         <FeatureBento />
         <ProductPreview />
         <HowItWorks />

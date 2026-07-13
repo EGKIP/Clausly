@@ -19,11 +19,11 @@ const tiers = [
     cta: { label: "Start free", href: "/signup" },
     features: [
       "Up to 5 stored documents",
-      "AI summaries & clause extraction",
+      "Summaries and clause extraction",
       "Basic risk labels",
       "Suggested reminders, you approve",
       "Email reminders",
-      "Document Q&A (5 / month)",
+      "Document Q&A: 25 questions / day",
     ],
   },
   {
@@ -32,16 +32,16 @@ const tiers = [
     tagline: "For everything you've signed.",
     price: { monthly: 12, yearly: 9 },
     highlight: true,
-    cta: { label: "Upgrade to Pro", href: "/signup?plan=pro" },
+    cta: { label: "Upgrade to Pro", href: "/upgrade" },
     features: [
       "Unlimited documents",
-      "Advanced AI analysis & long summaries",
+      "Deeper analysis and long summaries",
       "Full risk insights with explanations",
-      "Unlimited Document Q&A",
+      "Document Q&A: 250 questions / day",
       "Weekly insights · Monthly contract health",
       "Priority processing",
-      "Cross-document search (rolling out)",
-      "Calendar export (rolling out)",
+      "Cross-document search",
+      "Exportable summaries and clause data",
     ],
   },
 ];
@@ -185,7 +185,7 @@ export function Pricing() {
         </div>
 
         <p className="mt-10 text-center text-[12.5px] text-[var(--faint)]">
-          Final pricing for production may vary. This is the v0.1 plan structure described in the PRD.
+          Clausly is informational only and is not legal advice.
         </p>
       </Container>
     </section>

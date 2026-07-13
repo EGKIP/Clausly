@@ -262,14 +262,14 @@ export function FeatureBento() {
             <Headline className="mt-5">
               Every contract,{" "}
               <span className="italic text-[var(--accent-ink)]">
-                quietly organised.
+                in one clear place.
               </span>
             </Headline>
           </Reveal>
           <Reveal delay={0.1}>
             <p className="mt-5 text-[16.5px] leading-relaxed text-[var(--muted)]">
-              Six things Clausly does so you don&apos;t have to. Each one feels small.
-              Together they replace the spreadsheet you never made.
+              The essentials are up front: what it says, what matters, what is due,
+              and what you chose to be reminded about.
             </p>
           </Reveal>
         </div>
@@ -280,8 +280,8 @@ export function FeatureBento() {
             <FeatureCard className="h-full flex flex-col">
               <CardCopy
                 icon={Sparkles}
-                eyebrow="01 · AI Summary"
-                title="Plain-English summary, ready in seconds."
+                eyebrow="01 · Summary"
+                title="A plain-English read of the document."
                 description="Upload the PDF. Clausly returns a tight, readable summary plus the key terms so you know what you actually signed."
                 tone="clause"
               />
@@ -295,7 +295,7 @@ export function FeatureBento() {
               <CardCopy
                 icon={FileSearch}
                 eyebrow="02 · Clause library"
-                title="Every important clause, surfaced and categorised."
+                title="Important clauses, pulled into view."
                 description="Late fees, auto-renewal, termination, indemnity — pulled from the document with page references, in language you can read."
                 tone="iris"
               />
@@ -309,8 +309,8 @@ export function FeatureBento() {
               <CardCopy
                 icon={ShieldAlert}
                 eyebrow="03 · Risk awareness"
-                title="Risk you can actually act on."
-                description="Calibrated labels with explanations. Never alarmist, never vague."
+                title="Risk labels with the reason attached."
+                description="No drama. Just a clear note on why a clause may deserve a closer look."
                 tone="coral"
               />
               <RiskVisual />
@@ -337,7 +337,7 @@ export function FeatureBento() {
               <CardCopy
                 icon={BellRing}
                 eyebrow="05 · Reminders you approve"
-                title="Suggested by AI. Activated by you."
+                title="Suggested by Clausly. Activated by you."
                 description="Nothing reminds you of anything until you approve it. Edit timing, ignore noise, keep what matters."
                 tone="ember"
               />

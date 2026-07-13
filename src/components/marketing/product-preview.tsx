@@ -12,6 +12,9 @@ import {
   CalendarClock,
   ShieldAlert,
   Sparkles,
+  UploadCloud,
+  MessageSquareText,
+  CheckCircle2,
 } from "lucide-react";
 import { Container, Eyebrow, Headline, Badge } from "@/components/ui/primitives";
 import { RiskPill } from "@/components/ui/risk-pill";
@@ -20,11 +23,42 @@ import { cn } from "@/lib/utils";
 
 type Tab = "dashboard" | "document" | "portfolio" | "reminders";
 const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "document", label: "Document detail", icon: FileText },
+  { id: "dashboard", label: "Overview", icon: LayoutDashboard },
+  { id: "document", label: "One contract", icon: FileText },
   { id: "portfolio", label: "Portfolio", icon: ListFilter },
   { id: "reminders", label: "Reminders", icon: BellRing },
 ];
+
+const workflowSteps = [
+  {
+    icon: UploadCloud,
+    label: "Upload",
+    title: "Add a PDF",
+    text: "Drop in a lease, policy, NDA, or service agreement.",
+    tone: "accent",
+  },
+  {
+    icon: FileText,
+    label: "Review",
+    title: "See the plain-English readout",
+    text: "Summaries, clauses, dates, and risk are grouped together.",
+    tone: "iris",
+  },
+  {
+    icon: MessageSquareText,
+    label: "Ask",
+    title: "Ask about the contract",
+    text: "Get grounded answers with page and excerpt citations.",
+    tone: "ember",
+  },
+  {
+    icon: CheckCircle2,
+    label: "Approve",
+    title: "Keep only the reminders you want",
+    text: "Nothing is scheduled until you approve it.",
+    tone: "coral",
+  },
+] as const;
 
 export function ProductPreview() {
   const [active, setActive] = React.useState<Tab>("dashboard");
@@ -37,17 +71,25 @@ export function ProductPreview() {
           </Reveal>
           <Reveal delay={0.05}>
             <Headline className="mt-5">
-              A workspace built around{" "}
-              <span className="italic text-[var(--accent-ink)]">action</span>, not storage.
+              Open a contract and see the{" "}
+              <span className="italic text-[var(--accent-ink)]">next step</span>.
             </Headline>
           </Reveal>
           <Reveal delay={0.1}>
             <p className="mt-5 text-[16.5px] leading-relaxed text-[var(--muted)]">
-              Click through the surfaces. This is the real interface, rendered live —
-              not a screenshot.
+              Clausly keeps the work simple: add a document, review what matters,
+              ask a question, then approve the reminders you actually want.
             </p>
           </Reveal>
         </div>
+
+        <Reveal delay={0.12}>
+          <div className="mb-5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+            {workflowSteps.map((step) => (
+              <WorkflowStep key={step.label} {...step} />
+            ))}
+          </div>
+        </Reveal>
 
         <Reveal delay={0.15}>
           <div className="relative rounded-[var(--radius-2xl)] border border-[var(--border)] bg-[var(--surface-2)] p-3 md:p-4 shadow-[var(--shadow-float)]">
@@ -119,6 +161,43 @@ export function ProductPreview() {
 }
 
 /* ── Mock surfaces ─────────────────────────────────────────────────── */
+function WorkflowStep({
+  icon: Icon,
+  label,
+  title,
+  text,
+  tone,
+}: (typeof workflowSteps)[number]) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "inline-flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)]",
+            tone === "accent" && "bg-[var(--accent-soft)] text-[var(--accent-ink)]",
+            tone === "iris" && "bg-[var(--color-iris-soft)] text-[var(--color-iris)]",
+            tone === "ember" && "bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)]",
+            tone === "coral" && "bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)]",
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            {label}
+          </p>
+          <h3 className="mt-1 text-[14px] font-semibold leading-snug text-[var(--foreground)]">
+            {title}
+          </h3>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-[var(--muted)]">
+            {text}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DashboardSurface() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

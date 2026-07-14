@@ -94,8 +94,14 @@ export default function RemindersPage() {
         title="Reminders"
         description="Everything is suggested first. Clausly never fires a reminder without your nod."
         actions={
-          <Button variant="secondary" size="md" className="min-h-11 w-full sm:w-auto">
-            <Calendar className="size-3.5" /> Calendar view
+          <Button
+            variant="secondary"
+            size="md"
+            className="min-h-11 w-full sm:w-auto"
+            disabled
+            title="Calendar view is coming soon."
+          >
+            <Calendar className="size-3.5" /> Calendar soon
           </Button>
         }
       />

@@ -45,7 +45,7 @@ export function CommandPalette({
     { id: "docs", label: "Go to documents", icon: FileText, href: "/dashboard/documents" },
     { id: "rem", label: "Go to reminders", icon: BellRing, href: "/dashboard/reminders" },
     { id: "ins", label: "Go to insights", icon: Sparkles, href: "/dashboard/insights" },
-    { id: "up", label: "Upload a new document", icon: Upload, href: "/dashboard/documents" },
+    { id: "up", label: "Upload a new document", icon: Upload, href: "/dashboard/documents?upload=1" },
   ].filter((a) => (q ? a.label.toLowerCase().includes(q.toLowerCase()) : true));
 
   return (

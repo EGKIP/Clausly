@@ -294,8 +294,8 @@ function ShareRow({
             {busy ? "Revoking..." : "Revoke"}
           </button>
         ) : (
-          <Link href="/dashboard/settings" className="inline-flex items-center gap-1 text-[12px] text-[var(--muted)]">
-            <ExternalLink className="size-3" /> Details
+          <Link href="/dashboard/settings/activity" className="inline-flex items-center gap-1 text-[12px] text-[var(--muted)]">
+            <ExternalLink className="size-3" /> View activity
           </Link>
         )}
       </div>

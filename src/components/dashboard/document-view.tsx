@@ -344,7 +344,15 @@ function DatesPanel({ doc }: { doc: ContractDoc }) {
             <span className="font-serif text-[20px] tabular-nums tracking-[-0.01em]">
               {d.days < 0 ? `${Math.abs(d.days)}d ago` : `${d.days}d`}
             </span>
-            <Button variant="ghost" size="sm" className="min-h-11 w-full sm:min-h-0 sm:w-auto">Add reminder</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-11 w-full sm:min-h-0 sm:w-auto"
+              disabled
+              title="Custom reminder creation is coming soon."
+            >
+              Add reminder soon
+            </Button>
           </div>
         ))}
       </div>
@@ -358,7 +366,15 @@ function RemindersPanel({ reminders }: { reminders: Reminder[] }) {
     return (
       <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-strong)] p-10 text-center">
         <p className="font-serif text-[18px]">No reminders yet for this document.</p>
-        <Button variant="primary" size="sm" className="mt-4 min-h-11 w-full sm:min-h-0 sm:w-auto">Suggest reminders</Button>
+        <Button
+          variant="primary"
+          size="sm"
+          className="mt-4 min-h-11 w-full sm:min-h-0 sm:w-auto"
+          disabled
+          title="Reminder suggestion refresh is coming soon."
+        >
+          Suggestions appear after analysis
+        </Button>
       </div>
     );
   }

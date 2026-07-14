@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/* The Clausly logomark: a paragraph mark folded into an arc — suggesting
- * a clause being lifted out of a document into clarity. */
+/* The Clausly logomark: a contract page, a highlighted clause, and a reminder
+ * dot compressed into a small mark that stays legible in light and dark mode. */
 export function Logomark({ className }: { className?: string }) {
   return (
     <svg
@@ -18,14 +18,28 @@ export function Logomark({ className }: { className?: string }) {
           <stop offset="1" stopColor="color-mix(in oklch, var(--foreground) 70%, var(--accent) 30%)" />
         </linearGradient>
       </defs>
-      <rect x="1" y="1" width="30" height="30" rx="9" fill="url(#clauslyMark)" />
+      <rect x="1" y="1" width="30" height="30" rx="8" fill="url(#clauslyMark)" />
       <path
-        d="M11 10.5h11M11 16h8M11 21.5h6"
+        d="M20.25 7.75v5.25h5.25"
         stroke="var(--background)"
-        strokeWidth="1.75"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.72"
+      />
+      <path
+        d="M9.5 10.25h8.25M9.5 16h13M9.5 21.75h7.25"
+        stroke="var(--background)"
+        strokeWidth="1.65"
         strokeLinecap="round"
       />
-      <circle cx="24" cy="21.5" r="2.25" fill="var(--accent)" stroke="var(--background)" strokeWidth="1.25" />
+      <path
+        d="M9.5 16h9.75"
+        stroke="var(--accent)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <circle cx="23.5" cy="22" r="2.45" fill="var(--accent)" stroke="var(--background)" strokeWidth="1.2" />
     </svg>
   );
 }
@@ -43,9 +57,11 @@ export function Logo({
     <>
       <Logomark />
       {showWordmark && (
-        <span className="font-serif text-[22px] tracking-[-0.02em] leading-none">
+        <span className="font-serif text-[22px] leading-none">
           Clausly
-          <span className="text-[var(--muted)] text-[16px] align-baseline ml-[1px]">.app</span>
+          <span className="ml-[2px] align-baseline font-sans text-[13px] font-medium text-[var(--muted)]">
+            .app
+          </span>
         </span>
       )}
     </>

@@ -27,22 +27,36 @@ export async function POST() {
   }
   if (!data) return NextResponse.json({ error: "No subscription found." }, { status: 404 });
 
-  const session = await getStripe().billingPortal.sessions.create({
-    customer: data.stripe_customer_id,
-    return_url: `${getBaseUrl()}/dashboard/settings`,
-  });
+  let sessionUrl: string | null;
+  try {
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: data.stripe_customer_id,
+      return_url: `${getBaseUrl()}/dashboard/settings`,
+    });
+    sessionUrl = session.url;
+  } catch (error) {
+    return NextResponse.json({ error: portalErrorMessage(error) }, { status: 500 });
+  }
 
-  if (!session.url) {
+  if (!sessionUrl) {
     return NextResponse.json({ error: "Stripe portal did not return a URL." }, { status: 500 });
   }
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: sessionUrl });
 }
 
 function getBaseUrl() {
-  return (process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 }
 
 function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+function portalErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Stripe portal could not be opened.";
 }

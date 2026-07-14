@@ -59,4 +59,15 @@ describe("POST /api/billing/portal", () => {
       return_url: "https://clausly.test/dashboard/settings",
     });
   });
+
+  it("returns a readable Stripe error when portal creation fails", async () => {
+    seedBillingCustomer(userA, { stripe_customer_id: "cus_existing" });
+    portalCreateMock.mockRejectedValue(new Error("Customer portal is not configured."));
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "Customer portal is not configured." });
+  });
 });

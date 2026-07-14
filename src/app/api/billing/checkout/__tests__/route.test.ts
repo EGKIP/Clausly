@@ -10,8 +10,12 @@ import {
 
 const getOrCreateStripeCustomerMock = vi.hoisted(() => vi.fn());
 const checkoutCreateMock = vi.hoisted(() => vi.fn());
+const serviceSupabaseClient = vi.hoisted(() => ({ kind: "service" }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
+vi.mock("@/lib/supabase/service", () => ({
+  createServiceSupabaseClient: () => serviceSupabaseClient,
+}));
 vi.mock("@/lib/billing/stripe", () => ({
   getOrCreateStripeCustomer: getOrCreateStripeCustomerMock,
   getStripe: () => ({
@@ -34,6 +38,7 @@ describe("POST /api/billing/checkout", () => {
     checkoutCreateMock.mockResolvedValue({ url: "https://checkout.stripe.test/session" });
     process.env.STRIPE_PRO_PRICE_ID = "price_pro";
     process.env.NEXT_PUBLIC_BASE_URL = "https://clausly.test";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
   });
 
   it("returns the demo URL when Supabase env is absent", async () => {
@@ -73,7 +78,7 @@ describe("POST /api/billing/checkout", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ url: "https://checkout.stripe.test/session" });
-    expect(getOrCreateStripeCustomerMock).toHaveBeenCalledWith(expect.anything(), userA);
+    expect(getOrCreateStripeCustomerMock).toHaveBeenCalledWith(serviceSupabaseClient, userA);
     expect(checkoutCreateMock).toHaveBeenCalledWith({
       mode: "subscription",
       customer: "cus_test",
@@ -81,6 +86,34 @@ describe("POST /api/billing/checkout", () => {
       success_url: "https://clausly.test/dashboard/settings?upgraded=1",
       cancel_url: "https://clausly.test/upgrade?canceled=1",
       automatic_tax: { enabled: true },
+      billing_address_collection: "auto",
+      customer_update: {
+        address: "auto",
+        name: "auto",
+      },
     });
+  });
+
+  it("returns 503 when the service role key is missing", async () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    seedUser(userA, { subscription_tier: "free" });
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toEqual({ error: "Supabase service role is not configured." });
+    expect(checkoutCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a readable Stripe error when checkout creation fails", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    checkoutCreateMock.mockRejectedValue(new Error("No such price: price_bad"));
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: "No such price: price_bad" });
   });
 });

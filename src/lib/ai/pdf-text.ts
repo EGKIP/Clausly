@@ -3,6 +3,14 @@ const MIN_TEXT_LAYER_CHARS = 200;
 const OCR_PAGE_LIMIT = 20;
 const OCR_TIMEOUT_MS = 90_000;
 
+type NodeCanvasRuntime = {
+  DOMMatrix: unknown;
+  DOMPoint: unknown;
+  DOMRect: unknown;
+  ImageData: unknown;
+  Path2D: unknown;
+};
+
 export type OcrInput = Blob | string;
 
 export type OcrPageImage = {
@@ -80,6 +88,7 @@ export async function extractPdfTextWithOcr(file: Blob, options: ExtractPdfTextW
 }
 
 async function extractTextLayer(blob: Blob): Promise<string> {
+  await ensurePdfNodeRuntime();
   const { PDFParse } = await import("pdf-parse");
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const parser = new PDFParse({ data: bytes });
@@ -94,6 +103,7 @@ async function extractTextLayer(blob: Blob): Promise<string> {
 }
 
 async function renderPdfPageImages(file: Blob, options: { pageLimit: number }): Promise<OcrPageImages> {
+  await ensurePdfNodeRuntime();
   const { PDFParse } = await import("pdf-parse");
   const bytes = new Uint8Array(await file.arrayBuffer());
   const parser = new PDFParse({ data: bytes });
@@ -135,3 +145,74 @@ function nonWhitespaceLength(text: string) {
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
+
+async function ensurePdfNodeRuntime() {
+  const runtime = globalThis as typeof globalThis & {
+    DOMMatrix?: unknown;
+    DOMPoint?: unknown;
+    DOMRect?: unknown;
+    ImageData?: unknown;
+    Path2D?: unknown;
+  };
+
+  if (runtime.DOMMatrix && runtime.DOMPoint && runtime.DOMRect && runtime.ImageData && runtime.Path2D) {
+    return;
+  }
+
+  const canvas = await loadNodeCanvasRuntime();
+
+  installGlobalIfMissing("DOMMatrix", canvas.DOMMatrix);
+  installGlobalIfMissing("DOMPoint", canvas.DOMPoint);
+  installGlobalIfMissing("DOMRect", canvas.DOMRect);
+  installGlobalIfMissing("ImageData", canvas.ImageData);
+  installGlobalIfMissing("Path2D", canvas.Path2D);
+}
+
+function installGlobalIfMissing(name: string, value: unknown) {
+  if (!Reflect.get(globalThis, name)) {
+    Reflect.set(globalThis, name, value);
+  }
+}
+
+async function loadNodeCanvasRuntime(): Promise<NodeCanvasRuntime> {
+  const testRuntime = Reflect.get(globalThis, "__CLAUSLY_NODE_CANVAS_RUNTIME__");
+  if (isNodeCanvasRuntime(testRuntime)) {
+    return testRuntime;
+  }
+
+  if (process.env.NODE_ENV === "test") {
+    return testNodeCanvasRuntime;
+  }
+
+  const runtimeImport = new Function("specifier", "return import(specifier)") as (
+    specifier: string
+  ) => Promise<NodeCanvasRuntime>;
+
+  return runtimeImport("@napi-rs/canvas");
+}
+
+function isNodeCanvasRuntime(value: unknown): value is NodeCanvasRuntime {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      "DOMMatrix" in value &&
+      "DOMPoint" in value &&
+      "DOMRect" in value &&
+      "ImageData" in value &&
+      "Path2D" in value
+  );
+}
+
+class TestDOMMatrix {}
+class TestDOMPoint {}
+class TestDOMRect {}
+class TestImageData {}
+class TestPath2D {}
+
+const testNodeCanvasRuntime: NodeCanvasRuntime = {
+  DOMMatrix: TestDOMMatrix,
+  DOMPoint: TestDOMPoint,
+  DOMRect: TestDOMRect,
+  ImageData: TestImageData,
+  Path2D: TestPath2D,
+};

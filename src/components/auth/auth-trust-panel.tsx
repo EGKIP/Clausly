@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { BellRing, FileCheck2, LockKeyhole, MessageSquareText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,15 +31,27 @@ const trustSignals = [
 ] as const;
 
 export function AuthTrustPanel({ quote }: { quote: string }) {
-  const reduceMotion = useReducedMotion();
   const [active, setActive] = React.useState(0);
+  const [reduceMotion, setReduceMotion] = React.useState(false);
   const quotes = React.useMemo(
     () => [quote, ...trustQuotes.map((item) => item.quote).filter((item) => item !== quote)],
     [quote]
   );
 
   React.useEffect(() => {
-    if (reduceMotion || quotes.length <= 1) return;
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduceMotion(mediaQuery.matches);
+
+    function handleChange(event: MediaQueryListEvent) {
+      setReduceMotion(event.matches);
+    }
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  React.useEffect(() => {
+    if (reduceMotion || quotes.length <= 1) return undefined;
     const interval = window.setInterval(() => {
       setActive((value) => (value + 1) % quotes.length);
     }, 5200);
@@ -54,37 +65,33 @@ export function AuthTrustPanel({ quote }: { quote: string }) {
         <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-[var(--faint)]">
           {trustQuotes[active % trustQuotes.length]?.label ?? "Clausly"}
         </p>
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.blockquote
-            key={quotes[active]}
-            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
-            transition={{ duration: 0.35, ease: [0.165, 0.84, 0.44, 1] }}
-            className="mt-3 font-serif text-[22px] leading-[1.35] text-[var(--accent-ink)]"
-          >
-            &ldquo;{quotes[active]}&rdquo;
-          </motion.blockquote>
-        </AnimatePresence>
+        <blockquote
+          key={quotes[active]}
+          className={cn(
+            "mt-3 font-serif text-[22px] leading-[1.35] text-[var(--accent-ink)]",
+            !reduceMotion && "animate-auth-quote-in"
+          )}
+        >
+          &ldquo;{quotes[active]}&rdquo;
+        </blockquote>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-2.5">
         {trustSignals.map(({ icon: Icon, label }, index) => (
-          <motion.div
+          <div
             key={label}
-            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: reduceMotion ? 0 : 0.08 * index, duration: 0.35 }}
             className={cn(
               "rounded-[var(--radius-md)] border border-[var(--border)] bg-[color-mix(in_oklch,var(--surface)_76%,transparent)]",
-              "px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur"
+              "px-3.5 py-3 shadow-[var(--shadow-card)] backdrop-blur",
+              !reduceMotion && "animate-auth-signal-in"
             )}
+            style={{ animationDelay: reduceMotion ? undefined : `${index * 80}ms` }}
           >
             <Icon className="size-4 text-[var(--accent)]" />
             <p className="mt-2 text-[12.5px] leading-snug text-[var(--muted)]">
               {label}
             </p>
-          </motion.div>
+          </div>
         ))}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
+import { AuthTrustPanel } from "@/components/auth/auth-trust-panel";
 
 export function AuthShell({
   eyebrow,
@@ -26,6 +27,14 @@ export function AuthShell({
               maskImage: "linear-gradient(to bottom, black, transparent 72%)",
             }}
           />
+          <div
+            aria-hidden
+            className="absolute left-10 right-10 top-28 h-px bg-gradient-to-r from-transparent via-[var(--border-strong)] to-transparent"
+          />
+          <div
+            aria-hidden
+            className="absolute bottom-0 left-0 right-0 h-56 bg-gradient-to-t from-[color-mix(in_oklch,var(--accent-soft)_28%,transparent)] to-transparent"
+          />
           <div className="relative">
             <Logo />
           </div>
@@ -36,9 +45,7 @@ export function AuthShell({
             <h1 className="mt-4 font-serif text-[clamp(3rem,5.4vw,5.4rem)] leading-[0.96] tracking-[-0.02em] text-balance">
               {title}
             </h1>
-            <blockquote className="mt-7 border-l-2 border-[var(--accent)] pl-5 font-serif text-[22px] leading-[1.35] text-[var(--accent-ink)]">
-              &ldquo;{quote}&rdquo;
-            </blockquote>
+            <AuthTrustPanel quote={quote} />
           </div>
         </section>
 

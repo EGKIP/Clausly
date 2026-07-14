@@ -7,6 +7,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  if (shouldForwardOAuthCode(request.nextUrl)) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = "/auth/callback";
+    return NextResponse.redirect(redirectUrl);
+  }
+
   let response = NextResponse.next({ request });
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,4 +77,8 @@ function hasSupabaseEnv() {
 
 function shouldRequireOnboarding(pathname: string) {
   return (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) && pathname !== "/dashboard/welcome";
+}
+
+function shouldForwardOAuthCode(url: URL) {
+  return url.searchParams.has("code") && !url.pathname.startsWith("/auth/callback");
 }

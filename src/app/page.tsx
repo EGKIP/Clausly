@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { MarketingNav } from "@/components/marketing/nav";
 import { MarketingFooter } from "@/components/marketing/footer";
 import { Hero } from "@/components/marketing/hero";
@@ -12,7 +13,25 @@ import { FAQ } from "@/components/marketing/faq";
 import { FinalCTA } from "@/components/marketing/cta";
 import { AccountDeletedBanner } from "@/components/marketing/account-deleted-banner";
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const oauthCode = stringParam(params?.code);
+
+  if (oauthCode) {
+    const forwardedParams = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(params ?? {})) {
+      if (typeof value === "string") forwardedParams.set(key, value);
+      if (Array.isArray(value)) value.forEach((item) => forwardedParams.append(key, item));
+    }
+
+    redirect(`/auth/callback?${forwardedParams.toString()}`);
+  }
+
   return (
     <>
       <MarketingNav />
@@ -33,4 +52,8 @@ export default function HomePage() {
       <MarketingFooter />
     </>
   );
+}
+
+function stringParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }

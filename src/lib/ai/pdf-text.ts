@@ -1,4 +1,7 @@
 import { withTimeout } from "./with-timeout";
+import { NoTextLayerError } from "./errors";
+
+export { NoTextLayerError } from "./errors";
 
 const MAX_EXTRACTED_CHARS = 50_000;
 const MIN_TEXT_LAYER_CHARS = 200;
@@ -13,13 +16,6 @@ type NodeCanvasRuntime = {
   ImageData: unknown;
   Path2D: unknown;
 };
-
-export class NoTextLayerError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoTextLayerError";
-  }
-}
 
 export type OcrInput = Blob | string;
 
@@ -194,11 +190,7 @@ async function loadNodeCanvasRuntime(): Promise<NodeCanvasRuntime> {
     return testNodeCanvasRuntime;
   }
 
-  const runtimeImport = new Function("specifier", "return import(specifier)") as (
-    specifier: string
-  ) => Promise<NodeCanvasRuntime>;
-
-  return runtimeImport("@napi-rs/canvas");
+  return import("@napi-rs/canvas");
 }
 
 function isNodeCanvasRuntime(value: unknown): value is NodeCanvasRuntime {

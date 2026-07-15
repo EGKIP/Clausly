@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { categorizeAnalysisError, FAILURE_CATEGORY_COPY } from "../failure-categories";
-import { NoTextLayerError } from "../pdf-text";
+import { NoTextLayerError } from "../errors";
 
 describe("categorizeAnalysisError", () => {
   it("buckets a timeout error", () => {

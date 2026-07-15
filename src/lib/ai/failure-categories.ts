@@ -1,4 +1,4 @@
-import { NoTextLayerError } from "./pdf-text";
+import { NoTextLayerError } from "./errors";
 
 export type AnalysisFailureCategory =
   | "unsupported_file"

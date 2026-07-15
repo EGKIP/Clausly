@@ -6,27 +6,30 @@ import { AlertTriangle, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocumentStatus } from "@/lib/db/types";
 import { useDocumentStatusPoll } from "@/lib/hooks/use-document";
+import { FAILURE_CATEGORY_COPY, type AnalysisFailureCategory } from "@/lib/ai/failure-categories";
 
 /* Branches the document detail page rendering on the document.status field.
  * - ready   → renders children (the real DocumentView)
  * - pending → same skeleton as analyzing; we treat it as "just queued"
  * - analyzing → skeleton + polling, refresh server data when status flips
- * - failed  → error card with retry placeholder (analyze route lands in track N) */
+ * - failed  → error card with a category-specific message and a retry button */
 export function AnalysisGate({
   documentId,
   initialStatus,
   initialErrorMessage,
+  initialFailureCategory,
   children,
 }: {
   documentId: string;
   initialStatus: DocumentStatus;
   initialErrorMessage: string | null;
+  initialFailureCategory: AnalysisFailureCategory | null;
   children: React.ReactNode;
 }) {
   const router = useRouter();
   const [localStatus, setLocalStatus] = React.useState<DocumentStatus | null>(null);
   const pollingInitialStatus = localStatus ?? initialStatus;
-  const { status, errorMessage } = useDocumentStatusPoll(documentId, pollingInitialStatus, {
+  const { status, errorMessage, failureCategory } = useDocumentStatusPoll(documentId, pollingInitialStatus, {
     enabled: pollingInitialStatus === "analyzing" || pollingInitialStatus === "pending",
   });
 
@@ -44,6 +47,7 @@ export function AnalysisGate({
       <FailedState
         documentId={documentId}
         message={errorMessage ?? initialErrorMessage}
+        category={failureCategory ?? initialFailureCategory}
         onRetryStarted={() => setLocalStatus("analyzing")}
       />
     );
@@ -94,14 +98,17 @@ function AnalyzingState() {
 function FailedState({
   documentId,
   message,
+  category,
   onRetryStarted,
 }: {
   documentId: string;
   message: string | null;
+  category: AnalysisFailureCategory | null;
   onRetryStarted: () => void;
 }) {
   const [isRetrying, setIsRetrying] = React.useState(false);
   const [retryError, setRetryError] = React.useState<string | null>(null);
+  const copy = category ? FAILURE_CATEGORY_COPY[category] : null;
 
   async function retryAnalysis() {
     setIsRetrying(true);
@@ -139,15 +146,19 @@ function FailedState({
             Analysis failed
           </p>
           <h2 className="mt-2 font-serif text-[clamp(1.3rem,1.9vw,1.7rem)] leading-tight tracking-[-0.01em] text-[var(--foreground)]">
-            We couldn&apos;t read this contract.
+            {copy?.title ?? "We couldn't read this contract."}
           </h2>
           <p className="mt-2 max-w-xl text-[13.5px] text-[var(--foreground)] opacity-80">
-            {message ?? "An unexpected error stopped the analysis. The original file is safe and still in your library."}
+            {copy?.message ??
+              message ??
+              "An unexpected error stopped the analysis. The original file is safe and still in your library."}
           </p>
-          <p className="mt-3 text-[12px] text-[var(--muted)]">
-            Common causes: image-only scans without OCR, password-protected PDFs, or files
-            larger than the supported size.
-          </p>
+          {!copy && (
+            <p className="mt-3 text-[12px] text-[var(--muted)]">
+              Common causes: image-only scans without OCR, password-protected PDFs, or files
+              larger than the supported size.
+            </p>
+          )}
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <Button variant="primary" size="sm" onClick={retryAnalysis} disabled={isRetrying}>

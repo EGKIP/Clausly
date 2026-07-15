@@ -40,6 +40,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     document: doc,
     status,
     errorMessage,
+    failureCategory,
     clauses: docClauses,
     reminders: docReminders,
     signedUrl,
@@ -100,6 +101,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         documentId={doc.id}
         initialStatus={status}
         initialErrorMessage={errorMessage}
+        initialFailureCategory={failureCategory}
       >
         <DocumentView doc={doc} clauses={docClauses} reminders={docReminders} signedUrl={signedUrl} />
       </AnalysisGate>

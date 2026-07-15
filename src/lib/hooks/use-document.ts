@@ -5,11 +5,13 @@ import type { Clause } from "@/lib/mock-clauses";
 import type { ContractDoc } from "@/lib/mock-data";
 import type { Reminder } from "@/lib/mock-reminders";
 import type { DocumentStatus, KeyDate } from "@/lib/db/types";
+import type { AnalysisFailureCategory } from "@/lib/ai/failure-categories";
 
 type DocumentPayload = {
   document: ContractDoc;
   status: DocumentStatus;
   errorMessage: string | null;
+  failureCategory: AnalysisFailureCategory | null;
   clauses: Clause[];
   dates: KeyDate[];
   reminders: Reminder[];
@@ -58,6 +60,7 @@ export function useDocumentStatusPoll(
   const enabled = options?.enabled ?? true;
   const [status, setStatus] = React.useState<DocumentStatus>(initialStatus);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [failureCategory, setFailureCategory] = React.useState<AnalysisFailureCategory | null>(null);
 
   React.useEffect(() => {
     setStatus(initialStatus);
@@ -75,9 +78,10 @@ export function useDocumentStatusPoll(
         const response = await fetch(`/api/documents/${id}`, { cache: "no-store" });
         if (cancelled) return;
         if (response.ok) {
-          const payload = (await response.json()) as Pick<DocumentPayload, "status" | "errorMessage">;
+          const payload = (await response.json()) as Pick<DocumentPayload, "status" | "errorMessage" | "failureCategory">;
           setStatus(payload.status);
           setErrorMessage(payload.errorMessage ?? null);
+          setFailureCategory(payload.failureCategory ?? null);
           if (payload.status === "analyzing" || payload.status === "pending") {
             timer = setTimeout(tick, interval);
           }
@@ -96,5 +100,5 @@ export function useDocumentStatusPoll(
     };
   }, [enabled, id, interval, status]);
 
-  return { status, errorMessage };
+  return { status, errorMessage, failureCategory };
 }

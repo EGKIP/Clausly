@@ -6,6 +6,7 @@ import { documents as mockDocuments } from "@/lib/mock-data";
 import { reminders as mockReminders } from "@/lib/mock-reminders";
 import { toApiDate, toUiClause, toUiDocument, toUiReminder } from "./adapters";
 import type { DocumentDetail, DocumentRow, ReminderRow } from "./types";
+import type { AnalysisFailureCategory } from "@/lib/ai/failure-categories";
 
 export async function listDocuments() {
   if (!hasSupabaseEnv()) return mockDocuments;
@@ -41,6 +42,7 @@ export async function getDocumentDetail(id: string): Promise<DocumentDetail | nu
       document,
       status: "ready",
       errorMessage: null,
+      failureCategory: null,
       clauses: getClausesFor(id),
       dates: [],
       reminders: mockReminders.filter((item) => item.docId === id),
@@ -90,6 +92,7 @@ export async function getDocumentDetail(id: string): Promise<DocumentDetail | nu
     document: toUiDocument(document),
     status: document.status,
     errorMessage: document.error_message,
+    failureCategory: document.failure_category as AnalysisFailureCategory | null,
     clauses: (clauses ?? []).map(toUiClause),
     dates: (dates ?? []).map(toApiDate),
     reminders: ((reminders ?? []) as ReminderRow[]).map(toUiReminder),

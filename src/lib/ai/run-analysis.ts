@@ -5,6 +5,7 @@ import { persistAnalysis } from "./persistence";
 import * as pdfText from "./pdf-text";
 import { recordUsage } from "./usage-metrics";
 import { embedDocumentChunks } from "./embeddings";
+import { categorizeAnalysisError, type AnalysisFailureCategory } from "./failure-categories";
 
 type AnyClient = SupabaseClient<Database>;
 type PdfTextExtractor = typeof pdfText.extractPdfText;
@@ -51,7 +52,7 @@ export async function runAnalysis(
 
   const { error: statusError } = await supabase
     .from("documents")
-    .update({ status: "analyzing", error_message: null })
+    .update({ status: "analyzing", error_message: null, failure_category: null })
     .eq("id", doc.id)
     .eq("user_id", userId);
   if (statusError) throw statusError;
@@ -67,7 +68,7 @@ export async function runAnalysis(
 
     text = await getPdfTextExtractor()(file);
   } catch (error) {
-    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error));
+    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error), categorizeAnalysisError(error));
     throw error;
   }
 
@@ -84,7 +85,7 @@ export async function runAnalysis(
     });
   } catch (error) {
     analysisError = error;
-    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error));
+    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error), "provider_error");
     throw error;
   } finally {
     await recordUsage(supabase, {
@@ -113,10 +114,11 @@ export async function markAnalysisFailed(
   documentId: string,
   userId: string,
   message: string,
+  category: AnalysisFailureCategory,
 ) {
   await supabase
     .from("documents")
-    .update({ status: "failed", error_message: truncateError(message) })
+    .update({ status: "failed", error_message: truncateError(message), failure_category: category })
     .eq("id", documentId)
     .eq("user_id", userId);
 }

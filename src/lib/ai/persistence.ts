@@ -59,6 +59,7 @@ export async function persistAnalysis(
     tags: result.tags,
     status: "ready" as const,
     error_message: null,
+    failure_category: null,
   };
 
   const { error: updateError } = await supabase

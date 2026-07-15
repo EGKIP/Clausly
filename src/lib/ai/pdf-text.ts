@@ -14,6 +14,13 @@ type NodeCanvasRuntime = {
   Path2D: unknown;
 };
 
+export class NoTextLayerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoTextLayerError";
+  }
+}
+
 export type OcrInput = Blob | string;
 
 export type OcrPageImage = {
@@ -45,7 +52,7 @@ export type ExtractPdfTextWithOcrOptions = {
 export async function extractPdfText(blob: Blob): Promise<string> {
   const text = await extractTextLayer(blob);
   if (!text) {
-    throw new Error("PDF text extraction returned no text. OCR is not available yet.");
+    throw new NoTextLayerError("PDF text extraction returned no text. OCR is not available yet.");
   }
   return text;
 }
@@ -61,7 +68,7 @@ export async function extractPdfTextWithOcr(file: Blob, options: ExtractPdfTextW
 
   if (!isOcrEnabled(options.ocrEnabled)) {
     if (!textLayer) {
-      throw new Error("PDF text extraction returned no text. OCR is disabled.");
+      throw new NoTextLayerError("PDF text extraction returned no text. OCR is disabled.");
     }
     return textLayer.slice(0, maxExtractedChars);
   }
@@ -84,7 +91,7 @@ export async function extractPdfTextWithOcr(file: Blob, options: ExtractPdfTextW
 
   const ocrText = ocrTextParts.join("\n").trim();
   if (!ocrText) {
-    throw new Error("PDF OCR fallback returned no text.");
+    throw new NoTextLayerError("PDF OCR fallback returned no text.");
   }
 
   return ocrText.slice(0, maxExtractedChars);

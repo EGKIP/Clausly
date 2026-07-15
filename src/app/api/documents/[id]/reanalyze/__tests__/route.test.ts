@@ -16,7 +16,10 @@ import {
 import { extractPdfText } from "@/lib/ai/pdf-text";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
-vi.mock("@/lib/ai/pdf-text", () => ({ extractPdfText: vi.fn() }));
+vi.mock("@/lib/ai/pdf-text", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/pdf-text")>();
+  return { extractPdfText: vi.fn(), NoTextLayerError: actual.NoTextLayerError };
+});
 
 import { POST } from "../route";
 
@@ -113,6 +116,7 @@ describe("POST /api/documents/[id]/reanalyze", () => {
       id: document.id,
       status: "failed",
       error_message: "Still corrupt",
+      failure_category: "unknown",
     });
   });
 

@@ -1,3 +1,5 @@
+import { NoTextLayerError } from "./pdf-text";
+
 export type AnalysisFailureCategory =
   | "unsupported_file"
   | "storage_error"
@@ -40,16 +42,17 @@ export const FAILURE_CATEGORY_COPY: Record<AnalysisFailureCategory, { title: str
 
 /**
  * Buckets a thrown analysis error into a coarse, user-facing category.
- * Only covers categories that have to be inferred from a caught error's
- * message — "unsupported_file" (rejected during upload validation, before
- * analysis runs), "provider_error", and "stuck_timeout" are known from
- * context at their respective call sites and set directly, not sniffed here.
+ * Only covers categories that have to be inferred from a caught error —
+ * "unsupported_file" (rejected during upload validation, before analysis
+ * runs), "provider_error", and "stuck_timeout" are known from context at
+ * their respective call sites and set directly, not inferred here.
  */
 export function categorizeAnalysisError(error: unknown): AnalysisFailureCategory {
+  if (error instanceof NoTextLayerError) return "no_text";
+
   const message = error instanceof Error ? error.message : String(error);
 
   if (/timed out/i.test(message)) return "extraction_timeout";
-  if (/returned no text|no text|OCR fallback returned no text/i.test(message)) return "no_text";
   if (/download|storage/i.test(message)) return "storage_error";
 
   return "unknown";

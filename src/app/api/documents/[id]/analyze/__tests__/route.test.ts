@@ -13,7 +13,10 @@ import {
 import { extractPdfText } from "@/lib/ai/pdf-text";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
-vi.mock("@/lib/ai/pdf-text", () => ({ extractPdfText: vi.fn() }));
+vi.mock("@/lib/ai/pdf-text", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/ai/pdf-text")>();
+  return { extractPdfText: vi.fn(), NoTextLayerError: actual.NoTextLayerError };
+});
 
 import { POST } from "../route";
 
@@ -108,6 +111,23 @@ describe("POST /api/documents/[id]/analyze", () => {
       id: document.id,
       status: "failed",
       error_message: "Corrupt PDF fixture",
+      failure_category: "unknown",
+    });
+  });
+
+  it("categorizes a no-text-layer failure for friendlier messaging", async () => {
+    const { NoTextLayerError } = await import("@/lib/ai/pdf-text");
+    const document = seedDocument(userA, { status: "pending", error_message: null });
+    seedStoredPdf(document.storage_path, "pdf bytes");
+    extractPdfTextMock.mockRejectedValue(new NoTextLayerError("PDF text extraction returned no text. OCR is disabled."));
+
+    const response = await POST(request, routeContext(document.id));
+
+    expect(response.status).toBe(500);
+    expect(db().documents[0]).toMatchObject({
+      id: document.id,
+      status: "failed",
+      failure_category: "no_text",
     });
   });
 

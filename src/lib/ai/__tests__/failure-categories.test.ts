@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { categorizeAnalysisError, FAILURE_CATEGORY_COPY } from "../failure-categories";
+import { NoTextLayerError } from "../pdf-text";
 
 describe("categorizeAnalysisError", () => {
   it("buckets a timeout error", () => {
@@ -7,9 +8,9 @@ describe("categorizeAnalysisError", () => {
     expect(categorizeAnalysisError(new Error("OCR timed out after 90000ms on page 3."))).toBe("extraction_timeout");
   });
 
-  it("buckets a no-text error", () => {
-    expect(categorizeAnalysisError(new Error("PDF text extraction returned no text. OCR is disabled."))).toBe("no_text");
-    expect(categorizeAnalysisError(new Error("PDF OCR fallback returned no text."))).toBe("no_text");
+  it("buckets a NoTextLayerError regardless of its message", () => {
+    expect(categorizeAnalysisError(new NoTextLayerError("PDF text extraction returned no text. OCR is disabled."))).toBe("no_text");
+    expect(categorizeAnalysisError(new NoTextLayerError("PDF OCR fallback returned no text."))).toBe("no_text");
   });
 
   it("buckets a storage/download error", () => {

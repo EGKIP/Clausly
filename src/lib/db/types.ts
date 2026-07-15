@@ -1,4 +1,5 @@
 import type { RiskLevel } from "@/components/ui/risk-pill";
+import type { AnalysisFailureCategory } from "@/lib/ai/failure-categories";
 import type { Clause as UiClause } from "@/lib/mock-clauses";
 import type { ContractDoc, DocType } from "@/lib/mock-data";
 import type { Reminder as UiReminder, ReminderStatus } from "@/lib/mock-reminders";
@@ -70,6 +71,7 @@ export type DocumentDetail = {
   document: ContractDoc;
   status: DocumentStatus;
   errorMessage: string | null;
+  failureCategory: AnalysisFailureCategory | null;
   clauses: UiClause[];
   dates: KeyDate[];
   reminders: UiReminder[];

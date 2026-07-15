@@ -29,6 +29,9 @@ function documentRow(risk_level: DocumentRow["risk_level"], tags: string[] | nul
     summary: "Full summary",
     tags: tags as DocumentRow["tags"],
     error_message: null,
+    analysis_started_at: null,
+    analysis_attempts: 0,
+    failure_category: null,
     created_at: "2026-06-01T00:00:00Z",
     updated_at: "2026-06-01T00:00:00Z",
   };

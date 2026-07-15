@@ -1,7 +1,10 @@
+import { withTimeout } from "./with-timeout";
+
 const MAX_EXTRACTED_CHARS = 50_000;
 const MIN_TEXT_LAYER_CHARS = 200;
 const OCR_PAGE_LIMIT = 20;
 const OCR_TIMEOUT_MS = 90_000;
+const EXTRACTION_TIMEOUT_MS = 45_000;
 
 type NodeCanvasRuntime = {
   DOMMatrix: unknown;
@@ -10,6 +13,13 @@ type NodeCanvasRuntime = {
   ImageData: unknown;
   Path2D: unknown;
 };
+
+export class NoTextLayerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoTextLayerError";
+  }
+}
 
 export type OcrInput = Blob | string;
 
@@ -42,7 +52,7 @@ export type ExtractPdfTextWithOcrOptions = {
 export async function extractPdfText(blob: Blob): Promise<string> {
   const text = await extractTextLayer(blob);
   if (!text) {
-    throw new Error("PDF text extraction returned no text. OCR is not available yet.");
+    throw new NoTextLayerError("PDF text extraction returned no text. OCR is not available yet.");
   }
   return text;
 }
@@ -58,7 +68,7 @@ export async function extractPdfTextWithOcr(file: Blob, options: ExtractPdfTextW
 
   if (!isOcrEnabled(options.ocrEnabled)) {
     if (!textLayer) {
-      throw new Error("PDF text extraction returned no text. OCR is disabled.");
+      throw new NoTextLayerError("PDF text extraction returned no text. OCR is disabled.");
     }
     return textLayer.slice(0, maxExtractedChars);
   }
@@ -81,7 +91,7 @@ export async function extractPdfTextWithOcr(file: Blob, options: ExtractPdfTextW
 
   const ocrText = ocrTextParts.join("\n").trim();
   if (!ocrText) {
-    throw new Error("PDF OCR fallback returned no text.");
+    throw new NoTextLayerError("PDF OCR fallback returned no text.");
   }
 
   return ocrText.slice(0, maxExtractedChars);
@@ -94,7 +104,7 @@ async function extractTextLayer(blob: Blob): Promise<string> {
   const parser = new PDFParse({ data: bytes });
 
   try {
-    const result = await parser.getText();
+    const result = await withTimeout(parser.getText(), EXTRACTION_TIMEOUT_MS, "PDF text extraction timed out.");
     const text = result.text.trim();
     return text.slice(0, MAX_EXTRACTED_CHARS);
   } finally {

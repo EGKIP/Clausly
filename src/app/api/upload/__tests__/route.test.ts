@@ -1,5 +1,13 @@
+// @vitest-environment node
+//
+// This route runs in the Node.js server runtime, not a browser/DOM one. The
+// project's default jsdom test environment provides its own File/Blob shim
+// that (unlike Node's real, undici-backed File/Blob) doesn't implement
+// arrayBuffer() — overriding to the node environment here exercises the same
+// File/Blob implementation this route actually runs against in production.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createServiceSupabaseClientMock,
   createSupabaseClient,
   db,
   resetSupabaseMock,
@@ -11,6 +19,16 @@ import {
 } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
+vi.mock("@/lib/supabase/service", () => ({ createServiceSupabaseClient: () => createServiceSupabaseClientMock() }));
+// after() requires Next's request-scope context, which direct unit-test
+// calls to route handlers don't set up — run the callback immediately
+// instead, mirroring after()'s "runs once the response is on its way" intent
+// closely enough for these tests (see the upload route's real usage for the
+// production execution-extension behavior this stands in for).
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: (callback: () => unknown) => { void callback(); } };
+});
 
 import { POST } from "../route";
 
@@ -39,6 +57,16 @@ describe("POST /api/upload", () => {
     await expect(response.json()).resolves.toMatchObject({ error: "Invalid upload." });
   });
 
+  it("returns 400 when the file claims to be a PDF but isn't", async () => {
+    const spoofed = new File(["not actually a pdf"], "lease.pdf", { type: "application/pdf" });
+
+    const response = await POST(uploadRequest(spoofed));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.issues).toContainEqual({ path: "file", message: "This file doesn't look like a valid PDF." });
+  });
+
   it("returns 400 when the file exceeds the size limit", async () => {
     const oversized = new File([new Uint8Array(25 * 1024 * 1024 + 1)], "large.pdf", { type: "application/pdf" });
 
@@ -60,11 +88,16 @@ describe("POST /api/upload", () => {
     expect(db().documents[0]).toMatchObject({
       user_id: userA.id,
       title: "My Lease",
-      status: "analyzing",
       document_type: "other",
     });
     expect(db().documents[0].storage_path).toMatch(new RegExp("^" + userA.id + "/"));
     expect(storageCalls().uploaded[0].path).toBe(db().documents[0].storage_path);
+
+    // Analysis is kicked off in the background (fire-and-forget today, via
+    // after() from the next commit on) rather than awaited by the route, so
+    // the status flip to "analyzing" happens a few microtask ticks after the
+    // response is returned — poll rather than assume exact timing.
+    await vi.waitFor(() => expect(db().documents[0].status).toBe("analyzing"));
   });
 
   it("returns 402 when a free user is at the document limit", async () => {

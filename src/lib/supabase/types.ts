@@ -180,6 +180,9 @@ export type Database = {
           summary: string | null;
           tags: string[];
           error_message: string | null;
+          analysis_started_at: string | null;
+          analysis_attempts: number;
+          failure_category: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -205,6 +208,9 @@ export type Database = {
           summary?: string | null;
           tags?: string[];
           error_message?: string | null;
+          analysis_started_at?: string | null;
+          analysis_attempts?: number;
+          failure_category?: string | null;
           created_at?: string;
           updated_at?: string;
         };

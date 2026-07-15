@@ -1,5 +1,12 @@
+// @vitest-environment node
+//
+// Exercises the upload route, which runs in the Node.js server runtime, not
+// a browser/DOM one. jsdom's File/Blob shim doesn't implement arrayBuffer()
+// (unlike Node's real, undici-backed File/Blob), so this suite needs the
+// real node environment to exercise the route's PDF-signature check.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createServiceSupabaseClientMock,
   createSupabaseClient,
   db,
   jsonRequest,
@@ -12,7 +19,14 @@ import {
 } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
+vi.mock("@/lib/supabase/service", () => ({ createServiceSupabaseClient: () => createServiceSupabaseClientMock() }));
 vi.mock("server-only", () => ({}));
+// after() requires Next's request-scope context, which direct unit-test
+// calls to route handlers don't set up — run the callback immediately.
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: (callback: () => unknown) => { void callback(); } };
+});
 
 import { POST as uploadDocument } from "@/app/api/upload/route";
 import { GET as getDocument } from "@/app/api/documents/[id]/route";

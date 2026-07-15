@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getAnalysisDocument, runAnalysis } from "@/lib/ai/run-analysis";
+import { AlreadyAnalyzingError, getAnalysisDocument, runAnalysis } from "@/lib/ai/run-analysis";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -37,6 +37,9 @@ export async function POST(_request: Request, context: RouteContext) {
     const result = await runAnalysis(supabase, document.id, user.id, document);
     return NextResponse.json({ ok: true, ...result });
   } catch (analysisError) {
+    if (analysisError instanceof AlreadyAnalyzingError) {
+      return NextResponse.json({ error: analysisError.message }, { status: 409 });
+    }
     const message = analysisError instanceof Error ? analysisError.message : "Re-analysis failed.";
     return NextResponse.json({ error: message }, { status: 500 });
   }

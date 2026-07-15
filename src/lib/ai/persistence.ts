@@ -21,12 +21,25 @@ export type PersistResult = {
  *
  * Callers must verify documentId ownership before calling. RLS provides a
  * second line of defense, but this helper trusts the caller's user_id.
+ *
+ * attemptToken fences the final documents write: it's a no-op if a newer
+ * attempt has since claimed the document (documents.analysis_attempts no
+ * longer matches), so a stale/superseded attempt can't clobber a newer
+ * attempt's document-level status/summary/risk fields. This does NOT extend
+ * to the clause/date/reminder delete+insert steps below — a genuinely
+ * concurrent stale write can still replace those with stale data. The
+ * atomic claim in run-analysis.ts's claimAnalysisAttempt() prevents two
+ * attempts from running concurrently in the common case; this token guards
+ * the residual case of an attempt that's already past the claim step (e.g.
+ * on a zombie/frozen instance) resuming after a newer attempt has taken
+ * over. See the durable analysis pipeline plan for the accepted tradeoff.
  */
 export async function persistAnalysis(
   supabase: AnyClient,
   documentId: string,
   userId: string,
   result: AnalysisResult,
+  attemptToken: number,
 ): Promise<PersistResult> {
   // Snapshot semantics: a successful persist replaces the prior analysis. On a
   // first analyze these deletes hit zero rows; on reanalyze they clear stale
@@ -66,7 +79,8 @@ export async function persistAnalysis(
     .from("documents")
     .update(documentUpdate)
     .eq("id", documentId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("analysis_attempts", attemptToken);
   if (updateError) throw new AnalysisPersistenceError("documents.update", updateError.message);
 
   const clauseRows = result.clauses.map((clause) => ({
@@ -85,7 +99,7 @@ export async function persistAnalysis(
   let clauseIds: string[] = [];
   if (clauseRows.length > 0) {
     const { data, error } = await supabase.from("clauses").insert(clauseRows).select("id");
-    if (error) return rollback(supabase, documentId, userId, "clauses.insert", error.message);
+    if (error) return rollback(supabase, documentId, userId, attemptToken, "clauses.insert", error.message);
     clauseIds = (data ?? []).map((row: { id: string }) => row.id);
   }
 
@@ -103,7 +117,7 @@ export async function persistAnalysis(
   let dateIds: string[] = [];
   if (dateRows.length > 0) {
     const { data, error } = await supabase.from("dates").insert(dateRows).select("id");
-    if (error) return rollback(supabase, documentId, userId, "dates.insert", error.message);
+    if (error) return rollback(supabase, documentId, userId, attemptToken, "dates.insert", error.message);
     dateIds = (data ?? []).map((row: { id: string }) => row.id);
   }
 
@@ -123,7 +137,7 @@ export async function persistAnalysis(
   let reminderIds: string[] = [];
   if (reminderRows.length > 0) {
     const { data, error } = await supabase.from("reminders").insert(reminderRows).select("id");
-    if (error) return rollback(supabase, documentId, userId, "reminders.insert", error.message);
+    if (error) return rollback(supabase, documentId, userId, attemptToken, "reminders.insert", error.message);
     reminderIds = (data ?? []).map((row: { id: string }) => row.id);
   }
 
@@ -141,6 +155,7 @@ async function rollback(
   supabase: AnyClient,
   documentId: string,
   userId: string,
+  attemptToken: number,
   step: string,
   message: string,
 ): Promise<never> {
@@ -149,8 +164,9 @@ async function rollback(
   await supabase.from("reminders").delete().eq("document_id", documentId).eq("user_id", userId);
   await supabase
     .from("documents")
-    .update({ status: "failed", error_message: `${step}: ${message}` })
+    .update({ status: "failed", error_message: `${step}: ${message}`, failure_category: "provider_error" as const })
     .eq("id", documentId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("analysis_attempts", attemptToken);
   throw new AnalysisPersistenceError(step, message);
 }

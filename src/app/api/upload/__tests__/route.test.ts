@@ -77,11 +77,16 @@ describe("POST /api/upload", () => {
     expect(db().documents[0]).toMatchObject({
       user_id: userA.id,
       title: "My Lease",
-      status: "analyzing",
       document_type: "other",
     });
     expect(db().documents[0].storage_path).toMatch(new RegExp("^" + userA.id + "/"));
     expect(storageCalls().uploaded[0].path).toBe(db().documents[0].storage_path);
+
+    // Analysis is kicked off in the background (fire-and-forget today, via
+    // after() from the next commit on) rather than awaited by the route, so
+    // the status flip to "analyzing" happens a few microtask ticks after the
+    // response is returned — poll rather than assume exact timing.
+    await vi.waitFor(() => expect(db().documents[0].status).toBe("analyzing"));
   });
 
   it("returns 402 when a free user is at the document limit", async () => {

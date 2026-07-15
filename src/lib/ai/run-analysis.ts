@@ -22,7 +22,22 @@ type AnalysisDocument = {
   storage_path: string;
   jurisdiction: string | null;
   status: Database["public"]["Enums"]["document_status"];
+  analysis_attempts: number;
 };
+
+const ANALYSIS_DOCUMENT_COLUMNS =
+  "id, user_id, title, file_name, storage_path, jurisdiction, status, analysis_attempts";
+
+export class AlreadyAnalyzingError extends Error {
+  constructor() {
+    super("This document is already being analyzed.");
+    this.name = "AlreadyAnalyzingError";
+  }
+}
+
+export type ClaimResult =
+  | { claimed: true; attemptToken: number; document: AnalysisDocument }
+  | { claimed: false };
 
 export async function getAnalysisDocument(
   supabase: AnyClient,
@@ -31,7 +46,7 @@ export async function getAnalysisDocument(
 ): Promise<{ document: AnalysisDocument | null; error: { message: string; code?: string } | null }> {
   const { data, error } = await supabase
     .from("documents")
-    .select("id, user_id, title, file_name, storage_path, jurisdiction, status")
+    .select(ANALYSIS_DOCUMENT_COLUMNS)
     .eq("id", documentId)
     .eq("user_id", userId)
     .single();
@@ -42,6 +57,59 @@ export async function getAnalysisDocument(
   };
 }
 
+/**
+ * Atomically claims a document for analysis: bumps analysis_attempts (which
+ * also serves as this attempt's fencing token — see persistAnalysis's doc
+ * comment) and flips status to 'analyzing' in a single conditional UPDATE, so
+ * two concurrent callers can't both start analyzing the same document.
+ *
+ * Without `requireStaleSince`, the claim predicate is "not currently
+ * analyzing" (the normal upload/analyze/reanalyze path). With it, the
+ * predicate instead requires the document to already be 'analyzing' with an
+ * analysis_started_at older than the given cutoff — used by the
+ * stuck-analysis recovery sweep to reclaim a document whose prior attempt
+ * never finished, without racing a legitimately in-progress one.
+ *
+ * Returns `{claimed: false}` (not an error) when the predicate doesn't
+ * match — that's the expected outcome when something else currently holds
+ * the claim.
+ */
+export async function claimAnalysisAttempt(
+  supabase: AnyClient,
+  documentId: string,
+  userId: string,
+  options?: { requireStaleSince?: string },
+): Promise<ClaimResult> {
+  const { document: current, error } = await getAnalysisDocument(supabase, documentId, userId);
+  if (error || !current) {
+    throw new Error(error?.message ?? "Document not found.");
+  }
+
+  const attemptToken = (current.analysis_attempts ?? 0) + 1;
+
+  let query = supabase
+    .from("documents")
+    .update({
+      status: "analyzing" as const,
+      analysis_started_at: new Date().toISOString(),
+      analysis_attempts: attemptToken,
+      error_message: null,
+      failure_category: null,
+    })
+    .eq("id", documentId)
+    .eq("user_id", userId);
+
+  query = options?.requireStaleSince
+    ? query.eq("status", "analyzing").lt("analysis_started_at", options.requireStaleSince)
+    : query.neq("status", "analyzing");
+
+  const { data, error: claimError } = await query.select(ANALYSIS_DOCUMENT_COLUMNS).maybeSingle();
+  if (claimError) throw claimError;
+  if (!data) return { claimed: false };
+
+  return { claimed: true, attemptToken, document: data as AnalysisDocument };
+}
+
 export async function runAnalysis(
   supabase: AnyClient,
   documentId: string,
@@ -49,14 +117,19 @@ export async function runAnalysis(
   document?: AnalysisDocument,
 ) {
   const doc = document ?? (await loadOwnedDocument(supabase, documentId, userId));
+  const claim = await claimAnalysisAttempt(supabase, doc.id, userId);
+  if (!claim.claimed) throw new AlreadyAnalyzingError();
 
-  const { error: statusError } = await supabase
-    .from("documents")
-    .update({ status: "analyzing", error_message: null, failure_category: null })
-    .eq("id", doc.id)
-    .eq("user_id", userId);
-  if (statusError) throw statusError;
+  return runClaimedAnalysis(supabase, userId, claim.document, claim.attemptToken);
+}
 
+/** Runs the analysis pipeline body for a document already claimed via claimAnalysisAttempt(). */
+export async function runClaimedAnalysis(
+  supabase: AnyClient,
+  userId: string,
+  doc: AnalysisDocument,
+  attemptToken: number,
+) {
   let text: string;
   try {
     const { data: file, error: downloadError } = await supabase.storage
@@ -68,7 +141,7 @@ export async function runAnalysis(
 
     text = await getPdfTextExtractor()(file);
   } catch (error) {
-    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error), categorizeAnalysisError(error));
+    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error), categorizeAnalysisError(error), attemptToken);
     throw error;
   }
 
@@ -85,7 +158,7 @@ export async function runAnalysis(
     });
   } catch (error) {
     analysisError = error;
-    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error), "provider_error");
+    await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error), "provider_error", attemptToken);
     throw error;
   } finally {
     await recordUsage(supabase, {
@@ -98,7 +171,7 @@ export async function runAnalysis(
     });
   }
 
-  const persistResult = await persistAnalysis(supabase, doc.id, userId, result);
+  const persistResult = await persistAnalysis(supabase, doc.id, userId, result, attemptToken);
   void embedDocumentChunks(supabase, doc.id, userId, text).catch((error) => {
     console.warn("Document chunk indexing failed after analysis.", {
       documentId: doc.id,
@@ -115,12 +188,14 @@ export async function markAnalysisFailed(
   userId: string,
   message: string,
   category: AnalysisFailureCategory,
+  attemptToken: number,
 ) {
   await supabase
     .from("documents")
     .update({ status: "failed", error_message: truncateError(message), failure_category: category })
     .eq("id", documentId)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("analysis_attempts", attemptToken);
 }
 
 function errorMessage(error: unknown) {

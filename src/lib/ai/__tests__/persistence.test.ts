@@ -80,7 +80,7 @@ describe("persistAnalysis", () => {
     seedDate(document.id, userA, { label: "Stale date B" });
     seedReminder(document.id, userA, { title: "Stale reminder" });
 
-    const persisted = await persistAnalysis(createSupabaseClient() as never, document.id, userA.id, result());
+    const persisted = await persistAnalysis(createSupabaseClient() as never, document.id, userA.id, result(), 0);
 
     expect(persisted.clauseIds).toHaveLength(1);
     expect(persisted.dateIds).toHaveLength(1);
@@ -100,11 +100,31 @@ describe("persistAnalysis", () => {
     seedClause(documentA.id, userA, { title: "Stale user A clause" });
     const userBClause = seedClause(documentB.id, userB, { title: "User B clause" });
 
-    await persistAnalysis(createSupabaseClient() as never, documentA.id, userA.id, result());
+    await persistAnalysis(createSupabaseClient() as never, documentA.id, userA.id, result(), 0);
 
     expect(db().clauses).toEqual([
       expect.objectContaining({ title: "User B clause", id: userBClause.id, document_id: documentB.id, user_id: userB.id }),
       expect.objectContaining({ title: "Fresh notice window", document_id: documentA.id, user_id: userA.id }),
     ]);
+  });
+
+  it("does not overwrite a newer attempt's document-level fields when the token is stale", async () => {
+    const document = seedDocument(userA, {
+      status: "ready",
+      analysis_attempts: 2,
+      summary: "Summary from the newer attempt",
+      title: "Newer title",
+    });
+
+    // attemptToken 1 is stale — a newer attempt (token 2) has already
+    // claimed and presumably completed by the time this one finishes.
+    await persistAnalysis(createSupabaseClient() as never, document.id, userA.id, result(), 1);
+
+    expect(db().documents[0]).toMatchObject({
+      status: "ready",
+      summary: "Summary from the newer attempt",
+      title: "Newer title",
+      analysis_attempts: 2,
+    });
   });
 });

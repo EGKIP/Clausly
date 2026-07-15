@@ -93,11 +93,12 @@ describe("POST /api/upload", () => {
     expect(db().documents[0].storage_path).toMatch(new RegExp("^" + userA.id + "/"));
     expect(storageCalls().uploaded[0].path).toBe(db().documents[0].storage_path);
 
-    // Analysis is kicked off in the background (fire-and-forget today, via
-    // after() from the next commit on) rather than awaited by the route, so
-    // the status flip to "analyzing" happens a few microtask ticks after the
-    // response is returned — poll rather than assume exact timing.
-    await vi.waitFor(() => expect(db().documents[0].status).toBe("analyzing"));
+    // Analysis is deferred through after(). In this unit-test shim the
+    // callback runs immediately, so the document may already be ready/failed
+    // by the time the response assertion runs; the important contract here is
+    // that upload claimed an analysis attempt for the new document.
+    await vi.waitFor(() => expect(db().documents[0].analysis_attempts).toBe(1));
+    expect(["analyzing", "ready", "failed"]).toContain(db().documents[0].status);
   });
 
   it("returns 402 when a free user is at the document limit", async () => {

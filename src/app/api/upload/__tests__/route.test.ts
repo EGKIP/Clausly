@@ -7,6 +7,7 @@
 // File/Blob implementation this route actually runs against in production.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createServiceSupabaseClientMock,
   createSupabaseClient,
   db,
   resetSupabaseMock,
@@ -18,6 +19,16 @@ import {
 } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
+vi.mock("@/lib/supabase/service", () => ({ createServiceSupabaseClient: () => createServiceSupabaseClientMock() }));
+// after() requires Next's request-scope context, which direct unit-test
+// calls to route handlers don't set up — run the callback immediately
+// instead, mirroring after()'s "runs once the response is on its way" intent
+// closely enough for these tests (see the upload route's real usage for the
+// production execution-extension behavior this stands in for).
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: (callback: () => unknown) => { void callback(); } };
+});
 
 import { POST } from "../route";
 

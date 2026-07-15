@@ -6,6 +6,7 @@
 // real node environment to exercise the route's PDF-signature check.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createServiceSupabaseClientMock,
   createSupabaseClient,
   db,
   resetSupabaseMock,
@@ -15,8 +16,15 @@ import {
 } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
+vi.mock("@/lib/supabase/service", () => ({ createServiceSupabaseClient: () => createServiceSupabaseClientMock() }));
 vi.mock("@/lib/ai/run-analysis", () => ({ runAnalysis: vi.fn(async () => ({ ok: true })) }));
 vi.mock("server-only", () => ({}));
+// after() requires Next's request-scope context, which direct unit-test
+// calls to route handlers don't set up — run the callback immediately.
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: (callback: () => unknown) => { void callback(); } };
+});
 
 import { POST as uploadDocument } from "@/app/api/upload/route";
 import { DELETE as deleteDocument } from "@/app/api/documents/[id]/route";

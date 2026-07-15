@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { runAnalysis } from "@/lib/ai/run-analysis";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
@@ -9,6 +10,13 @@ import { isPdfSignature } from "@/lib/upload/pdf-signature";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const titleSchema = boundedTextSchema(1, 200);
+
+// Extends how long Vercel keeps this function alive for the after() callback
+// below. 300s fits the current Pro-tier maxDuration ceiling; raise toward
+// 800s if Fluid Compute is enabled. Large scanned/OCR documents can still
+// exceed this — the stuck-analysis recovery sweep (see
+// /api/admin/recover-stuck-analyses) picks those up and retries them.
+export const maxDuration = 300;
 
 async function validateUpload(formData: FormData) {
   const rawFile = formData.get("file");
@@ -132,12 +140,22 @@ export async function POST(request: Request) {
     // Audit logging is best-effort; upload success remains the source of truth.
   }
 
-  void runAnalysis(supabase, document.id, user.id).catch((error) => {
-    console.error("Background document analysis failed.", {
-      documentId: document.id,
-      userId: user.id,
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
+  // Deferred via after() so Vercel keeps this function alive past the
+  // response (up to maxDuration) instead of the analysis racing an instance
+  // freeze/recycle as a bare detached promise. Uses the service-role client,
+  // not the request-scoped cookie-bound one — by the time this callback
+  // runs the response has already been sent, and runAnalysis already
+  // enforces ownership explicitly via .eq('user_id', userId) on every write.
+  after(async () => {
+    try {
+      await runAnalysis(createServiceSupabaseClient(), document.id, user.id);
+    } catch (error) {
+      console.error("Background document analysis failed.", {
+        documentId: document.id,
+        userId: user.id,
+        message: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
   });
 
   return NextResponse.json({ id: document.id, document }, { status: 201 });

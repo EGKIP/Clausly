@@ -1,21 +1,18 @@
 "use client";
 
-import * as React from "react";
 import { Check, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
 import { Container, Eyebrow, Headline, Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
 import { cn } from "@/lib/utils";
-
-type Cycle = "monthly" | "yearly";
 
 const tiers = [
   {
     id: "free",
     name: "Free",
     tagline: "For your first contracts.",
-    price: { monthly: 0, yearly: 0 },
+    price: 0,
+    priceLabel: "forever",
     cta: { label: "Start free", href: "/signup" },
     features: [
       "Up to 5 stored documents",
@@ -30,7 +27,8 @@ const tiers = [
     id: "pro",
     name: "Pro",
     tagline: "For everything you've signed.",
-    price: { monthly: 12, yearly: 9 },
+    price: 12,
+    priceLabel: "/ month",
     highlight: true,
     cta: { label: "Upgrade to Pro", href: "/upgrade" },
     features: [
@@ -47,7 +45,6 @@ const tiers = [
 ];
 
 export function Pricing() {
-  const [cycle, setCycle] = React.useState<Cycle>("yearly");
   return (
     <section id="pricing" className="relative py-24 md:py-32">
       <Container>
@@ -67,43 +64,6 @@ export function Pricing() {
             <p className="mt-5 text-[16px] leading-relaxed text-[var(--muted)]">
               No credit card to start. Cancel any time. Pricing is in USD.
             </p>
-          </Reveal>
-
-          {/* Cycle toggle */}
-          <Reveal delay={0.15}>
-            <div className="mt-8 inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-card)]">
-              {(["monthly", "yearly"] as Cycle[]).map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCycle(c)}
-                  className={cn(
-                    "relative inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
-                    cycle === c ? "text-[var(--background)]" : "text-[var(--muted)] hover:text-[var(--foreground)]"
-                  )}
-                >
-                  {cycle === c && (
-                    <motion.span
-                      layoutId="cycle-pill"
-                      className="absolute inset-0 rounded-full bg-[var(--foreground)]"
-                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                    />
-                  )}
-                  <span className="relative capitalize">{c}</span>
-                  {c === "yearly" && (
-                    <span
-                      className={cn(
-                        "relative inline-flex items-center rounded-full px-1.5 py-px text-[10px] font-mono",
-                        cycle === c
-                          ? "bg-[color-mix(in_oklch,var(--background)_30%,transparent)] text-[var(--background)]"
-                          : "bg-[var(--accent-soft)] text-[var(--accent-ink)]"
-                      )}
-                    >
-                      −25%
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
           </Reveal>
         </div>
 
@@ -143,10 +103,10 @@ export function Pricing() {
 
                   <div className="mt-6 flex items-baseline gap-1.5">
                     <span className="font-serif text-[56px] leading-none tracking-[-0.025em]">
-                      ${t.price[cycle]}
+                      ${t.price}
                     </span>
                     <span className="text-[14px] text-[var(--muted)]">
-                      {t.price[cycle] === 0 ? "forever" : `/ ${cycle === "yearly" ? "mo, billed yearly" : "month"}`}
+                      {t.priceLabel}
                     </span>
                   </div>
 

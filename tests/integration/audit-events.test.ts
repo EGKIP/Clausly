@@ -1,3 +1,9 @@
+// @vitest-environment node
+//
+// Exercises the upload route, which runs in the Node.js server runtime, not
+// a browser/DOM one. jsdom's File/Blob shim doesn't implement arrayBuffer()
+// (unlike Node's real, undici-backed File/Blob), so this suite needs the
+// real node environment to exercise the route's PDF-signature check.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,

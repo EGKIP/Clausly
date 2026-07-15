@@ -5,11 +5,12 @@ import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { boundedTextSchema, validationIssues } from "@/lib/validation";
 import { canUploadDocument } from "@/lib/billing/plan";
+import { isPdfSignature } from "@/lib/upload/pdf-signature";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const titleSchema = boundedTextSchema(1, 200);
 
-function validateUpload(formData: FormData) {
+async function validateUpload(formData: FormData) {
   const rawFile = formData.get("file");
   const rawTitle = formData.get("title");
   const file = rawFile instanceof File ? rawFile : null;
@@ -27,6 +28,14 @@ function validateUpload(formData: FormData) {
     }
     if (file.size > MAX_FILE_BYTES) {
       issues.push({ path: "file", message: "PDF must be 25 MB or smaller." });
+    }
+    // Trust the file's actual bytes, not the client-supplied MIME type, before
+    // this ever reaches pdf-parse/OCR.
+    if (file.type === "application/pdf" && file.size <= MAX_FILE_BYTES) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (!isPdfSignature(bytes)) {
+        issues.push({ path: "file", message: "This file doesn't look like a valid PDF." });
+      }
     }
   }
 
@@ -47,7 +56,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await request.formData();
-  const validation = validateUpload(formData);
+  const validation = await validateUpload(formData);
 
   if (!validation.success) {
     return NextResponse.json(

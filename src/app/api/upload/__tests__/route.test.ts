@@ -1,3 +1,10 @@
+// @vitest-environment node
+//
+// This route runs in the Node.js server runtime, not a browser/DOM one. The
+// project's default jsdom test environment provides its own File/Blob shim
+// that (unlike Node's real, undici-backed File/Blob) doesn't implement
+// arrayBuffer() — overriding to the node environment here exercises the same
+// File/Blob implementation this route actually runs against in production.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
@@ -37,6 +44,16 @@ describe("POST /api/upload", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "Invalid upload." });
+  });
+
+  it("returns 400 when the file claims to be a PDF but isn't", async () => {
+    const spoofed = new File(["not actually a pdf"], "lease.pdf", { type: "application/pdf" });
+
+    const response = await POST(uploadRequest(spoofed));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.issues).toContainEqual({ path: "file", message: "This file doesn't look like a valid PDF." });
   });
 
   it("returns 400 when the file exceeds the size limit", async () => {

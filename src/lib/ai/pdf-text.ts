@@ -8,6 +8,7 @@ const MIN_TEXT_LAYER_CHARS = 200;
 const OCR_PAGE_LIMIT = 20;
 const OCR_TIMEOUT_MS = 90_000;
 const EXTRACTION_TIMEOUT_MS = 45_000;
+const PDF_WORKER_DATA_URL_ENVIRONMENTS = new Set(["production", "development"]);
 
 type NodeCanvasRuntime = {
   DOMMatrix: unknown;
@@ -95,7 +96,7 @@ export async function extractPdfTextWithOcr(file: Blob, options: ExtractPdfTextW
 
 async function extractTextLayer(blob: Blob): Promise<string> {
   await ensurePdfNodeRuntime();
-  const { PDFParse } = await import("pdf-parse");
+  const PDFParse = await loadPdfParser();
   const bytes = new Uint8Array(await blob.arrayBuffer());
   const parser = new PDFParse({ data: bytes });
 
@@ -110,7 +111,7 @@ async function extractTextLayer(blob: Blob): Promise<string> {
 
 async function renderPdfPageImages(file: Blob, options: { pageLimit: number }): Promise<OcrPageImages> {
   await ensurePdfNodeRuntime();
-  const { PDFParse } = await import("pdf-parse");
+  const PDFParse = await loadPdfParser();
   const bytes = new Uint8Array(await file.arrayBuffer());
   const parser = new PDFParse({ data: bytes });
 
@@ -137,6 +138,17 @@ async function renderPdfPageImages(file: Blob, options: { pageLimit: number }): 
 async function loadDefaultOcrProvider(): Promise<OcrProvider> {
   const { tesseractOcrProvider } = await import("./ocr/tesseract-provider");
   return tesseractOcrProvider;
+}
+
+async function loadPdfParser(): Promise<typeof import("pdf-parse").PDFParse> {
+  const { PDFParse } = await import("pdf-parse");
+
+  if (PDF_WORKER_DATA_URL_ENVIRONMENTS.has(process.env.NODE_ENV ?? "")) {
+    const { getData } = await import("pdf-parse/worker");
+    PDFParse.setWorker(getData());
+  }
+
+  return PDFParse;
 }
 
 function isOcrEnabled(override: boolean | undefined) {

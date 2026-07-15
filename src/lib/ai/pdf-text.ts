@@ -1,7 +1,10 @@
+import { withTimeout } from "./with-timeout";
+
 const MAX_EXTRACTED_CHARS = 50_000;
 const MIN_TEXT_LAYER_CHARS = 200;
 const OCR_PAGE_LIMIT = 20;
 const OCR_TIMEOUT_MS = 90_000;
+const EXTRACTION_TIMEOUT_MS = 45_000;
 
 type NodeCanvasRuntime = {
   DOMMatrix: unknown;
@@ -94,7 +97,7 @@ async function extractTextLayer(blob: Blob): Promise<string> {
   const parser = new PDFParse({ data: bytes });
 
   try {
-    const result = await parser.getText();
+    const result = await withTimeout(parser.getText(), EXTRACTION_TIMEOUT_MS, "PDF text extraction timed out.");
     const text = result.text.trim();
     return text.slice(0, MAX_EXTRACTED_CHARS);
   } finally {

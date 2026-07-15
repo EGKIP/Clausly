@@ -62,6 +62,39 @@ describe("extractPdfText", () => {
     expect(sawDomMatrix).toHaveBeenCalledWith(globalThis.DOMMatrix);
     expect(globalThis.DOMMatrix).toBe(TestDOMMatrix);
   });
+
+  it("times out and still destroys the parser if getText hangs", async () => {
+    vi.useFakeTimers();
+    const destroy = vi.fn(async () => {});
+
+    vi.doMock("pdf-parse", () => ({
+      PDFParse: class {
+        async getText() {
+          return new Promise(() => {
+            // Never resolves — simulates a hung/pathological PDF parse.
+          });
+        }
+
+        async destroy() {
+          await destroy();
+        }
+      },
+    }));
+
+    try {
+      const { extractPdfText } = await import("../pdf-text");
+      const pending = extractPdfText({
+        arrayBuffer: async () => new TextEncoder().encode("%PDF-test").buffer,
+      } as Blob);
+
+      const assertion = expect(pending).rejects.toThrow("PDF text extraction timed out.");
+      await vi.advanceTimersByTimeAsync(45_000);
+      await assertion;
+      expect(destroy).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 function deleteRuntimeGlobals() {

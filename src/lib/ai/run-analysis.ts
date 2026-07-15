@@ -190,12 +190,19 @@ export async function markAnalysisFailed(
   category: AnalysisFailureCategory,
   attemptToken: number,
 ) {
+  // The status='analyzing' check (on top of the attemptToken fence) matters
+  // most for callers reporting failure well after the attempt started, e.g.
+  // the stuck-analysis recovery sweep: it stops a stale "give up" write from
+  // clobbering a document that a still-valid attempt already completed
+  // successfully (persistAnalysis doesn't change analysis_attempts, so
+  // status is the thing that would've moved).
   await supabase
     .from("documents")
     .update({ status: "failed", error_message: truncateError(message), failure_category: category })
     .eq("id", documentId)
     .eq("user_id", userId)
-    .eq("analysis_attempts", attemptToken);
+    .eq("analysis_attempts", attemptToken)
+    .eq("status", "analyzing");
 }
 
 function errorMessage(error: unknown) {

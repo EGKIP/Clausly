@@ -1,6 +1,11 @@
-import { z } from "zod";
 import type { AnalysisInput } from "../provider";
-import { analysisResultSchema, type AnalysisResult } from "../schema";
+import type { AnalysisResult } from "../schema";
+import {
+  buildAnalysisSystemPrompt,
+  buildAnalysisUserPrompt,
+  parseProviderJson,
+  runAnalysisWithRepair,
+} from "./analysis-response";
 
 type ProviderOptions = {
   model: string;
@@ -28,29 +33,17 @@ export async function analyzeWithOpenAIProvider(
     throw new Error("OpenAI provider is implemented but OPENAI_API_KEY is missing, so real calls are not implemented for this environment.");
   }
 
-  return analyzeWithRetry(async (schemaError) => {
-    const response = await postOpenAI(apiKey, options.model, input, schemaError);
-    return parseJson(extractText(response));
+  return runAnalysisWithRepair("OpenAI", async (repairInstructions) => {
+    const response = await postOpenAI(apiKey, options.model, input, repairInstructions);
+    return parseProviderJson("OpenAI", extractText(response));
   });
-}
-
-async function analyzeWithRetry(call: (schemaError?: string) => Promise<unknown>) {
-  let raw = await call();
-  const first = analysisResultSchema.safeParse(raw);
-  if (first.success) return first.data;
-
-  raw = await call(formatSchemaError(first.error));
-  const second = analysisResultSchema.safeParse(raw);
-  if (second.success) return second.data;
-
-  throw new Error(`OpenAI response failed Clausly analysis schema validation: ${formatSchemaError(second.error)}`);
 }
 
 async function postOpenAI(
   apiKey: string,
   model: string,
   input: AnalysisInput,
-  schemaError?: string,
+  repairInstructions?: string,
 ): Promise<OpenAIResponse> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -66,8 +59,8 @@ async function postOpenAI(
       body: JSON.stringify({
         model,
         input: [
-          { role: "system", content: systemPrompt(schemaError) },
-          { role: "user", content: userPrompt(input) },
+          { role: "system", content: buildAnalysisSystemPrompt(repairInstructions) },
+          { role: "user", content: buildAnalysisUserPrompt(input) },
         ],
         text: { format: { type: "json_object" } },
       }),
@@ -98,41 +91,4 @@ function extractText(response: OpenAIResponse): string {
 
   if (!text) throw new Error("OpenAI analysis response did not include JSON text.");
   return text;
-}
-
-function parseJson(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    throw new Error("OpenAI analysis response was not valid JSON.");
-  }
-}
-
-function systemPrompt(schemaError?: string): string {
-  return [
-    "You are Clausly's contract analysis engine.",
-    "Return only a JSON object matching the provided contract-analysis schema.",
-    "Use ISO 8601 dates in YYYY-MM-DD format when dates are present.",
-    "Use null for unknown nullable values and [] for unknown arrays.",
-    "Do not include markdown, explanations, or text outside the JSON object.",
-    schemaError ? `Previous JSON failed validation. Correct this schema error: ${schemaError}` : "",
-  ].filter(Boolean).join("\n");
-}
-
-function userPrompt(input: AnalysisInput): string {
-  return [
-    `Title: ${input.title}`,
-    `File name: ${input.fileName}`,
-    `Jurisdiction hint: ${input.jurisdictionHint ?? "unknown"}`,
-    "Document text:",
-    input.text,
-  ].join("\n");
-}
-
-function formatSchemaError(error: z.ZodError): string {
-  return error.issues
-    .slice(0, 8)
-    .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
-    .join("; ")
-    .slice(0, 500);
 }

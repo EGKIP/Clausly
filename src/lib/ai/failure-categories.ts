@@ -1,4 +1,4 @@
-import { NoTextLayerError } from "./errors";
+import { NoTextLayerError, ProviderSchemaError } from "./errors";
 
 export type AnalysisFailureCategory =
   | "unsupported_file"
@@ -28,7 +28,7 @@ export const FAILURE_CATEGORY_COPY: Record<AnalysisFailureCategory, { title: str
   },
   provider_error: {
     title: "Analysis failed",
-    message: "The AI analysis step ran into an error. This is usually temporary — try re-analyzing in a moment.",
+    message: "The AI response didn't match the expected contract format. This is usually temporary — try re-analyzing in a moment.",
   },
   stuck_timeout: {
     title: "Analysis didn't finish in time",
@@ -49,6 +49,7 @@ export const FAILURE_CATEGORY_COPY: Record<AnalysisFailureCategory, { title: str
  */
 export function categorizeAnalysisError(error: unknown): AnalysisFailureCategory {
   if (error instanceof NoTextLayerError) return "no_text";
+  if (error instanceof ProviderSchemaError) return "provider_error";
 
   const message = error instanceof Error ? error.message : String(error);
 

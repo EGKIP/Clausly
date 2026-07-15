@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { analyzeDocument, getAnalysisModel, getAnalysisProvider } from "../../provider";
+import { ProviderSchemaError } from "../../errors";
 import type { AnalysisResult } from "../../schema";
 
 const sampleInput = {
@@ -131,6 +132,86 @@ describe("real AI provider selection", () => {
     vi.mocked(fetch).mockImplementation(() => jsonResponse(anthropicResponse({ documentTitle: "" })));
 
     await expect(analyzeDocument(sampleInput)).rejects.toThrow(/schema validation/i);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("tells the model the exact allowed enum values in the system prompt", async () => {
+    process.env.CLAUSLY_AI_PROVIDER = "openai";
+    vi.mocked(fetch).mockImplementation(() => jsonResponse(openAIResponse(validResult())));
+
+    await analyzeDocument(sampleInput);
+
+    const body = String(vi.mocked(fetch).mock.calls[0][1]?.body);
+    expect(body).toContain('\\"lease\\" | \\"auto\\" | \\"employment\\" | \\"service\\" | \\"nda\\" | \\"other\\"');
+    expect(body).toContain('\\"Low\\" | \\"Medium\\" | \\"High\\" | \\"Needs Review\\"');
+    expect(body).toContain("documentTitle");
+    expect(body).toContain("suggestedReminders");
+  });
+
+  it("accepts natural-language enum drift without needing a retry", async () => {
+    process.env.CLAUSLY_AI_PROVIDER = "openai";
+    const drifted = {
+      ...validResult(),
+      documentType: "Lease Agreement",
+      riskLevel: "medium risk",
+      clauses: [{ ...validResult().clauses[0], riskLevel: "HIGH RISK" }],
+    };
+    vi.mocked(fetch).mockImplementation(() => jsonResponse(openAIResponse(drifted)));
+
+    const result = await analyzeDocument(sampleInput);
+
+    expect(result.documentType).toBe("lease");
+    expect(result.riskLevel).toBe("Medium");
+    expect(result.clauses[0].riskLevel).toBe("High");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a response wrapped in an analysis envelope", async () => {
+    process.env.CLAUSLY_AI_PROVIDER = "openai";
+    vi.mocked(fetch).mockImplementation(() => jsonResponse(openAIResponse({ analysis: validResult() })));
+
+    const result = await analyzeDocument(sampleInput);
+
+    expect(result.documentTitle).toBe("Sample Lease");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("includes invalid paths and allowed values in the repair prompt", async () => {
+    process.env.CLAUSLY_AI_PROVIDER = "openai";
+    vi.mocked(fetch)
+      .mockImplementationOnce(() => jsonResponse(openAIResponse(validResult({ documentType: "mystery" as never }))))
+      .mockImplementationOnce(() => jsonResponse(openAIResponse(validResult())));
+
+    await analyzeDocument(sampleInput);
+
+    const repairBody = String(vi.mocked(fetch).mock.calls[1][1]?.body);
+    expect(repairBody).toContain("documentType");
+    expect(repairBody).toContain('Allowed \\"documentType\\" values');
+    expect(repairBody).toContain('Allowed \\"riskLevel\\" values');
+  });
+
+  it("throws a typed ProviderSchemaError when repair also fails, without contract text", async () => {
+    process.env.CLAUSLY_AI_PROVIDER = "openai";
+    vi.mocked(fetch).mockImplementation(() =>
+      jsonResponse(openAIResponse(validResult({ documentType: "mystery" as never })))
+    );
+
+    const failure = await analyzeDocument(sampleInput).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(ProviderSchemaError);
+    expect(failure.message).toMatch(/schema validation/i);
+    expect(failure.message).toContain("documentType");
+    expect(failure.message).not.toContain(sampleInput.text);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("still rejects unknown documentType after normalization and repair", async () => {
+    process.env.CLAUSLY_AI_PROVIDER = "anthropic";
+    vi.mocked(fetch).mockImplementation(() =>
+      jsonResponse(anthropicResponse(validResult({ documentType: "mystery document" as never })))
+    );
+
+    await expect(analyzeDocument(sampleInput)).rejects.toThrow(/documentType/);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

@@ -21,9 +21,9 @@ import { cn } from "@/lib/utils";
 
 const primary = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/dashboard/documents", label: "Documents", icon: FileText, count: 7 },
+  { href: "/dashboard/documents", label: "Documents", icon: FileText },
   { href: "/dashboard/clauses", label: "Clauses", icon: BookOpen },
-  { href: "/dashboard/reminders", label: "Reminders", icon: BellRing, count: 4, dot: true },
+  { href: "/dashboard/reminders", label: "Reminders", icon: BellRing },
   { href: "/dashboard/insights", label: "Insights", icon: Sparkles, pro: true },
 ];
 
@@ -82,14 +82,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                     <Badge tone="clause" className="relative ml-auto px-1.5 py-px text-[9.5px] font-mono">
                       PRO
                     </Badge>
-                  )}
-                  {item.count !== undefined && (
-                    <span className="relative ml-auto inline-flex items-center gap-1">
-                      {item.dot && <span className="size-1.5 rounded-full bg-[var(--color-coral)]" />}
-                      <span className="font-mono text-[11px] text-[var(--faint)] tabular-nums">
-                        {item.count}
-                      </span>
-                    </span>
                   )}
                 </Link>
               </li>

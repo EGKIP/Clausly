@@ -23,13 +23,23 @@ export const analysisClauseSchema = z.object({
   confidence: z.number().min(0).max(1),
 }).strict();
 
+export const analysisDateKindSchema = z.enum([
+  "deadline",
+  "renewal",
+  "notice",
+  "payment",
+  "effective",
+  "end",
+  "review",
+]);
+
 export const analysisDateSchema = z.object({
   title: z.string().trim().min(1).max(160),
   date: iso8601DateSchema,
   description: z.string().trim().min(0).max(2000).default(""),
   sourcePage: z.number().int().min(1).nullable().default(null),
   sourceText: z.string().trim().min(0).max(2000).default(""),
-  kind: z.enum(["deadline", "renewal", "notice", "payment", "effective", "end", "review"]).default("deadline"),
+  kind: analysisDateKindSchema.default("deadline"),
   confidence: z.number().min(0).max(1),
 }).strict();
 

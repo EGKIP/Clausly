@@ -100,10 +100,15 @@ export function UploadModal({
         if (!response.ok) {
           const payload = await response.json().catch(() => ({ error: "Upload failed." }));
           const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
+          // Validation failures carry the specific reason (wrong file type,
+          // over the size limit, not a real PDF) in issues[] — surface that
+          // instead of the generic top-level "Invalid upload." error.
+          const issueMessage = Array.isArray(payload.issues) ? payload.issues[0]?.message : undefined;
+          const message = issueMessage ?? payload.error ?? "Upload failed.";
           setLimitError(limit);
-          setError(payload.error ?? "Upload failed.");
+          setError(message);
           setPhase("error");
-          if (!limit) toast.error(payload.error ?? "Upload failed.");
+          if (!limit) toast.error(message);
           return;
         }
         const payload = (await response.json()) as { id: string };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { categorizeAnalysisError, FAILURE_CATEGORY_COPY } from "../failure-categories";
-import { NoTextLayerError } from "../errors";
+import { NoTextLayerError, ProviderSchemaError } from "../errors";
 
 describe("categorizeAnalysisError", () => {
   it("buckets a timeout error", () => {
@@ -11,6 +11,11 @@ describe("categorizeAnalysisError", () => {
   it("buckets a NoTextLayerError regardless of its message", () => {
     expect(categorizeAnalysisError(new NoTextLayerError("PDF text extraction returned no text. OCR is disabled."))).toBe("no_text");
     expect(categorizeAnalysisError(new NoTextLayerError("PDF OCR fallback returned no text."))).toBe("no_text");
+  });
+
+  it("buckets a ProviderSchemaError as a provider error", () => {
+    const error = new ProviderSchemaError("OpenAI", "documentType: Invalid input");
+    expect(categorizeAnalysisError(error)).toBe("provider_error");
   });
 
   it("buckets a storage/download error", () => {

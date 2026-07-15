@@ -11,8 +11,10 @@ const originalGlobals = {
 describe("extractPdfText", () => {
   afterEach(() => {
     vi.resetModules();
+    vi.unstubAllEnvs();
     vi.doUnmock("@napi-rs/canvas");
     vi.doUnmock("pdf-parse");
+    vi.doUnmock("pdf-parse/worker");
     restoreGlobal("DOMMatrix", originalGlobals.DOMMatrix);
     restoreGlobal("DOMPoint", originalGlobals.DOMPoint);
     restoreGlobal("DOMRect", originalGlobals.DOMRect);
@@ -61,6 +63,50 @@ describe("extractPdfText", () => {
     expect(text).toBe("A lease with a real text layer.");
     expect(sawDomMatrix).toHaveBeenCalledWith(globalThis.DOMMatrix);
     expect(globalThis.DOMMatrix).toBe(TestDOMMatrix);
+  });
+
+  it("configures pdf-parse with the bundled worker data URL outside tests", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    deleteRuntimeGlobals();
+
+    class TestDOMMatrix {}
+    class TestDOMPoint {}
+    class TestDOMRect {}
+    class TestImageData {}
+    class TestPath2D {}
+
+    Reflect.set(globalThis, "__CLAUSLY_NODE_CANVAS_RUNTIME__", {
+      DOMMatrix: TestDOMMatrix,
+      DOMPoint: TestDOMPoint,
+      DOMRect: TestDOMRect,
+      ImageData: TestImageData,
+      Path2D: TestPath2D,
+    });
+
+    const setWorker = vi.fn();
+
+    vi.doMock("pdf-parse/worker", () => ({
+      getData: () => "data:text/javascript;base64,worker-bundle",
+    }));
+
+    vi.doMock("pdf-parse", () => ({
+      PDFParse: class {
+        static setWorker = setWorker;
+
+        async getText() {
+          return { text: "A lease with a real text layer." };
+        }
+
+        async destroy() {}
+      },
+    }));
+
+    const { extractPdfText } = await import("../pdf-text");
+    await extractPdfText({
+      arrayBuffer: async () => new TextEncoder().encode("%PDF-test").buffer,
+    } as Blob);
+
+    expect(setWorker).toHaveBeenCalledWith("data:text/javascript;base64,worker-bundle");
   });
 
   it("times out and still destroys the parser if getText hangs", async () => {

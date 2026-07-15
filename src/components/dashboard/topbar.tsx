@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Search, Upload, Bell, Menu, ChevronDown, LogOut, Settings } from "lucide-react";
+import { Search, Upload, Menu, ChevronDown, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggleButton } from "@/components/theme-toggle";
 import { signOut } from "@/lib/auth/actions";
@@ -81,16 +81,6 @@ export function Topbar({ onOpenSidebar, onOpenUpload, onOpenSearch }: TopbarProp
         {/* Theme */}
         <ThemeToggleButton className="hidden sm:inline-flex" />
 
-        {/* Notifications */}
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="relative inline-flex size-9 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--surface-2)]"
-        >
-          <Bell className="size-4 text-[var(--muted)]" />
-          <span className="absolute top-2 right-2 size-1.5 rounded-full bg-[var(--color-coral)] ring-2 ring-[var(--surface)]" />
-        </button>
-
         {/* User */}
         <UserMenu />
       </div>
@@ -101,6 +91,7 @@ export function Topbar({ onOpenSidebar, onOpenUpload, onOpenSearch }: TopbarProp
 function UserMenu() {
   const [open, setOpen] = React.useState(false);
   const [email, setEmail] = React.useState<string>("demo@clausly.app");
+  const [plan, setPlan] = React.useState<"free" | "pro" | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -116,7 +107,18 @@ function UserMenu() {
         if (!cancelled) setEmail("demo@clausly.app");
       }
     }
+    async function loadPlan() {
+      try {
+        const response = await fetch("/api/profile");
+        if (cancelled || !response.ok) return;
+        const payload = (await response.json()) as { plan?: "free" | "pro" };
+        if (!cancelled && (payload.plan === "free" || payload.plan === "pro")) setPlan(payload.plan);
+      } catch {
+        /* leave plan unknown; the menu simply omits the plan line */
+      }
+    }
     void loadUser();
+    void loadPlan();
     return () => {
       cancelled = true;
     };
@@ -158,7 +160,11 @@ function UserMenu() {
         <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[240px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]">
           <div className="px-3 py-2.5">
             <p className="truncate text-[12.5px] font-medium">{email}</p>
-            <p className="mt-0.5 text-[11px] text-[var(--faint)]">Free plan</p>
+            {plan && (
+              <p className="mt-0.5 text-[11px] text-[var(--faint)]">
+                {plan === "pro" ? "Pro plan" : "Free plan"}
+              </p>
+            )}
           </div>
           <div className="my-1 h-px bg-[var(--border)]" />
           <Link

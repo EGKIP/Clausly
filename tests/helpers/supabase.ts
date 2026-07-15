@@ -157,6 +157,10 @@ export function seedDocument(user = userA, overrides: Row = {}) {
     summary: "A test lease.",
     summary_short: "A test lease.",
     tags: ["Lease"],
+    error_message: null,
+    analysis_started_at: null,
+    analysis_attempts: 0,
+    failure_category: null,
     created_at: "2026-06-01T00:00:00.000Z",
     updated_at: "2026-06-01T00:00:00.000Z",
     ...overrides,
@@ -571,30 +575,35 @@ class Query {
   }
 
   single() {
-    return this.execute(true);
+    return this.execute(true, false);
+  }
+
+  maybeSingle() {
+    return this.execute(true, true);
   }
 
   then(resolve: (value: any) => void, reject?: (reason?: any) => void) {
     return this.execute().then(resolve, reject);
   }
 
-  private async execute(single = false) {
+  private async execute(single = false, lenient = false) {
     const forced = consumeFailure(this.action, this.table);
     if (forced) return { data: single ? null : [], error: forced, count: null };
 
     if (this.action === "insert") return this.executeInsert(single);
-    if (this.action === "update") return this.executeUpdate(single);
+    if (this.action === "update") return this.executeUpdate(single, lenient);
     if (this.action === "delete") return this.executeDelete();
-    return this.executeSelect(single);
+    return this.executeSelect(single, lenient);
   }
 
-  private async executeSelect(single: boolean) {
+  private async executeSelect(single: boolean, lenient = false) {
     const filtered = this.filteredRows();
     const rows = this.orderedAndLimitedRows(filtered);
     if (this.head) return { data: null, error: null, count: filtered.length };
     if (single) {
       const row = rows[0];
-      return row ? { data: clone(row), error: null, count: null } : { data: null, error: notFound(), count: null };
+      if (row) return { data: clone(row), error: null, count: null };
+      return { data: null, error: lenient ? null : notFound(), count: null };
     }
     return { data: clone(rows), error: null, count: this.wantsCount ? filtered.length : null };
   }
@@ -606,7 +615,7 @@ class Query {
     return { data: single ? clone(inserted[0]) : clone(inserted), error: null, count: null };
   }
 
-  private async executeUpdate(single: boolean) {
+  private async executeUpdate(single: boolean, lenient = false) {
     const rows = this.filteredRows();
     for (const row of rows) {
       for (const [key, value] of Object.entries(this.payload ?? {})) {
@@ -615,7 +624,8 @@ class Query {
     }
     if (single) {
       const row = rows[0];
-      return row ? { data: clone(row), error: null, count: null } : { data: null, error: notFound(), count: null };
+      if (row) return { data: clone(row), error: null, count: null };
+      return { data: null, error: lenient ? null : notFound(), count: null };
     }
     return { data: clone(rows), error: null, count: rows.length };
   }

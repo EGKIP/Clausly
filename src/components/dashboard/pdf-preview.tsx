@@ -48,6 +48,9 @@ export function PDFPreview({
 
   const zoom = ZOOM_STEPS[zoomIdx];
   const canRenderReal = Boolean(signedUrl) && !viewerError;
+  const handleViewerError = React.useCallback((message: string) => {
+    setViewerError(message || "PDF preview could not load.");
+  }, []);
 
   return (
     <div className="flex h-[560px] min-w-0 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] sm:h-[680px]">
@@ -95,14 +98,19 @@ export function PDFPreview({
       {/* Document body */}
       <div className="flex-1 overflow-auto bg-[var(--surface-2)] px-3 py-5 sm:px-6 sm:py-8 md:px-10">
         {canRenderReal ? (
-          <PDFViewer
-            url={signedUrl!}
-            page={page}
-            zoom={zoom}
-            activeClause={activeClause}
-            onLoad={setTotalPages}
-            onError={setViewerError}
-          />
+          <PdfPreviewErrorBoundary key={signedUrl} onError={handleViewerError}>
+            <PDFViewer
+              url={signedUrl!}
+              page={page}
+              zoom={zoom}
+              activeClause={activeClause}
+              onLoad={(nextTotalPages) => {
+                setTotalPages(nextTotalPages);
+                setPage((currentPage) => Math.min(currentPage, Math.max(1, nextTotalPages)));
+              }}
+              onError={handleViewerError}
+            />
+          </PdfPreviewErrorBoundary>
         ) : (
           <FauxPaper docTitle={docTitle} page={page} pages={totalPages} activeClause={activeClause} />
         )}
@@ -139,6 +147,35 @@ export function PDFPreview({
       </div>
     </div>
   );
+}
+
+class PdfPreviewErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError: (message: string) => void },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    this.props.onError(error instanceof Error ? error.message : "PDF preview could not load.");
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="mx-auto aspect-[8.5/11] w-full max-w-[520px] rounded-[6px] border border-[color-mix(in_oklch,var(--color-coral)_30%,var(--border))] bg-white/60 backdrop-blur-sm flex items-center justify-center">
+          <p className="px-6 text-center font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
+            PDF preview is unavailable.
+          </p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 function IconButton({

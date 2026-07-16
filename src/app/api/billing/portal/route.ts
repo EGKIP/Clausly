@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BILLING_PORTAL_ERROR, logBillingError } from "@/lib/billing/errors";
 import { getStripe } from "@/lib/billing/stripe";
 import { createClient } from "@/lib/supabase/server";
 
@@ -35,7 +36,8 @@ export async function POST() {
     });
     sessionUrl = session.url;
   } catch (error) {
-    return NextResponse.json({ error: portalErrorMessage(error) }, { status: 500 });
+    logBillingError("Stripe portal failed.", error);
+    return NextResponse.json({ error: BILLING_PORTAL_ERROR }, { status: 500 });
   }
 
   if (!sessionUrl) {
@@ -51,12 +53,4 @@ function getBaseUrl() {
 
 function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
-}
-
-function portalErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "Stripe portal could not be opened.";
 }

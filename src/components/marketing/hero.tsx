@@ -78,8 +78,8 @@ export function Hero() {
                 Start with one PDF
                 <ArrowRight className="size-4" />
               </Button>
-              <Button variant="secondary" size="lg" href="/dashboard">
-                Try the live demo
+              <Button variant="secondary" size="lg" href="#preview">
+                See the product
               </Button>
             </motion.div>
 

@@ -60,10 +60,10 @@ export function FinalCTA() {
                 <Button
                   variant="outline"
                   size="xl"
-                  href="/dashboard"
+                  href="/login"
                   className="w-full lg:w-auto border-white/20 text-white hover:bg-white/10"
                 >
-                  Try the live demo
+                  Sign in
                 </Button>
               </div>
             </div>

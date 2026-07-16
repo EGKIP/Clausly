@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BILLING_CHECKOUT_ERROR, logBillingError } from "@/lib/billing/errors";
 import { getUserPlan } from "@/lib/billing/plan";
 import { getOrCreateStripeCustomer, getStripe } from "@/lib/billing/stripe";
 import { createClient } from "@/lib/supabase/server";
@@ -48,7 +49,8 @@ export async function POST() {
     });
     sessionUrl = session.url;
   } catch (error) {
-    return NextResponse.json({ error: checkoutErrorMessage(error) }, { status: 500 });
+    logBillingError("Stripe checkout failed.", error);
+    return NextResponse.json({ error: BILLING_CHECKOUT_ERROR }, { status: 500 });
   }
 
   if (!sessionUrl) {
@@ -68,12 +70,4 @@ function hasSupabaseEnv() {
 
 function hasServiceSupabaseEnv() {
   return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
-}
-
-function checkoutErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return "Stripe checkout could not be started.";
 }

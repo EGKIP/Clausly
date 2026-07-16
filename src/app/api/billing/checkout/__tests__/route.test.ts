@@ -108,12 +108,30 @@ describe("POST /api/billing/checkout", () => {
 
   it("returns a readable Stripe error when checkout creation fails", async () => {
     seedUser(userA, { subscription_tier: "free" });
-    checkoutCreateMock.mockRejectedValue(new Error("No such price: price_bad"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = new Error("Invalid API Key provided: sk_test_**************************************************IVe$");
+    Object.assign(error, {
+      type: "StripeAuthenticationError",
+      code: "api_key_invalid",
+      requestId: "req_test",
+      statusCode: 401,
+    });
+    checkoutCreateMock.mockRejectedValue(error);
 
     const response = await POST();
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: "No such price: price_bad" });
+    expect(body).toEqual({ error: "Stripe checkout could not be started. Please try again or contact support." });
+    expect(JSON.stringify(body)).not.toContain("sk_test");
+    expect(warn).toHaveBeenCalledWith("Stripe checkout failed.", {
+      name: "Error",
+      type: "StripeAuthenticationError",
+      code: "api_key_invalid",
+      statusCode: 401,
+      requestId: "req_test",
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("sk_test");
+    warn.mockRestore();
   });
 });

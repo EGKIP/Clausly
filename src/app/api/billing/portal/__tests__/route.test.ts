@@ -62,12 +62,30 @@ describe("POST /api/billing/portal", () => {
 
   it("returns a readable Stripe error when portal creation fails", async () => {
     seedBillingCustomer(userA, { stripe_customer_id: "cus_existing" });
-    portalCreateMock.mockRejectedValue(new Error("Customer portal is not configured."));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = new Error("Invalid API Key provided: sk_test_**************************************************IVe$");
+    Object.assign(error, {
+      type: "StripeAuthenticationError",
+      code: "api_key_invalid",
+      requestId: "req_test",
+      statusCode: 401,
+    });
+    portalCreateMock.mockRejectedValue(error);
 
     const response = await POST();
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: "Customer portal is not configured." });
+    expect(body).toEqual({ error: "Stripe portal could not be opened. Please try again or contact support." });
+    expect(JSON.stringify(body)).not.toContain("sk_test");
+    expect(warn).toHaveBeenCalledWith("Stripe portal failed.", {
+      name: "Error",
+      type: "StripeAuthenticationError",
+      code: "api_key_invalid",
+      statusCode: 401,
+      requestId: "req_test",
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("sk_test");
+    warn.mockRestore();
   });
 });

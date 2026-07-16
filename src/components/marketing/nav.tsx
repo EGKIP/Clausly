@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, ArrowUpRight } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -55,15 +55,6 @@ export function MarketingNav() {
                 </Link>
               </li>
             ))}
-            <li>
-              <Link
-                href="/dashboard"
-                className="px-3 py-2 rounded-[var(--radius-sm)] hover:text-[var(--foreground)] hover:bg-[var(--surface-2)] transition-colors inline-flex items-center gap-1"
-              >
-                Demo
-                <ArrowUpRight className="size-3.5" />
-              </Link>
-            </li>
           </ul>
 
           <div className="hidden md:flex items-center gap-2">

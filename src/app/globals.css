@@ -127,6 +127,15 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  /* Anchor targets sit below the fixed marketing nav instead of under it. */
+  [id] {
+    scroll-margin-top: 96px;
+  }
   body {
     background: var(--background);
     color: var(--foreground);
@@ -188,10 +197,6 @@
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
-@keyframes auth-quote-in {
-  0% { opacity: 0; transform: translateY(8px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
 @keyframes auth-signal-in {
   0% { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
@@ -200,7 +205,6 @@
 .animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
 .animate-pulse-soft { animation: pulse-soft 3s ease-in-out infinite; }
 .animate-marquee { animation: marquee 40s linear infinite; }
-.animate-auth-quote-in { animation: auth-quote-in 420ms var(--ease-out-quart) both; }
 .animate-auth-signal-in { animation: auth-signal-in 420ms var(--ease-out-quart) both; }
 
 .animate-skeleton-shimmer {

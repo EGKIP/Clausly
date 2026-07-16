@@ -30,6 +30,7 @@ const documentOptions = {
 
 export function PDFViewer({ url, page, zoom, activeClause, onLoad, onError }: ViewerProps) {
   const [width, setWidth] = React.useState<number>(0);
+  const [totalPages, setTotalPages] = React.useState<number>(0);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
@@ -43,15 +44,26 @@ export function PDFViewer({ url, page, zoom, activeClause, onLoad, onError }: Vi
   }, []);
 
   const file = React.useMemo(() => ({ url }), [url]);
-  const showOverlay = activeClause && activeClause.page === page;
+  const safePage = totalPages > 0 ? Math.min(Math.max(1, page), totalPages) : Math.max(1, page);
+  const showOverlay = activeClause && activeClause.page === safePage;
+  const handleError = React.useCallback(
+    (error: Error) => {
+      onError?.(error.message);
+    },
+    [onError]
+  );
 
   return (
     <div ref={containerRef} className="relative mx-auto w-full max-w-[640px] overflow-x-auto">
       <Document
         file={file}
         options={documentOptions}
-        onLoadSuccess={(doc) => onLoad?.(doc.numPages)}
-        onLoadError={(error) => onError?.(error.message)}
+        onLoadSuccess={(doc) => {
+          setTotalPages(doc.numPages);
+          onLoad?.(doc.numPages);
+        }}
+        onSourceError={handleError}
+        onLoadError={handleError}
         loading={<ViewerSkeleton message="Loading document…" />}
         error={<ViewerSkeleton message="Couldn't load this PDF." tone="warn" />}
       >
@@ -63,10 +75,13 @@ export function PDFViewer({ url, page, zoom, activeClause, onLoad, onError }: Vi
           className="relative inline-block rounded-[6px] overflow-hidden shadow-[0_1px_0_oklch(0%_0_0/0.04),0_24px_60px_-24px_oklch(20%_0.03_260/0.18)] bg-white"
         >
           <Page
-            pageNumber={page}
+            pageNumber={safePage}
             width={width > 0 ? width * zoom : undefined}
             renderTextLayer
             renderAnnotationLayer={false}
+            onLoadError={handleError}
+            onRenderError={handleError}
+            error={<ViewerSkeleton message="Couldn't render this page." tone="warn" />}
             loading={<ViewerSkeleton message="Rendering page…" />}
           />
           {showOverlay && <ClauseOverlay bbox={activeClause.bbox ?? null} />}

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, UploadCloud, FileText, Sparkles, Lock } from "lucide-react";
+import { X, UploadCloud, FileText, Sparkles, Lock, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -254,8 +254,17 @@ export function UploadModal({
                       className={cn("h-full", phase === "error" ? "bg-[var(--color-coral)]" : "bg-[var(--accent)]")}
                     />
                   </div>
-                  <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-[var(--accent-ink)]">
-                    <Sparkles className="size-3" />
+                  <p
+                    className={cn(
+                      "mt-3 inline-flex items-center gap-1.5 text-[12px]",
+                      phase === "error" ? "text-[var(--color-coral-ink)]" : "text-[var(--accent-ink)]"
+                    )}
+                  >
+                    {phase === "error" ? (
+                      <TriangleAlert className="size-3 shrink-0" />
+                    ) : (
+                      <Sparkles className="size-3 shrink-0" />
+                    )}
                     {phase === "uploading" && "Uploading securely…"}
                     {phase === "analyzing" && "Queued for clause, date and risk analysis…"}
                     {phase === "error" && (error ?? "Upload failed.")}

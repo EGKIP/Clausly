@@ -1,11 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, CalendarClock, MoreHorizontal } from "lucide-react";
+import { FileText, CalendarClock, Loader2, MoreHorizontal, TriangleAlert } from "lucide-react";
 import { RiskPill } from "@/components/ui/risk-pill";
 import { Badge } from "@/components/ui/primitives";
 import type { ContractDoc } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
+
+/* A document that isn't ready shows its actual state instead of the
+ * misleading null-risk fallback pill ("Needs Review" on a doc that's
+ * still analyzing reads like a risk verdict). */
+function DocumentStatusMarker({ doc }: { doc: ContractDoc }) {
+  if (doc.status === "failed") {
+    return (
+      <Badge tone="coral" className="inline-flex items-center gap-1">
+        <TriangleAlert className="size-3" /> Needs attention
+      </Badge>
+    );
+  }
+  if (doc.status === "pending" || doc.status === "analyzing") {
+    return (
+      <Badge tone="neutral" className="inline-flex items-center gap-1 text-[var(--muted)]">
+        <Loader2 className="size-3 motion-safe:animate-spin" /> Analyzing
+      </Badge>
+    );
+  }
+  return <RiskPill level={doc.risk} size="sm" />;
+}
 
 /* Card variant for a document — used in grid views. */
 export function DocumentCard({
@@ -27,7 +48,7 @@ export function DocumentCard({
         <div className="inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface-2)] border border-[var(--border)]">
           <FileText className="size-4 text-[var(--muted)]" />
         </div>
-        <RiskPill level={doc.risk} size="sm" />
+        <DocumentStatusMarker doc={doc} />
       </div>
 
       <h3 className="mt-4 font-serif text-[18px] leading-[1.2] tracking-[-0.005em] line-clamp-2">
@@ -88,7 +109,7 @@ export function DocumentRow({ doc }: { doc: ContractDoc }) {
         {doc.jurisdiction}
       </div>
       <div className="flex items-center gap-2">
-        <RiskPill level={doc.risk} size="sm" />
+        <DocumentStatusMarker doc={doc} />
       </div>
     </Link>
   );

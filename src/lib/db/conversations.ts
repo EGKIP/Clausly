@@ -50,6 +50,7 @@ type QueryResult<T> = {
 };
 
 type Query<T> = PromiseLike<QueryResult<T>> & {
+  select(columns?: string): Query<T>;
   eq(column: string, value: unknown): Query<T>;
   order(column: string, options?: { ascending?: boolean }): Query<T>;
   limit(count: number): Query<T>;
@@ -91,6 +92,7 @@ export async function getOrCreateConversation(
       document_id: documentId,
       title,
     })
+    .select("*")
     .single();
 
   if (error) throw new Error(error.message);
@@ -135,6 +137,7 @@ export async function appendMessage(
       content,
       citations,
     })
+    .select("*")
     .single();
 
   if (error) throw new Error(error.message);

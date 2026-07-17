@@ -499,6 +499,7 @@ class Query {
   private limitCount: number | null = null;
   private head = false;
   private wantsCount = false;
+  private returnsRepresentation = false;
   private action: "select" | "insert" | "update" | "delete" = "select";
   private payload: Row | Row[] | null = null;
 
@@ -507,6 +508,7 @@ class Query {
   select(_columns = "*", options?: { count?: string; head?: boolean }) {
     this.head = Boolean(options?.head);
     this.wantsCount = Boolean(options?.count);
+    if (this.action !== "select") this.returnsRepresentation = true;
     return this;
   }
 
@@ -612,6 +614,7 @@ class Query {
     const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
     const inserted = rows.filter(Boolean).map((row) => ({ ...row, id: row.id ?? nextUuid() }));
     tables[this.table].push(...inserted);
+    if (!this.returnsRepresentation) return { data: single ? null : [], error: null, count: null };
     return { data: single ? clone(inserted[0]) : clone(inserted), error: null, count: null };
   }
 

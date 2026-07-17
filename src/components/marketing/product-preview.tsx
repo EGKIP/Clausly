@@ -131,7 +131,7 @@ export function ProductPreview() {
                   <span className="size-2.5 rounded-full bg-[var(--surface-3)]" />
                 </div>
                 <div className="rounded-full border border-[var(--border)] bg-[var(--background)] px-3 py-1 font-mono text-[10.5px] text-[var(--faint)] tracking-wider">
-                  clausly.app/{active === "document" ? "doc/greenfield-lease" : active}
+                  {active === "document" ? "documents / Greenfield lease" : `workspace / ${active}`}
                 </div>
                 <div className="size-6" />
               </div>

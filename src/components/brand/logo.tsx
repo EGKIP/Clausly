@@ -57,11 +57,8 @@ export function Logo({
     <>
       <Logomark />
       {showWordmark && (
-        <span className="font-serif text-[22px] leading-none">
+        <span className="font-serif text-[22px] leading-none tracking-[-0.015em]">
           Clausly
-          <span className="ml-[2px] align-baseline font-sans text-[13px] font-medium text-[var(--muted)]">
-            .app
-          </span>
         </span>
       )}
     </>

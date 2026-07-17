@@ -39,7 +39,7 @@ export function Topbar({ onOpenSidebar, onOpenUpload, onOpenSearch }: TopbarProp
         type="button"
         onClick={onOpenSearch}
         className={cn(
-          "group flex-1 max-w-[520px] flex items-center gap-2.5 h-10 rounded-[var(--radius-md)]",
+          "group min-w-0 flex-1 max-w-[520px] flex items-center gap-2.5 h-10 rounded-[var(--radius-md)]",
           "border border-[var(--border)] bg-[var(--surface)] px-3.5 text-left",
           "text-[13.5px] text-[var(--faint)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-2)] transition-colors"
         )}
@@ -56,7 +56,7 @@ export function Topbar({ onOpenSidebar, onOpenUpload, onOpenSearch }: TopbarProp
         </span>
       </button>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <div data-tour="upload" className="inline-flex">
           <Button
             variant="primary"

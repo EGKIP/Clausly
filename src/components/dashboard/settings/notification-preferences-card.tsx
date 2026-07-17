@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Bell, CheckCircle2, Mail, Save } from "lucide-react";
-import { Badge, Card } from "@/components/ui/primitives";
+import { CheckCircle2, Mail, Save } from "lucide-react";
+import { Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -109,13 +109,9 @@ export function NotificationPreferencesCard({
         </div>
 
         <div className="rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Bell className="size-3.5 text-[var(--muted)]" />
-            <span className="text-[12.5px] font-medium">Reminder defaults</span>
-            <Badge tone="iris">Coming soon</Badge>
-          </div>
-          <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
-            Timing defaults for renewals, notice windows, payments, and reviews will live here.
+          <p className="text-[12.5px] font-medium">Reminder timing</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-[var(--muted)]">
+            You can edit suggested reminder dates before approval. The master email switch only controls delivery.
           </p>
         </div>
 

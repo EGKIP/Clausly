@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Bell, CheckCircle2, LogOut, Mail, Save, ShieldAlert, Sparkles, User } from "lucide-react";
+import { AlertTriangle, CheckCircle2, LogOut, Mail, Save, ShieldAlert, Sparkles, User } from "lucide-react";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
 import type { NotificationPreferences as NotificationPreferencesShape } from "@/components/dashboard/settings/notification-preferences-card";
 import { NotificationPreferences } from "@/components/dashboard/settings/notification-preferences";
@@ -314,13 +314,9 @@ export default function SettingsPage() {
               </div>
             </Card>
             <Card className="p-4 sm:p-6">
-              <div className="flex flex-wrap items-center gap-2">
-                <Bell className="size-3.5 text-[var(--muted)]" />
-                <span className="text-[12.5px] font-medium">Reminder defaults</span>
-                <Badge tone="iris">Coming soon</Badge>
-              </div>
-              <p className="mt-2 text-[13px] leading-relaxed text-[var(--muted)]">
-                Timing defaults for renewals, notice windows, payments, and reviews will live here.
+              <p className="text-[12.5px] font-medium">Reminder timing</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-[var(--muted)]">
+                Each suggested reminder can be edited before approval, so important dates stay under your control.
               </p>
             </Card>
           </div>

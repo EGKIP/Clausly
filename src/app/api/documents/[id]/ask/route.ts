@@ -186,7 +186,10 @@ export async function POST(request: Request, context: RouteContext) {
 
   if (chunks.length === 0) {
     return NextResponse.json(
-      { error: "Document text is still being indexed, try again shortly.", code: "DOC_NOT_INDEXED" },
+      {
+        error: "Document text is not indexed yet. Re-analyze this document, then try Ask Clausly again.",
+        code: "DOC_NOT_INDEXED",
+      },
       { status: 409 }
     );
   }

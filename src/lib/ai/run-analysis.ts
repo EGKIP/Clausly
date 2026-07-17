@@ -172,12 +172,7 @@ export async function runClaimedAnalysis(
   }
 
   const persistResult = await persistAnalysis(supabase, doc.id, userId, result, attemptToken);
-  void embedDocumentChunks(supabase, doc.id, userId, text).catch((error) => {
-    console.warn("Document chunk indexing failed after analysis.", {
-      documentId: doc.id,
-      message: error instanceof Error ? error.message : "Unknown indexing error.",
-    });
-  });
+  await embedDocumentChunks(supabase, doc.id, userId, text);
 
   return persistResult;
 }

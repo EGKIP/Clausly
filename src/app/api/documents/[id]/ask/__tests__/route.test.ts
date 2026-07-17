@@ -68,7 +68,7 @@ describe("POST /api/documents/[id]/ask", () => {
 
     expect(response.status).toBe(409);
     expect(body).toEqual({
-      error: "Document text is still being indexed, try again shortly.",
+      error: "Document text is not indexed yet. Re-analyze this document, then try Ask Clausly again.",
       code: "DOC_NOT_INDEXED",
     });
   });

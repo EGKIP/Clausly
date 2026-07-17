@@ -150,6 +150,13 @@ describe("runAnalysis", () => {
       error_message: null,
       failure_category: null,
     });
+    expect(db().document_chunks).toEqual([
+      expect.objectContaining({
+        document_id: document.id,
+        user_id: userA.id,
+        content: "Lease text with enough content.",
+      }),
+    ]);
   });
 
   it("marks the document failed with a category when extraction throws", async () => {

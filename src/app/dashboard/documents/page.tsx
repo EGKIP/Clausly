@@ -66,6 +66,14 @@ export default function DocumentsPage() {
 
   const hasFilters = q !== "" || type !== "All" || risk !== "All risk";
   const portfolioEmpty = !isLoading && !error && documents.length === 0;
+  const resultSummary = isLoading
+    ? "Loading your portfolio"
+    : `${filtered.length} ${filtered.length === 1 ? "document" : "documents"} shown`;
+  const activeFilters = [
+    q.trim() ? `Search: “${q.trim()}”` : null,
+    type !== "All" ? `Type: ${type}` : null,
+    risk !== "All risk" ? `Risk: ${risk}` : null,
+  ].filter((filter): filter is string => Boolean(filter));
 
   if (portfolioEmpty) {
     return (
@@ -156,9 +164,23 @@ export default function DocumentsPage() {
         </div>
       </div>
 
-      <p className="mt-6 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--faint)]">
-        Showing {filtered.length} of {documents.length}
-      </p>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-[var(--border)] py-3">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--faint)]">
+          {resultSummary} · {documents.length} total
+        </p>
+        {activeFilters.length > 0 && (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            {activeFilters.map((filter) => (
+              <span
+                key={filter}
+                className="rounded-[var(--radius-xs)] bg-[var(--surface-2)] px-2 py-1 text-[11.5px] text-[var(--muted)]"
+              >
+                {filter}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Body */}
       {isLoading ? (
@@ -168,7 +190,7 @@ export default function DocumentsPage() {
       ) : filtered.length === 0 ? (
         <EmptyState onClear={() => { setQ(""); setType("All"); setRisk("All risk"); }} />
       ) : view === "grid" ? (
-        <div data-tour="documents" className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div data-tour="documents" className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map((d, i) => (
             <motion.div
               key={d.id}
@@ -181,7 +203,7 @@ export default function DocumentsPage() {
           ))}
         </div>
       ) : (
-        <div data-tour="documents" className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+        <div data-tour="documents" className="mt-5 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
           <div className="hidden md:grid grid-cols-[2.6fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-[var(--border)] bg-[var(--surface-2)] font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
             <span>Document</span>
             <span>Ends</span>

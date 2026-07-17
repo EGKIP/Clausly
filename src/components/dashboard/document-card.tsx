@@ -36,6 +36,8 @@ export function DocumentCard({
   doc: ContractDoc;
   className?: string;
 }) {
+  const endsLabel = documentEndsLabel(doc.ends);
+
   return (
     <Link
       href={`/dashboard/documents/${doc.id}`}
@@ -70,7 +72,7 @@ export function DocumentCard({
         <span className="inline-flex min-w-0 items-center gap-1.5">
           <CalendarClock className="size-3 shrink-0" />
           <span className="truncate">
-          Ends {doc.ends}
+            {endsLabel}
           </span>
         </span>
         <span
@@ -86,6 +88,8 @@ export function DocumentCard({
 
 /* Row variant for a document — used in list views. */
 export function DocumentRow({ doc }: { doc: ContractDoc }) {
+  const endsLabel = documentEndsLabel(doc.ends);
+
   return (
     <Link
       href={`/dashboard/documents/${doc.id}`}
@@ -103,7 +107,7 @@ export function DocumentRow({ doc }: { doc: ContractDoc }) {
         </div>
       </div>
       <div className="hidden md:block text-[12.5px] text-[var(--muted)] font-mono tabular-nums">
-        {doc.ends}
+        {endsLabel}
       </div>
       <div className="hidden md:block text-[12px] text-[var(--muted)]">
         {doc.jurisdiction}
@@ -113,4 +117,9 @@ export function DocumentRow({ doc }: { doc: ContractDoc }) {
       </div>
     </Link>
   );
+}
+
+function documentEndsLabel(ends: string) {
+  if (!ends || ends === "—") return "No end date";
+  return `Ends ${ends}`;
 }

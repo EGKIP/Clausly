@@ -93,17 +93,6 @@ export default function RemindersPage() {
         eyebrow="Inbox"
         title="Reminders"
         description="Everything is suggested first. Clausly never fires a reminder without your nod."
-        actions={
-          <Button
-            variant="secondary"
-            size="md"
-            className="min-h-11 w-full sm:w-auto"
-            disabled
-            title="Calendar view is coming soon."
-          >
-            <Calendar className="size-3.5" /> Calendar soon
-          </Button>
-        }
       />
 
       <div className="mt-8 flex max-w-full items-center gap-1 overflow-x-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 scrollbar-none sm:w-fit">

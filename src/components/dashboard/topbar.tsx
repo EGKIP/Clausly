@@ -91,6 +91,7 @@ export function Topbar({ onOpenSidebar, onOpenUpload, onOpenSearch }: TopbarProp
 function UserMenu() {
   const [open, setOpen] = React.useState(false);
   const [email, setEmail] = React.useState<string>("demo@clausly.app");
+  const [displayName, setDisplayName] = React.useState<string | null>(null);
   const [plan, setPlan] = React.useState<"free" | "pro" | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -107,18 +108,22 @@ function UserMenu() {
         if (!cancelled) setEmail("demo@clausly.app");
       }
     }
-    async function loadPlan() {
+    async function loadProfile() {
       try {
         const response = await fetch("/api/profile");
         if (cancelled || !response.ok) return;
-        const payload = (await response.json()) as { plan?: "free" | "pro" };
-        if (!cancelled && (payload.plan === "free" || payload.plan === "pro")) setPlan(payload.plan);
+        const payload = (await response.json()) as { plan?: "free" | "pro"; displayName?: string };
+        if (cancelled) return;
+        if (payload.plan === "free" || payload.plan === "pro") setPlan(payload.plan);
+        if (typeof payload.displayName === "string" && payload.displayName.trim()) {
+          setDisplayName(payload.displayName.trim());
+        }
       } catch {
-        /* leave plan unknown; the menu simply omits the plan line */
+        /* leave profile unknown; the menu falls back to the email prefix */
       }
     }
     void loadUser();
-    void loadPlan();
+    void loadProfile();
     return () => {
       cancelled = true;
     };
@@ -132,8 +137,10 @@ function UserMenu() {
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const initial = email.charAt(0).toUpperCase();
-  const label = email.split("@")[0].replace(/[._-]/g, " ");
+  // Display name leads; email stays out of the always-visible topbar and
+  // lives in the dropdown instead.
+  const label = displayName ?? email.split("@")[0].replace(/[._-]/g, " ");
+  const initial = (label.charAt(0) || email.charAt(0)).toUpperCase();
 
   return (
     <div ref={menuRef} className="relative">
@@ -150,8 +157,7 @@ function UserMenu() {
           {initial}
         </div>
         <div className="hidden max-w-[160px] leading-tight md:block">
-          <p className="truncate text-[12.5px] font-medium capitalize">{label}</p>
-          <p className="truncate text-[10.5px] text-[var(--faint)]">{email}</p>
+          <p className={cn("truncate text-[12.5px] font-medium", !displayName && "capitalize")}>{label}</p>
         </div>
         <ChevronDown className="hidden size-3.5 text-[var(--faint)] md:block" />
       </button>
@@ -159,7 +165,10 @@ function UserMenu() {
       {open && (
         <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[240px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]">
           <div className="px-3 py-2.5">
-            <p className="truncate text-[12.5px] font-medium">{email}</p>
+            {displayName && <p className="truncate text-[12.5px] font-medium">{displayName}</p>}
+            <p className={cn("truncate", displayName ? "mt-0.5 text-[11px] text-[var(--faint)]" : "text-[12.5px] font-medium")}>
+              {email}
+            </p>
             {plan && (
               <p className="mt-0.5 text-[11px] text-[var(--faint)]">
                 {plan === "pro" ? "Pro plan" : "Free plan"}

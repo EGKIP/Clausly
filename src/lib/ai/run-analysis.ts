@@ -171,10 +171,20 @@ export async function runClaimedAnalysis(
     });
   }
 
-  const persistResult = await persistAnalysis(supabase, doc.id, userId, result, attemptToken);
-  await embedDocumentChunks(supabase, doc.id, userId, text);
+  // Index chunks before the document flips to 'ready' so Ask Clausly never
+  // sees a ready document with an empty index. Indexing failure stays
+  // non-fatal to the analysis itself — the Ask route can rebuild the index
+  // on demand — but it must not go unnoticed (embedDocumentChunks logs at
+  // error level and reports the failure back).
+  const embedResult = await embedDocumentChunks(supabase, doc.id, userId, text);
+  if (embedResult.error) {
+    console.error("Analysis completed but chunk indexing failed; Ask Clausly will attempt on-demand recovery.", {
+      documentId: doc.id,
+      message: embedResult.error,
+    });
+  }
 
-  return persistResult;
+  return persistAnalysis(supabase, doc.id, userId, result, attemptToken);
 }
 
 export async function markAnalysisFailed(

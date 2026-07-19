@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { reindexDocumentChunksFromStorage } from "@/lib/ai/embeddings";
 import { getEmbeddingModel, getEmbeddingProvider, getEmbeddingProviderName } from "@/lib/ai/embeddings/provider";
 import { getQAModel, getQAProvider, getQAProviderName } from "@/lib/ai/qa/provider";
 import { encodeSseFrame } from "@/lib/ai/qa/sse";
@@ -112,7 +113,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { data: document, error: documentError } = await supabase
     .from("documents")
-    .select("id, user_id, status")
+    .select("id, user_id, status, storage_path")
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
@@ -170,28 +171,34 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const [questionEmbedding] = await getEmbeddingProvider()([parsed.data.question]);
-  const { data: matches, error: matchError } = await supabase.rpc("match_document_chunks", {
-    target_document_id: document.id,
-    query_embedding: questionEmbedding,
-    match_count: 5,
-  });
-
-  if (matchError) return NextResponse.json({ error: matchError.message }, { status: 500 });
-
-  const chunks = ((matches ?? []) as MatchChunk[]).map((chunk) => ({
-    id: chunk.id,
-    content: chunk.content,
-    pageNumber: chunk.page_number,
-  }));
+  let chunks = await matchChunks(supabase, document.id, questionEmbedding);
+  if (chunks instanceof NextResponse) return chunks;
 
   if (chunks.length === 0) {
-    return NextResponse.json(
-      {
-        error: "Document text is not indexed yet. Re-analyze this document, then try Ask Clausly again.",
-        code: "DOC_NOT_INDEXED",
-      },
-      { status: 409 }
-    );
+    // Ready document with an empty index: the original embedding pass failed
+    // (or the document predates chunk indexing). Rebuild the index inline so
+    // the user isn't stuck behind a manual re-analyze.
+    const recovery = await reindexDocumentChunksFromStorage(supabase, {
+      id: document.id,
+      user_id: document.user_id,
+      storage_path: document.storage_path,
+    });
+
+    if (recovery.indexed > 0) {
+      chunks = await matchChunks(supabase, document.id, questionEmbedding);
+      if (chunks instanceof NextResponse) return chunks;
+    }
+
+    if (chunks.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "This document's text couldn't be indexed for Ask Clausly. Re-analyze the document, and if the problem persists the PDF may have no readable text.",
+          code: "DOC_NOT_INDEXED",
+        },
+        { status: 409 }
+      );
+    }
   }
 
   if (wantsStream) {
@@ -238,6 +245,26 @@ export async function POST(request: Request, context: RouteContext) {
     citations,
     conversation,
   });
+}
+
+async function matchChunks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  documentId: string,
+  questionEmbedding: number[],
+): Promise<AskChunk[] | NextResponse> {
+  const { data: matches, error: matchError } = await supabase.rpc("match_document_chunks", {
+    target_document_id: documentId,
+    query_embedding: questionEmbedding,
+    match_count: 5,
+  });
+
+  if (matchError) return NextResponse.json({ error: matchError.message }, { status: 500 });
+
+  return ((matches ?? []) as MatchChunk[]).map((chunk) => ({
+    id: chunk.id,
+    content: chunk.content,
+    pageNumber: chunk.page_number,
+  }));
 }
 
 function streamAskResponse(input: {

@@ -12,6 +12,13 @@ import {
 } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
+// after() requires Next's request-scope context, which direct unit-test
+// calls to route handlers don't set up — run the callback immediately
+// instead (same shim as the upload route tests).
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return { ...actual, after: (callback: () => unknown) => { void callback(); } };
+});
 
 import { GET } from "../route";
 

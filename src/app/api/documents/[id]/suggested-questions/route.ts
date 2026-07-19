@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getEmbeddingProvider } from "@/lib/ai/embeddings/provider";
 import { generateDocumentSuggestions } from "@/lib/ai/qa/suggest";
 import { canAskQuestion } from "@/lib/billing/qa-rate-limit";
@@ -68,11 +68,18 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
-  void generateAndPersistSuggestions(supabase, document.id, user.id).catch((error) => {
-    console.warn("Document suggestion generation failed.", {
-      documentId: document.id,
-      message: error instanceof Error ? error.message : "Unknown suggestion generation error.",
-    });
+  // after() keeps the serverless function alive until generation finishes —
+  // a bare detached promise dies with the response on Vercel, which left
+  // suggestions permanently ungenerated and the UI stuck on "pending".
+  after(async () => {
+    try {
+      await generateAndPersistSuggestions(supabase, document.id, user.id);
+    } catch (error) {
+      console.error("Document suggestion generation failed.", {
+        documentId: document.id,
+        message: error instanceof Error ? error.message : "Unknown suggestion generation error.",
+      });
+    }
   });
 
   return NextResponse.json({ suggestions: [], pending: true });

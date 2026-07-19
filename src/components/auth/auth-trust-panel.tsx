@@ -23,6 +23,14 @@ const trustQuotes: readonly TrustQuote[] = [
     quote: "Nothing becomes a reminder until you approve it.",
     label: "User control",
   },
+  {
+    quote: "Auto-renewal clauses love hiding on page 37. We read page 37.",
+    label: "Fine print, found",
+  },
+  {
+    quote: "Fewer 2 a.m. “did we ever cancel that?” moments.",
+    label: "Peace of mind",
+  },
 ];
 
 const trustSignals = [
@@ -64,18 +72,25 @@ export function AuthTrustPanel({ quote }: { quote: string }) {
 
   React.useEffect(() => {
     if (reduceMotion || paused || items.length <= 1) return undefined;
+    // `active` in the deps restarts the countdown whenever the quote changes
+    // (including a manual dot click), so a full interval always elapses
+    // before the next auto-advance instead of a jarring near-immediate jump.
     const interval = window.setInterval(() => {
       setActive((value) => (value + 1) % items.length);
     }, ROTATE_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
-  }, [items.length, paused, reduceMotion]);
+  }, [active, items.length, paused, reduceMotion]);
 
   return (
     <div
       className="mt-7"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false);
+      }}
     >
       {/* Fixed-height stage with cross-fading layers: no remount flash, no
        * layout shift as quotes of different lengths swap in. */}

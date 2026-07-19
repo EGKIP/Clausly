@@ -171,10 +171,27 @@ export async function runClaimedAnalysis(
     });
   }
 
-  const persistResult = await persistAnalysis(supabase, doc.id, userId, result, attemptToken);
-  await embedDocumentChunks(supabase, doc.id, userId, text);
+  // A title the user chose (at upload or via rename) must survive
+  // re-analysis. Only let the provider's title through when the current one
+  // is still the filename-derived default from the upload route.
+  if (!isFilenameDerivedTitle(doc.title, doc.file_name)) {
+    result = { ...result, documentTitle: doc.title };
+  }
 
-  return persistResult;
+  // Index chunks before the document flips to 'ready' so Ask Clausly never
+  // sees a ready document with an empty index. Indexing failure stays
+  // non-fatal to the analysis itself — the Ask route can rebuild the index
+  // on demand — but it must not go unnoticed (embedDocumentChunks logs at
+  // error level and reports the failure back).
+  const embedResult = await embedDocumentChunks(supabase, doc.id, userId, text);
+  if (embedResult.error) {
+    console.error("Analysis completed but chunk indexing failed; Ask Clausly will attempt on-demand recovery.", {
+      documentId: doc.id,
+      message: embedResult.error,
+    });
+  }
+
+  return persistAnalysis(supabase, doc.id, userId, result, attemptToken);
 }
 
 export async function markAnalysisFailed(
@@ -198,6 +215,11 @@ export async function markAnalysisFailed(
     .eq("user_id", userId)
     .eq("analysis_attempts", attemptToken)
     .eq("status", "analyzing");
+}
+
+function isFilenameDerivedTitle(title: string, fileName: string) {
+  const trimmed = title.trim();
+  return trimmed === fileName.trim() || trimmed === fileName.replace(/\.pdf$/i, "").trim();
 }
 
 function errorMessage(error: unknown) {

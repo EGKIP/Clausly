@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { BILLING_CHECKOUT_ERROR, logBillingError } from "@/lib/billing/errors";
+import {
+  BILLING_CHECKOUT_ERROR,
+  BILLING_CONFIG_ERROR,
+  BILLING_CONFIG_ERROR_CODE,
+  logBillingError,
+} from "@/lib/billing/errors";
 import { getUserPlan } from "@/lib/billing/plan";
 import { getOrCreateStripeCustomer, getStripe } from "@/lib/billing/stripe";
 import { createClient } from "@/lib/supabase/server";
@@ -24,10 +29,18 @@ export async function POST() {
     return NextResponse.json({ error: "Already on Pro." }, { status: 409 });
   }
 
-  const priceId = process.env.STRIPE_PRO_PRICE_ID;
-  if (!priceId) {
-    return NextResponse.json({ error: "Missing STRIPE_PRO_PRICE_ID." }, { status: 500 });
+  const configIssue = billingConfigIssue();
+  if (configIssue) {
+    // The reason names the misconfigured variable but never its value —
+    // wrong-field pastes must not end up in logs.
+    console.error("Stripe checkout blocked by configuration.", { reason: configIssue });
+    return NextResponse.json(
+      { error: BILLING_CONFIG_ERROR, code: BILLING_CONFIG_ERROR_CODE },
+      { status: 500 }
+    );
   }
+
+  const priceId = (process.env.STRIPE_PRO_PRICE_ID ?? "").trim();
 
   let sessionUrl: string | null;
   try {
@@ -58,6 +71,18 @@ export async function POST() {
   }
 
   return NextResponse.json({ url: sessionUrl });
+}
+
+function billingConfigIssue(): string | null {
+  if (!process.env.STRIPE_SECRET_KEY?.trim()) return "STRIPE_SECRET_KEY is missing.";
+
+  const priceId = process.env.STRIPE_PRO_PRICE_ID?.trim();
+  if (!priceId) return "STRIPE_PRO_PRICE_ID is missing.";
+  if (!priceId.startsWith("price_")) {
+    return "STRIPE_PRO_PRICE_ID must be a price_... ID (a prod_... product ID will not work).";
+  }
+
+  return null;
 }
 
 function getBaseUrl() {

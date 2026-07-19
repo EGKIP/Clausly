@@ -103,10 +103,10 @@ describe("embedDocumentChunks", () => {
     });
   });
 
-  it("returns zero indexed chunks instead of throwing on provider errors", async () => {
+  it("returns zero indexed chunks and the error instead of throwing on provider errors", async () => {
     const supabase = createSupabaseClient() as unknown as EmbedSupabaseClient;
     const document = seedDocument(userA);
-    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const result = await embedDocumentChunks(supabase, document.id, userA.id, "Valid text to index.", {
       provider: async () => {
@@ -114,12 +114,13 @@ describe("embedDocumentChunks", () => {
       },
     });
 
-    expect(result).toEqual({ indexed: 0 });
+    expect(result).toEqual({ indexed: 0, error: "Embedding provider down." });
     expect(db().document_chunks).toHaveLength(0);
-    expect(warning).toHaveBeenCalledWith("Document chunk indexing failed.", {
+    expect(errorLog).toHaveBeenCalledWith("Document chunk indexing failed.", {
       documentId: document.id,
+      provider: "mock",
       message: "Embedding provider down.",
     });
-    warning.mockRestore();
+    errorLog.mockRestore();
   });
 });

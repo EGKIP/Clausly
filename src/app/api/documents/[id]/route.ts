@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
+import { toUiDocument } from "@/lib/db/adapters";
 import { getDocumentDetail } from "@/lib/db/documents";
 import { createClient } from "@/lib/supabase/server";
+import { boundedTextSchema, validationIssues } from "@/lib/validation";
+
+const documentPatchSchema = z.object({
+  title: boundedTextSchema(1, 200),
+}).strict();
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -25,6 +32,50 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!detail) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(detail);
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  if (!hasSupabaseEnv()) {
+    return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const parsed = documentPatchSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid document update.", issues: validationIssues(parsed.error) },
+      { status: 400 }
+    );
+  }
+
+  const { id } = await context.params;
+  const { data, error } = await supabase
+    .from("documents")
+    .update({ title: parsed.data.title })
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Document not found." }, { status: 404 });
+
+  try {
+    await recordAuditEvent(supabase, {
+      userId: user.id,
+      action: AUDIT_ACTIONS.DOCUMENT_RENAMED,
+      resourceType: "document",
+      resourceId: id,
+      metadata: { title: parsed.data.title, ...auditRequestMetadata(request) },
+    });
+  } catch {
+    // Audit logging is best-effort; the rename itself is the source of truth.
+  }
+
+  return NextResponse.json({ document: toUiDocument(data) });
 }
 
 export async function DELETE(request: Request, context: RouteContext) {

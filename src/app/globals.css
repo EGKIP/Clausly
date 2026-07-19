@@ -100,6 +100,17 @@
     0 8px 24px -12px oklch(0% 0 0 / 0.5);
   --shadow-float: 0 1px 0 0 oklch(100% 0 0 / 0.04),
     0 24px 60px -24px oklch(0% 0 0 / 0.6);
+  /* Status color families keep their light-mode "soft" backgrounds unless
+   * re-mapped here — near-white fills under near-white foreground text made
+   * risk cards unreadable in dark mode. Mirrors the accent-soft/ink pattern. */
+  --color-clause-soft: oklch(28% 0.06 175);
+  --color-clause-ink: oklch(88% 0.08 175);
+  --color-ember-soft: oklch(29% 0.06 70);
+  --color-ember-ink: oklch(88% 0.1 70);
+  --color-coral-soft: oklch(29% 0.07 25);
+  --color-coral-ink: oklch(86% 0.1 25);
+  --color-iris-soft: oklch(29% 0.06 280);
+  --color-iris: oklch(78% 0.11 280);
   color-scheme: dark;
 }
 

@@ -172,6 +172,7 @@ function ReminderRow({
 }) {
   const Icon = iconFor(reminder.type);
   const urgent = reminder.daysAway > 0 && reminder.daysAway < 14;
+  const isPast = reminder.daysAway < 0;
 
   return (
     <div className="grid grid-cols-1 gap-3 px-3.5 py-3 md:grid-cols-[1fr_auto] md:items-center">
@@ -195,12 +196,24 @@ function ReminderRow({
           <p className="mt-2 font-mono text-[11px] text-[var(--faint)] tabular-nums">
             {reminder.fireOn} · {reminder.daysAway < 0 ? `${Math.abs(reminder.daysAway)} days late` : `${reminder.daysAway} days away`}
           </p>
+          {isPast && onApprove && (
+            <p className="mt-1 text-[11.5px] text-[var(--color-coral-ink)]">
+              This date has already passed — edit it to a future date to approve.
+            </p>
+          )}
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap md:justify-end">
         {onApprove && (
-          <Button variant="primary" size="sm" disabled={pending} onClick={onApprove} className="min-h-11 w-full sm:min-h-0 sm:w-auto">
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={pending || isPast}
+            title={isPast ? "This date has passed. Edit the reminder to a future date first." : undefined}
+            onClick={onApprove}
+            className="min-h-11 w-full sm:min-h-0 sm:w-auto"
+          >
             <Check className="size-3.5" /> Approve
           </Button>
         )}

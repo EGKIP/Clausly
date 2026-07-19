@@ -40,6 +40,9 @@ type PortfolioChatMessage = {
   citations?: PortfolioAskResult["citations"];
 };
 
+const MAX_SUGGESTION_POLLS = 5;
+const SUGGESTION_POLL_MS = 2500;
+
 export function PortfolioAsk() {
   const [question, setQuestion] = React.useState("");
   const [loading, setLoading] = React.useState(false);
@@ -51,6 +54,7 @@ export function PortfolioAsk() {
   const [suggestions, setSuggestions] = React.useState<string[]>([]);
   const [suggestionsPending, setSuggestionsPending] = React.useState(false);
   const [suggestionsLoaded, setSuggestionsLoaded] = React.useState(false);
+  const [suggestionAttempts, setSuggestionAttempts] = React.useState(0);
   const [result, setResult] = React.useState<PortfolioAskResult | null>(null);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const showSuggestions = !conversationId && messages.length === 0;
@@ -90,30 +94,47 @@ export function PortfolioAsk() {
   }, []);
 
   React.useEffect(() => {
-    if (!showSuggestions || suggestionsLoaded || question.trim().length > 0) return;
-    let cancelled = false;
+    if (!showSuggestions || question.trim().length > 0) return;
+    // Finished: either suggestions arrived or polling gave up.
+    if (suggestionsLoaded && !suggestionsPending) return;
+    if (suggestionsLoaded && suggestionAttempts >= MAX_SUGGESTION_POLLS) return;
 
-    async function loadSuggestions() {
-      setSuggestionsLoaded(true);
-      setSuggestionsPending(true);
+    let cancelled = false;
+    // First load fires immediately; while the server reports pending
+    // (generation running in the background), poll until it lands.
+    const delay = suggestionsLoaded ? SUGGESTION_POLL_MS : 0;
+
+    const timer = window.setTimeout(async () => {
+      if (!suggestionsLoaded) {
+        setSuggestionsLoaded(true);
+        setSuggestionsPending(true);
+      }
       const response = await fetch("/api/ask/portfolio/suggested-questions").catch(() => null);
+      if (cancelled) return;
+      const nextAttempts = suggestionAttempts + 1;
+      setSuggestionAttempts(nextAttempts);
       if (!response?.ok) {
-        if (!cancelled) setSuggestionsPending(false);
+        setSuggestionsPending(false);
         return;
       }
       const body = await response.json().catch(() => null);
       if (cancelled) return;
-      if (Array.isArray(body?.suggestions)) {
-        setSuggestions(body.suggestions.filter((item: unknown): item is string => typeof item === "string"));
+      const items = Array.isArray(body?.suggestions)
+        ? body.suggestions.filter((item: unknown): item is string => typeof item === "string")
+        : [];
+      if (items.length > 0) {
+        setSuggestions(items);
+        setSuggestionsPending(false);
+        return;
       }
-      setSuggestionsPending(Boolean(body?.pending));
-    }
+      setSuggestionsPending(Boolean(body?.pending) && nextAttempts < MAX_SUGGESTION_POLLS);
+    }, delay);
 
-    void loadSuggestions();
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [question, showSuggestions, suggestionsLoaded]);
+  }, [question, showSuggestions, suggestionsLoaded, suggestionsPending, suggestionAttempts]);
 
   async function selectConversation(id: string) {
     setConversationId(id);
@@ -144,6 +165,7 @@ export function PortfolioAsk() {
     setSuggestions([]);
     setSuggestionsPending(false);
     setSuggestionsLoaded(false);
+    setSuggestionAttempts(0);
     textareaRef.current?.focus();
   }
 
@@ -312,7 +334,7 @@ export function PortfolioAsk() {
         )}
       </div>
 
-      {showSuggestions && (
+      {showSuggestions && (suggestionsPending || suggestions.length > 0) && (
         <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
             Suggested portfolio questions
@@ -332,17 +354,9 @@ export function PortfolioAsk() {
               ))}
             </div>
           ) : (
-            <div className="mt-3 space-y-2">
-              {suggestionsPending ? (
-                <>
-                  <div className="h-3 w-56 rounded-full bg-[var(--border)]" />
-                  <div className="h-3 w-44 rounded-full bg-[var(--border)]" />
-                </>
-              ) : (
-                <p className="text-[12.5px] text-[var(--muted)]">
-                  Suggestions are being prepared for your portfolio.
-                </p>
-              )}
+            <div className="mt-3 space-y-2 motion-safe:animate-pulse" aria-label="Loading suggested questions">
+              <div className="h-3 w-56 rounded-full bg-[var(--border)]" />
+              <div className="h-3 w-44 rounded-full bg-[var(--border)]" />
             </div>
           )}
         </div>

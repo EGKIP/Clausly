@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getEmbeddingProvider } from "@/lib/ai/embeddings/provider";
 import { generatePortfolioSuggestions } from "@/lib/ai/qa/suggest";
 import { canAskQuestion } from "@/lib/billing/qa-rate-limit";
@@ -10,6 +10,10 @@ type MatchChunk = {
   content: string;
   page_number: number | null;
 };
+
+// after() only extends the function's life up to maxDuration — give the
+// deferred suggestion generation (embedding + LLM call) room to finish.
+export const maxDuration = 300;
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const anchor = "portfolio key terms, renewal dates, notice windows, obligations, costs, risks";
@@ -58,11 +62,18 @@ export async function GET() {
     );
   }
 
-  void generateAndPersistSuggestions(supabase, user.id, documentCount).catch((error) => {
-    console.warn("Portfolio suggestion generation failed.", {
-      userId: user.id,
-      message: error instanceof Error ? error.message : "Unknown suggestion generation error.",
-    });
+  // after() keeps the serverless function alive until generation finishes —
+  // a bare detached promise dies with the response on Vercel, which left
+  // suggestions permanently ungenerated and the UI stuck on "pending".
+  after(async () => {
+    try {
+      await generateAndPersistSuggestions(supabase, user.id, documentCount);
+    } catch (error) {
+      console.error("Portfolio suggestion generation failed.", {
+        userId: user.id,
+        message: error instanceof Error ? error.message : "Unknown suggestion generation error.",
+      });
+    }
   });
 
   return NextResponse.json({ suggestions: [], pending: true });

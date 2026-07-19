@@ -89,6 +89,40 @@ describe("/api/reminders/[id]", () => {
     });
   });
 
+  it("rejects approving a reminder whose fire date is in the past", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "suggested", fire_on: "2026-01-05" });
+
+    const response = await APPROVE(jsonRequest({}), routeContext(reminder.id));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toMatchObject({ code: "REMINDER_PAST" });
+    expect(db().reminders[0].status).toBe("suggested");
+  });
+
+  it("approves a past reminder when the same request moves its date into the future", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "suggested", fire_on: "2026-01-05" });
+    const future = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+
+    const response = await APPROVE(jsonRequest({ fire_on: future }), routeContext(reminder.id));
+
+    expect(response.status).toBe(200);
+    expect(db().reminders[0]).toMatchObject({ status: "approved", fire_on: future });
+  });
+
+  it("still approves reminders with future fire dates", async () => {
+    const document = seedDocument(userA);
+    const future = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+    const reminder = seedReminder(document.id, userA, { status: "suggested", fire_on: future });
+
+    const response = await APPROVE(jsonRequest({}), routeContext(reminder.id));
+
+    expect(response.status).toBe(200);
+    expect(db().reminders[0].status).toBe("approved");
+  });
+
   it("dismisses reminders without deleting the row", async () => {
     const document = seedDocument(userA);
     const reminder = seedReminder(document.id, userA, { status: "approved" });

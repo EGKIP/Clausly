@@ -1,5 +1,6 @@
 export const AUDIT_ACTIONS = {
   DOCUMENT_UPLOADED: "document.uploaded",
+  DOCUMENT_RENAMED: "document.renamed",
   DOCUMENT_DELETED: "document.deleted",
   REMINDER_APPROVED: "reminder.approved",
   REMINDER_DISMISSED: "reminder.dismissed",

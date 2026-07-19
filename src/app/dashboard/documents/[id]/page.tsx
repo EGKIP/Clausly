@@ -10,6 +10,7 @@ import { DocumentView } from "@/components/dashboard/document-view";
 import { AnalysisGate } from "@/components/dashboard/analysis-gate";
 import { CompareWithButton } from "@/components/dashboard/compare/compare-with-button";
 import { ExportButton } from "@/components/dashboard/document-actions/export-button";
+import { RenameableTitle } from "@/components/dashboard/document-actions/rename-title";
 import { ShareDialog } from "@/components/dashboard/share/share-dialog";
 import { getExportUsage, type ExportUsage } from "@/lib/exports/limits";
 import { getUserPlan } from "@/lib/billing/plan";
@@ -73,9 +74,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               Uploaded {doc.uploadedDaysAgo}d ago
             </span>
           </div>
-          <h1 className="mt-4 font-serif text-[clamp(2rem,3.2vw,2.8rem)] leading-[1.05] tracking-[-0.015em] text-balance">
-            {doc.title}
-          </h1>
+          <RenameableTitle documentId={doc.id} title={doc.title} className="mt-4" />
           <p className="mt-2 text-[14px] text-[var(--muted)]">
             {doc.party}
             {doc.monthly && (

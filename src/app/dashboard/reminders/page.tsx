@@ -140,6 +140,7 @@ export default function RemindersPage() {
           const Icon = iconFor(r.type);
           const urgent = r.daysAway > 0 && r.daysAway < 14;
           const isPending = activeReminders.pendingIds.has(r.id);
+          const isPast = r.daysAway < 0;
           return (
             <motion.div
               key={r.id}
@@ -166,10 +167,16 @@ export default function RemindersPage() {
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <p className="text-[14.5px] font-medium leading-tight">{r.title}</p>
                     <Badge tone="outline">{r.type}</Badge>
+                    {isPast && tab !== "sent" && <Badge tone="outline">Past</Badge>}
                   </div>
                   <p className="text-[12.5px] text-[var(--muted)] leading-relaxed">
                     {r.description}
                   </p>
+                  {isPast && tab === "suggested" && (
+                    <p className="mt-1.5 text-[11.5px] text-[var(--color-coral-ink)]">
+                      This date has already passed — edit it to a future date to approve.
+                    </p>
+                  )}
                   <p className="mt-2 text-[11.5px] text-[var(--faint)]">
                     For{" "}
                     <Link href={`/dashboard/documents/${r.docId}`} className="text-[var(--accent-ink)] hover:underline">
@@ -200,7 +207,8 @@ export default function RemindersPage() {
                     <Button
                       variant="primary"
                       size="sm"
-                      disabled={isPending}
+                      disabled={isPending || isPast}
+                      title={isPast ? "This date has passed. Edit the reminder to a future date first." : undefined}
                       onClick={() => void handleApprove(r.id)}
                       className="min-h-11 w-full sm:min-h-0 sm:w-auto"
                     >

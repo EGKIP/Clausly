@@ -9,6 +9,7 @@ import {
   seedDocument,
   seedDocumentChunk,
   seedMessage,
+  seedStoredPdf,
   seedUsageMetric,
   setSupabaseUser,
   userA,
@@ -16,12 +17,19 @@ import {
 } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
+vi.mock("@/lib/ai/pdf-text", () => ({
+  extractPdfTextWithOcr: vi.fn(),
+}));
 
+import { extractPdfTextWithOcr } from "@/lib/ai/pdf-text";
 import { POST } from "../route";
+
+const extractPdfTextWithOcrMock = vi.mocked(extractPdfTextWithOcr);
 
 describe("POST /api/documents/[id]/ask", () => {
   beforeEach(() => {
     resetSupabaseMock(userA);
+    extractPdfTextWithOcrMock.mockReset();
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -60,17 +68,42 @@ describe("POST /api/documents/[id]/ask", () => {
     expect(body).toEqual({ error: "Document is not ready yet.", code: "DOC_NOT_READY" });
   });
 
-  it("returns 409 when chunks are not indexed yet", async () => {
+  it("returns 409 when chunks are missing and inline reindexing fails", async () => {
+    // No stored PDF seeded, so the recovery download fails and the index
+    // stays empty.
     const document = seedDocument(userA, { status: "ready" });
 
     const response = await POST(jsonRequest({ question: "What is the rent?" }), routeContext(document.id));
     const body = await response.json();
 
     expect(response.status).toBe(409);
-    expect(body).toEqual({
-      error: "Document text is not indexed yet. Re-analyze this document, then try Ask Clausly again.",
-      code: "DOC_NOT_INDEXED",
-    });
+    expect(body).toMatchObject({ code: "DOC_NOT_INDEXED" });
+    expect(body.error).toContain("couldn't be indexed");
+  });
+
+  it("rebuilds the index inline and answers when a ready document has no chunks", async () => {
+    const document = seedDocument(userA, { status: "ready" });
+    seedStoredPdf(document.storage_path);
+    extractPdfTextWithOcrMock.mockResolvedValue(
+      "The tenant may terminate by giving 60 days written notice before the renewal date.",
+    );
+
+    const response = await POST(
+      jsonRequest({ question: "What is the termination clause?" }),
+      routeContext(document.id),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.answer).toContain("Based on the indexed document excerpts");
+    expect(db().document_chunks).toEqual([
+      expect.objectContaining({
+        document_id: document.id,
+        user_id: userA.id,
+        content: "The tenant may terminate by giving 60 days written notice before the renewal date.",
+      }),
+    ]);
+    expect(body.citations.length).toBeGreaterThan(0);
   });
 
   it("returns JSON 429 before opening a stream when the daily Q&A limit is reached", async () => {

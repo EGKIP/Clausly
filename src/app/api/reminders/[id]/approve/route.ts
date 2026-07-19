@@ -50,6 +50,20 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Dismissed reminders cannot be approved." }, { status: 409 });
   }
 
+  // Approving a reminder whose fire date already passed would queue an email
+  // that can never fire on time. Applies to the date after any override in
+  // this request, so editing the date to a future one in the same call works.
+  const effectiveFireOn = parsed.data.fire_on ?? String(existing.fire_on).slice(0, 10);
+  if (effectiveFireOn < todayUtcDate()) {
+    return NextResponse.json(
+      {
+        error: "This reminder's date has already passed. Edit it to a future date before approving.",
+        code: "REMINDER_PAST",
+      },
+      { status: 409 }
+    );
+  }
+
   const wasSuggested = existing.status === "suggested";
   const { data, error } = await supabase
     .from("reminders")
@@ -98,6 +112,10 @@ async function logReminderLifecycle(supabase: Awaited<ReturnType<typeof createCl
   } catch {
     // usage_metrics is best-effort here; reminder state is the source of truth.
   }
+}
+
+function todayUtcDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function hasSupabaseEnv() {

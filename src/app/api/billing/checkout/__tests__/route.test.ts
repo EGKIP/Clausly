@@ -36,6 +36,7 @@ describe("POST /api/billing/checkout", () => {
     getOrCreateStripeCustomerMock.mockResolvedValue("cus_test");
     checkoutCreateMock.mockReset();
     checkoutCreateMock.mockResolvedValue({ url: "https://checkout.stripe.test/session" });
+    process.env.STRIPE_SECRET_KEY = "sk_test_config";
     process.env.STRIPE_PRO_PRICE_ID = "price_pro";
     process.env.NEXT_PUBLIC_BASE_URL = "https://clausly.test";
     process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role";
@@ -126,6 +127,7 @@ describe("POST /api/billing/checkout", () => {
     expect(JSON.stringify(body)).not.toContain("sk_test");
     expect(warn).toHaveBeenCalledWith("Stripe checkout failed.", {
       name: "Error",
+      message: "Invalid API Key provided: [redacted]",
       type: "StripeAuthenticationError",
       code: "api_key_invalid",
       statusCode: 401,
@@ -133,5 +135,66 @@ describe("POST /api/billing/checkout", () => {
     });
     expect(JSON.stringify(warn.mock.calls)).not.toContain("sk_test");
     warn.mockRestore();
+  });
+
+  it("returns BILLING_CONFIG_ERROR when the price ID is missing", async () => {
+    delete process.env.STRIPE_PRO_PRICE_ID;
+    seedUser(userA, { subscription_tier: "free" });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toMatchObject({ code: "BILLING_CONFIG_ERROR" });
+    expect(checkoutCreateMock).not.toHaveBeenCalled();
+    expect(errorLog).toHaveBeenCalledWith("Stripe checkout blocked by configuration.", {
+      reason: "STRIPE_PRO_PRICE_ID is missing.",
+    });
+    errorLog.mockRestore();
+  });
+
+  it("returns BILLING_CONFIG_ERROR when the price ID is a product ID", async () => {
+    process.env.STRIPE_PRO_PRICE_ID = "prod_ABC123";
+    seedUser(userA, { subscription_tier: "free" });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toMatchObject({ code: "BILLING_CONFIG_ERROR" });
+    expect(checkoutCreateMock).not.toHaveBeenCalled();
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain("prod_ABC123");
+    errorLog.mockRestore();
+  });
+
+  it("returns BILLING_CONFIG_ERROR when the Stripe secret key is missing", async () => {
+    delete process.env.STRIPE_SECRET_KEY;
+    seedUser(userA, { subscription_tier: "free" });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await POST();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      error: "Billing isn't configured correctly on our side. Please contact support.",
+      code: "BILLING_CONFIG_ERROR",
+    });
+    expect(checkoutCreateMock).not.toHaveBeenCalled();
+    errorLog.mockRestore();
+  });
+
+  it("trims whitespace pasted into the price ID env var", async () => {
+    process.env.STRIPE_PRO_PRICE_ID = "  price_pro\n";
+    seedUser(userA, { subscription_tier: "free" });
+
+    const response = await POST();
+
+    expect(response.status).toBe(200);
+    expect(checkoutCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ line_items: [{ price: "price_pro", quantity: 1 }] })
+    );
   });
 });

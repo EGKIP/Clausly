@@ -159,6 +159,36 @@ describe("runAnalysis", () => {
     ]);
   });
 
+  it("keeps a user-chosen title through re-analysis but upgrades filename-derived defaults", async () => {
+    const renamed = seedDocument(userA, {
+      status: "pending",
+      analysis_attempts: 0,
+      title: "My car loan",
+      file_name: "scan-2026.pdf",
+    });
+    seedStoredPdf(renamed.storage_path);
+    extractPdfTextMock.mockResolvedValue("Loan text with enough content.");
+    analyzeDocumentMock.mockResolvedValue(analysisResult({ documentTitle: "Vehicle financing agreement" }));
+    const client = createSupabaseClient() as never;
+
+    await runAnalysis(client, renamed.id, userA.id);
+    expect(db().documents[0].title).toBe("My car loan");
+
+    resetSupabaseMock(userA);
+    const fresh = seedDocument(userA, {
+      status: "pending",
+      analysis_attempts: 0,
+      title: "scan-2026",
+      file_name: "scan-2026.pdf",
+    });
+    seedStoredPdf(fresh.storage_path);
+    extractPdfTextMock.mockResolvedValue("Loan text with enough content.");
+    analyzeDocumentMock.mockResolvedValue(analysisResult({ documentTitle: "Vehicle financing agreement" }));
+
+    await runAnalysis(client, fresh.id, userA.id);
+    expect(db().documents[0].title).toBe("Vehicle financing agreement");
+  });
+
   it("marks the document failed with a category when extraction throws", async () => {
     const document = seedDocument(userA, { status: "pending", analysis_attempts: 0 });
     seedStoredPdf(document.storage_path);

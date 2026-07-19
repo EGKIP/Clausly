@@ -70,6 +70,10 @@ export async function getDocumentDetail(id: string): Promise<DocumentDetail | nu
         .from("reminders")
         .select("*, documents(title)")
         .eq("document_id", id)
+        // Ignored reminders must stay hidden here too: toUiReminder maps
+        // 'ignored' back to 'suggested' for the UI type, so leaking them
+        // makes the detail page disagree with the reminders inbox.
+        .neq("status", "ignored")
         .order("fire_on", { ascending: true }),
     ]);
 

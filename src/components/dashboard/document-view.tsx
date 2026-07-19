@@ -402,7 +402,10 @@ function RemindersPanel({ reminders }: { reminders: Reminder[] }) {
 }
 
 /* ── Ask Clausly ────────────────────────────────────────────────────── */
-function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
+const MAX_SUGGESTION_POLLS = 5;
+const SUGGESTION_POLL_MS = 2500;
+
+export function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
   const [question, setQuestion] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -413,6 +416,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
   const [suggestions, setSuggestions] = React.useState<string[]>([]);
   const [suggestionsPending, setSuggestionsPending] = React.useState(false);
   const [suggestionsLoaded, setSuggestionsLoaded] = React.useState(false);
+  const [suggestionAttempts, setSuggestionAttempts] = React.useState(0);
   const [result, setResult] = React.useState<{
     answer: string;
     citations: Array<{ chunkId: string; pageNumber: number | null; snippet: string }>;
@@ -455,30 +459,47 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
   }, [docId]);
 
   React.useEffect(() => {
-    if (!showSuggestions || suggestionsLoaded || question.trim().length > 0) return;
-    let cancelled = false;
+    if (!showSuggestions || question.trim().length > 0) return;
+    // Finished: either suggestions arrived or polling gave up.
+    if (suggestionsLoaded && !suggestionsPending) return;
+    if (suggestionsLoaded && suggestionAttempts >= MAX_SUGGESTION_POLLS) return;
 
-    async function loadSuggestions() {
-      setSuggestionsLoaded(true);
-      setSuggestionsPending(true);
+    let cancelled = false;
+    // First load fires immediately; while the server reports pending
+    // (generation running in the background), poll until it lands.
+    const delay = suggestionsLoaded ? SUGGESTION_POLL_MS : 0;
+
+    const timer = window.setTimeout(async () => {
+      if (!suggestionsLoaded) {
+        setSuggestionsLoaded(true);
+        setSuggestionsPending(true);
+      }
       const response = await fetch(`/api/documents/${docId}/suggested-questions`).catch(() => null);
+      if (cancelled) return;
+      const nextAttempts = suggestionAttempts + 1;
+      setSuggestionAttempts(nextAttempts);
       if (!response?.ok) {
-        if (!cancelled) setSuggestionsPending(false);
+        setSuggestionsPending(false);
         return;
       }
       const body = await response.json().catch(() => null);
       if (cancelled) return;
-      if (Array.isArray(body?.suggestions)) {
-        setSuggestions(body.suggestions.filter((item: unknown): item is string => typeof item === "string"));
+      const items = Array.isArray(body?.suggestions)
+        ? body.suggestions.filter((item: unknown): item is string => typeof item === "string")
+        : [];
+      if (items.length > 0) {
+        setSuggestions(items);
+        setSuggestionsPending(false);
+        return;
       }
-      setSuggestionsPending(Boolean(body?.pending));
-    }
+      setSuggestionsPending(Boolean(body?.pending) && nextAttempts < MAX_SUGGESTION_POLLS);
+    }, delay);
 
-    void loadSuggestions();
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [docId, question, showSuggestions, suggestionsLoaded]);
+  }, [docId, question, showSuggestions, suggestionsLoaded, suggestionsPending, suggestionAttempts]);
 
   async function selectConversation(id: string) {
     setConversationId(id);
@@ -509,6 +530,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
     setSuggestions([]);
     setSuggestionsPending(false);
     setSuggestionsLoaded(false);
+    setSuggestionAttempts(0);
     inputRef.current?.focus();
   }
 
@@ -676,7 +698,7 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
         )}
       </div>
 
-      {showSuggestions && (
+      {showSuggestions && (suggestionsPending || suggestions.length > 0) && (
         <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
           <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
             Suggested questions
@@ -696,17 +718,9 @@ function AskPanel({ docId, docTitle }: { docId: string; docTitle: string }) {
               ))}
             </div>
           ) : (
-            <div className="mt-3 space-y-2">
-              {suggestionsPending ? (
-                <>
-                  <div className="h-3 w-52 rounded-full bg-[var(--border)]" />
-                  <div className="h-3 w-40 rounded-full bg-[var(--border)]" />
-                </>
-              ) : (
-                <p className="text-[12.5px] text-[var(--muted)]">
-                  Suggestions are being prepared for this document.
-                </p>
-              )}
+            <div className="mt-3 space-y-2 motion-safe:animate-pulse" aria-label="Loading suggested questions">
+              <div className="h-3 w-52 rounded-full bg-[var(--border)]" />
+              <div className="h-3 w-40 rounded-full bg-[var(--border)]" />
             </div>
           )}
         </div>

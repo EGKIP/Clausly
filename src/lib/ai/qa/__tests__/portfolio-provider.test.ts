@@ -3,6 +3,7 @@ import {
   answerPortfolioWithMockProvider,
   answerPortfolioWithOpenAIProvider,
   getPortfolioQAProvider,
+  streamPortfolioWithOpenAIProvider,
   type PortfolioQAInput,
 } from "../portfolio-provider";
 
@@ -31,6 +32,20 @@ function jsonResponse(payload: unknown) {
     ok: true,
     status: 200,
     json: async () => payload,
+  } as Response);
+}
+
+function streamResponse(frames: string[]) {
+  const encoder = new TextEncoder();
+  return Promise.resolve({
+    ok: true,
+    status: 200,
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const frame of frames) controller.enqueue(encoder.encode(frame));
+        controller.close();
+      },
+    }),
   } as Response);
 }
 
@@ -94,5 +109,22 @@ describe("portfolio QA provider", () => {
 
     await expect(answerPortfolioWithOpenAIProvider(sampleInput)).rejects.toThrow(/schema validation/i);
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("streams plain prose from OpenAI instead of JSON objects", async () => {
+    process.env.OPENAI_API_KEY = "test-openai-key";
+    vi.mocked(fetch).mockImplementation(() => streamResponse([
+      'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Greenfield expires first."}\n\n',
+      'event: response.completed\ndata: {"type":"response.completed"}\n\n',
+    ]));
+
+    const events = [];
+    for await (const event of streamPortfolioWithOpenAIProvider(sampleInput)) events.push(event);
+
+    const request = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(request.stream).toBe(true);
+    expect(request.text).toBeUndefined();
+    expect(request.input[0].content).toContain("Do not output JSON");
+    expect(events).toContainEqual({ type: "token", text: "Greenfield expires first." });
   });
 });

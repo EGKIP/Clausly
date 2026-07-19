@@ -1,5 +1,5 @@
 import { answerWithMockProvider, getQAModel, type QAInput } from "./provider";
-import { qaSystemPrompt, qaUserPrompt } from "./prompts";
+import { qaStreamingSystemPrompt, qaUserPrompt } from "./prompts";
 
 export type QAStreamEvent =
   | { type: "token"; text: string }
@@ -56,10 +56,9 @@ export async function* streamWithOpenAIProvider(input: QAInput): AsyncIterable<Q
       body: JSON.stringify({
         model: getQAModel(),
         input: [
-          { role: "system", content: qaSystemPrompt() },
+          { role: "system", content: qaStreamingSystemPrompt() },
           { role: "user", content: qaUserPrompt(input) },
         ],
-        text: { format: { type: "json_object" } },
         stream: true,
       }),
     });

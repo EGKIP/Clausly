@@ -110,6 +110,16 @@ describe("/api/documents/[id]", () => {
     expect(storageCalls().removed).toEqual([document.storage_path]);
   });
 
+  it("does not delete cross-tenant documents", async () => {
+    const other = seedDocument(userB);
+
+    const response = await DELETE(new Request("http://localhost.test", { method: "DELETE" }), routeContext(other.id));
+
+    expect(response.status).toBe(404);
+    expect(db().documents).toHaveLength(1);
+    expect(storageCalls().removed).toEqual([]);
+  });
+
   it("returns 403 when the storage path does not belong to the user", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const document = seedDocument(userA, { storage_path: userB.id + "/foreign/doc.pdf" });

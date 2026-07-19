@@ -155,10 +155,10 @@ async function postOpenAI(
       body: JSON.stringify({
         model,
         input: [
-          { role: "system", content: systemPrompt(schemaError) },
+          { role: "system", content: stream ? streamingSystemPrompt() : systemPrompt(schemaError) },
           { role: "user", content: userPrompt(input) },
         ],
-        text: { format: { type: "json_object" } },
+        ...(stream ? {} : { text: { format: { type: "json_object" } } }),
         ...(stream ? { stream: true } : {}),
       }),
     });
@@ -186,6 +186,18 @@ async function postOpenAIJson(
 ): Promise<{ output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> }> {
   const response = await postOpenAI(apiKey, model, input, schemaError);
   return await response.json();
+}
+
+function streamingSystemPrompt(): string {
+  return [
+    "You answer questions across MULTIPLE contract documents using ONLY the provided excerpts.",
+    "You may reference prior turns in the conversation when relevant, but always ground answers in the provided excerpts.",
+    "Each excerpt includes a document title, optional page number, and excerpt text.",
+    "Answer in plain, readable prose for the user interface.",
+    "Do not output JSON, markdown code fences, excerpt IDs, or citationChunkIds.",
+    "If the excerpts do not contain the answer, say so plainly.",
+    "Clausly provides contract intelligence and reminders, not legal advice.",
+  ].join("\n");
 }
 
 function systemPrompt(schemaError?: string): string {

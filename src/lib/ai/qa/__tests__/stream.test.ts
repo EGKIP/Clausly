@@ -76,6 +76,27 @@ describe("QA streaming providers", () => {
       { type: "error", message: "Model failed" },
     ]);
   });
+
+  it("requests plain prose from OpenAI for streaming instead of JSON objects", async () => {
+    process.env.OPENAI_API_KEY = "test-key";
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: openAIStream([
+        'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"Plain answer"}\n\n',
+        'event: response.completed\ndata: {"type":"response.completed"}\n\n',
+      ]),
+    } as Response);
+
+    const events = [];
+    for await (const event of streamWithOpenAIProvider(input)) events.push(event);
+
+    const request = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body));
+    expect(request.stream).toBe(true);
+    expect(request.text).toBeUndefined();
+    expect(request.input[0].content).toContain("Do not output JSON");
+    expect(events).toContainEqual({ type: "token", text: "Plain answer" });
+  });
 });
 
 function openAIStream(frames: string[]) {

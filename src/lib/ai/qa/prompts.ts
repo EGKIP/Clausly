@@ -13,6 +13,17 @@ export function qaSystemPrompt(schemaError?: string): string {
   ].filter(Boolean).join("\n");
 }
 
+export function qaStreamingSystemPrompt(): string {
+  return [
+    "You answer questions about ONE contract document using ONLY the provided excerpts.",
+    "You may reference prior turns in the conversation when relevant, but always ground answers in the provided excerpts.",
+    "Answer in plain, readable prose for the user interface.",
+    "Do not output JSON, markdown code fences, excerpt IDs, or citationChunkIds.",
+    "If the excerpts do not contain the answer, say so plainly.",
+    "Clausly provides contract intelligence and reminders, not legal advice.",
+  ].join("\n");
+}
+
 export function qaUserPrompt(input: QAInput): string {
   return qaUserPromptWithHistory(input);
 }

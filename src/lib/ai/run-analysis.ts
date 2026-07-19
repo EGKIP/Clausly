@@ -171,6 +171,13 @@ export async function runClaimedAnalysis(
     });
   }
 
+  // A title the user chose (at upload or via rename) must survive
+  // re-analysis. Only let the provider's title through when the current one
+  // is still the filename-derived default from the upload route.
+  if (!isFilenameDerivedTitle(doc.title, doc.file_name)) {
+    result = { ...result, documentTitle: doc.title };
+  }
+
   // Index chunks before the document flips to 'ready' so Ask Clausly never
   // sees a ready document with an empty index. Indexing failure stays
   // non-fatal to the analysis itself — the Ask route can rebuild the index
@@ -208,6 +215,11 @@ export async function markAnalysisFailed(
     .eq("user_id", userId)
     .eq("analysis_attempts", attemptToken)
     .eq("status", "analyzing");
+}
+
+function isFilenameDerivedTitle(title: string, fileName: string) {
+  const trimmed = title.trim();
+  return trimmed === fileName.trim() || trimmed === fileName.replace(/\.pdf$/i, "").trim();
 }
 
 function errorMessage(error: unknown) {

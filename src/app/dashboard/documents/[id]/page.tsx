@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { PageBody } from "@/components/dashboard/page-header";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/primitives";
 import { RiskPill } from "@/components/ui/risk-pill";
 import { getDocumentDetail, listDocuments } from "@/lib/db/documents";
 import { DocumentView } from "@/components/dashboard/document-view";
 import { AnalysisGate } from "@/components/dashboard/analysis-gate";
 import { CompareWithButton } from "@/components/dashboard/compare/compare-with-button";
+import { DeleteDocumentButton } from "@/components/dashboard/document-actions/delete-document-button";
 import { ExportButton } from "@/components/dashboard/document-actions/export-button";
 import { RenameableTitle } from "@/components/dashboard/document-actions/rename-title";
 import { ShareDialog } from "@/components/dashboard/share/share-dialog";
@@ -90,9 +90,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           <ExportButton documentId={doc.id} usage={serializableExportUsage(exportUsage)} />
           <ShareDialog documentId={doc.id} plan={sharePlan} />
           <CompareWithButton currentDocument={doc} documents={documents} />
-          <Button variant="ghost" size="sm" aria-label="Delete" className="text-[var(--color-coral-ink)]">
-            <Trash2 className="size-3.5" /> Delete
-          </Button>
+          <DeleteDocumentButton documentId={doc.id} documentTitle={doc.title} />
         </div>
       </div>
 

@@ -8,6 +8,10 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+// after() only extends the function's life up to maxDuration — give the
+// deferred suggestion generation (embedding + LLM call) room to finish.
+export const maxDuration = 300;
+
 type MatchChunk = {
   id: string;
   content: string;

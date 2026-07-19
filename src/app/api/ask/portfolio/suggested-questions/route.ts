@@ -11,6 +11,10 @@ type MatchChunk = {
   page_number: number | null;
 };
 
+// after() only extends the function's life up to maxDuration — give the
+// deferred suggestion generation (embedding + LLM call) room to finish.
+export const maxDuration = 300;
+
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const anchor = "portfolio key terms, renewal dates, notice windows, obligations, costs, risks";
 const canned = [

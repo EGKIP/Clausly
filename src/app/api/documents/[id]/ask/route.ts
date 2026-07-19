@@ -22,6 +22,11 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+// The inline index-recovery path (download PDF, extract text, embed chunks)
+// plus a streamed answer can exceed Vercel's default function timeout.
+// Matches the upload route's Pro-tier ceiling.
+export const maxDuration = 300;
+
 const questionSchema = z.object({
   question: z.string().trim().min(3).max(500),
   conversationId: z.string().uuid().optional(),

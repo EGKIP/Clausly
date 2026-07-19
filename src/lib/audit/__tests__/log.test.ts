@@ -24,6 +24,7 @@ describe("audit logging", () => {
   it("defines the canonical audit action vocabulary", () => {
     expect(Object.values(AUDIT_ACTIONS)).toEqual([
       "document.uploaded",
+      "document.renamed",
       "document.deleted",
       "reminder.approved",
       "reminder.dismissed",

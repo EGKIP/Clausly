@@ -92,8 +92,12 @@ export async function DELETE(request: Request, context: RouteContext) {
     .from("documents")
     .select("storage_path")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
+  if (readError?.code === "PGRST116") {
+    return NextResponse.json({ error: "Document not found." }, { status: 404 });
+  }
   if (readError) return NextResponse.json({ error: readError.message }, { status: 404 });
 
   if (!document.storage_path.startsWith(`${user.id}/`)) {
@@ -110,7 +114,11 @@ export async function DELETE(request: Request, context: RouteContext) {
 
   if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 });
 
-  const { error: deleteError } = await supabase.from("documents").delete().eq("id", id);
+  const { error: deleteError } = await supabase
+    .from("documents")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
 
   try {

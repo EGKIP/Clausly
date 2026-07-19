@@ -80,6 +80,7 @@ describe("POST /api/billing/portal", () => {
     expect(JSON.stringify(body)).not.toContain("sk_test");
     expect(warn).toHaveBeenCalledWith("Stripe portal failed.", {
       name: "Error",
+      message: "Invalid API Key provided: [redacted]",
       type: "StripeAuthenticationError",
       code: "api_key_invalid",
       statusCode: 401,

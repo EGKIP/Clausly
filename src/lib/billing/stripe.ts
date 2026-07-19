@@ -46,7 +46,9 @@ let stripe: Stripe | null = null;
 export function getStripe(): Stripe {
   if (stripe) return stripe;
 
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+  // Trim defends against stray whitespace/newlines pasted into env vars —
+  // Stripe rejects such keys with a hard-to-trace authentication error.
+  const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!secretKey) {
     throw new Error("Missing STRIPE_SECRET_KEY.");
   }

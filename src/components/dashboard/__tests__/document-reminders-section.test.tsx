@@ -104,6 +104,31 @@ describe("DocumentRemindersSection", () => {
     expect(screen.queryByText("Reminders")).not.toBeInTheDocument();
   });
 
+  it("disables Approve and explains why when the reminder date has passed", () => {
+    const pastReminder = reminder({
+      id: "past-1",
+      title: "Missed notice deadline",
+      status: "suggested",
+      daysAway: -5,
+    });
+    setupReminders({ suggested: [pastReminder], approved: [] });
+
+    render(<DocumentRemindersSection doc={doc} />);
+
+    expect(screen.getByRole("button", { name: /^Approve$/ })).toBeDisabled();
+    expect(
+      screen.getByText("This date has already passed — edit it to a future date to approve.")
+    ).toBeInTheDocument();
+  });
+
+  it("keeps Approve enabled for future reminders", () => {
+    setupReminders({ suggested: [suggestedReminder], approved: [] });
+
+    render(<DocumentRemindersSection doc={doc} />);
+
+    expect(screen.getByRole("button", { name: /^Approve$/ })).toBeEnabled();
+  });
+
   it("calls reminder hook helpers from inline actions", async () => {
     const approve = vi.fn().mockResolvedValue({ ...suggestedReminder, status: "approved" });
     const update = vi.fn().mockResolvedValue({ ...suggestedReminder, title: "Updated deadline" });

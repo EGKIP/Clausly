@@ -24,6 +24,29 @@ describe("/api/reminders", () => {
     expect(payload.reminders[0]).toMatchObject({ id: approved.id, title: "Approved", status: "approved" });
   });
 
+  it("returns analysis-created suggested reminders in the suggested filter", async () => {
+    // persistAnalysis inserts extracted reminders with status 'suggested';
+    // they must surface in the reminders inbox Suggested tab.
+    const document = seedDocument(userA);
+    const suggested = seedReminder(document.id, userA, {
+      status: "suggested",
+      title: "Renewal notice due",
+      confidence: 0.9,
+    });
+
+    const response = await GET(new Request("http://localhost.test/api/reminders?status=suggested"));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.reminders).toHaveLength(1);
+    expect(payload.reminders[0]).toMatchObject({
+      id: suggested.id,
+      title: "Renewal notice due",
+      status: "suggested",
+      docTitle: "Test Lease",
+    });
+  });
+
   it("returns 400 for invalid reminder payloads", async () => {
     const response = await POST(jsonRequest({ title: "Missing document" }));
 

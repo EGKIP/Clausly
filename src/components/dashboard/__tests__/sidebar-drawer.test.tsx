@@ -71,7 +71,7 @@ describe("dashboard sidebar drawer", () => {
     fireEvent.click(screen.getByRole("button", { name: /open navigation/i }));
     const drawer = await screen.findByRole("dialog", { name: /dashboard navigation/i });
     const drawerQueries = within(drawer);
-    const firstLink = drawerQueries.getByRole("link", { name: /clausly home/i });
+    const firstLink = drawerQueries.getByRole("link", { name: /clausly dashboard/i });
     const lastLink = drawerQueries.getByRole("link", { name: /help/i });
 
     await waitFor(() => expect(firstLink).toHaveFocus());
@@ -81,5 +81,15 @@ describe("dashboard sidebar drawer", () => {
 
     fireEvent.keyDown(drawer, { key: "Tab", shiftKey: true });
     expect(lastLink).toHaveFocus();
+  });
+
+  it("keeps the brand link inside the authenticated dashboard", async () => {
+    render(<DashboardShell><main>Dashboard</main></DashboardShell>);
+
+    fireEvent.click(screen.getByRole("button", { name: /open navigation/i }));
+    const drawer = await screen.findByRole("dialog", { name: /dashboard navigation/i });
+    const brandLink = within(drawer).getByRole("link", { name: /clausly dashboard/i });
+
+    expect(brandLink).toHaveAttribute("href", "/dashboard");
   });
 });

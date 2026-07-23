@@ -148,6 +148,18 @@ describe("real AI provider selection", () => {
     expect(body).toContain("suggestedReminders");
   });
 
+  it("asks real providers for fuller grounded clause coverage", async () => {
+    process.env.CLAUSLY_AI_PROVIDER = "openai";
+    vi.mocked(fetch).mockImplementation(() => jsonResponse(openAIResponse(validResult())));
+
+    await analyzeDocument(sampleInput);
+
+    const body = String(vi.mocked(fetch).mock.calls[0][1]?.body);
+    expect(body).toContain("identify roughly 8-18 material clauses");
+    expect(body).toContain("Every clause must be grounded in an exact sourceText quote");
+    expect(body).toContain("Use whyItMatters to explain the practical effect");
+  });
+
   it("accepts natural-language enum drift without needing a retry", async () => {
     process.env.CLAUSLY_AI_PROVIDER = "openai";
     const drifted = {

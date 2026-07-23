@@ -165,7 +165,7 @@ function DemoNotice() {
         </span>
         <p className="text-[12.5px] text-[var(--muted)] leading-relaxed">
           <span className="font-medium text-[var(--foreground)]">Sample contract.</span>{" "}
-          The clauses, dates, and reminders are illustrative — upload your own
+          The clauses, dates, and reminders are illustrative. Upload your own
           PDF to see real Clausly analysis.
         </p>
       </div>

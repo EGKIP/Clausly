@@ -63,7 +63,7 @@ export function ProblemSolution() {
             <p className="mt-6 text-[16.5px] leading-relaxed text-[var(--muted)] max-w-xl">
               Renewal windows close. Late-fee clauses you never noticed kick in.
               The PDF you signed last March is in a folder you can&apos;t find.
-              It&apos;s not negligence — contracts are designed to be skimmed once,
+              It&apos;s not negligence. Contracts are designed to be skimmed once,
               and forgotten.
             </p>
           </Reveal>

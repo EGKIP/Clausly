@@ -31,7 +31,7 @@ export interface ContractDoc {
 export const documents: ContractDoc[] = [
   {
     id: "greenfield-lease",
-    title: "Greenfield Apartments — Unit B12",
+    title: "Greenfield Apartments, Unit B12",
     party: "Greenfield Holdings LLC",
     type: "Lease",
     jurisdiction: "Minnesota",
@@ -100,7 +100,7 @@ export const documents: ContractDoc[] = [
   },
   {
     id: "storage-bin-14",
-    title: "Northtown Storage — Bin 14",
+    title: "Northtown Storage, Bin 14",
     party: "Northtown Self-Storage",
     type: "Lease",
     jurisdiction: "Minnesota",
@@ -134,7 +134,7 @@ export const documents: ContractDoc[] = [
   },
   {
     id: "acme-employment",
-    title: "Acme Studios — Offer Letter",
+    title: "Acme Studios, Offer Letter",
     party: "Acme Studios, Inc.",
     type: "Employment",
     jurisdiction: "California",

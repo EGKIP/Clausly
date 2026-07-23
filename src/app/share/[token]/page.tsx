@@ -123,7 +123,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
         <Divider />
         <footer className="pb-6 text-sm leading-6 text-[var(--muted)]">
-          This is a shared digest. The full contract is held by the sender. Informational only — not legal advice.
+          This is a shared digest. The full contract is held by the sender. Informational only, not legal advice.
         </footer>
       </div>
     </main>

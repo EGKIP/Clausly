@@ -27,7 +27,7 @@ const steps = [
   {
     n: "04",
     icon: BellRing,
-    title: "Get reminded — on time",
+    title: "Get reminded on time",
     body: "Email reminders at the timing you chose. Open the document with one click.",
   },
 ];

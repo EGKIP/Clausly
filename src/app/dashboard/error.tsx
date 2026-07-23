@@ -19,7 +19,7 @@ export default function DashboardError({ reset }: { error: Error & { digest?: st
         </h1>
         <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--foreground)] opacity-80">
           Something went wrong while loading your workspace. Your documents are
-          safe — this is a loading problem, not a data problem.
+          safe. This is a loading problem, not a data problem.
         </p>
         <div className="mt-5">
           <Button variant="primary" size="sm" onClick={reset}>

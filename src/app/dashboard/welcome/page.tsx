@@ -23,7 +23,7 @@ const steps = [
     icon: Upload,
     eyebrow: "01 · Upload",
     title: "Drop a PDF you've signed.",
-    body: "Leases, insurance, employment offers, NDAs. PDFs up to 25 MB. Native or scanned — Clausly handles both.",
+    body: "Leases, insurance, employment offers, NDAs. PDFs up to 25 MB. Native or scanned, Clausly handles both.",
   },
   {
     icon: Sparkles,
@@ -42,7 +42,7 @@ const steps = [
 const promises = [
   "Encrypted at rest. Decrypted only when you open the document.",
   "Your documents are never used to train AI models.",
-  "Clausly is an aid — not legal advice. Always read what we flag as High risk.",
+  "Clausly is an aid, not legal advice. Always read what we flag as High risk.",
 ];
 
 export default function WelcomePage() {
@@ -99,7 +99,7 @@ export default function WelcomePage() {
               A reader, not an oracle.
             </h3>
             <p className="mt-3 text-[14px] leading-relaxed text-[var(--accent-ink)]">
-              Clausly explains the document you uploaded — what it says, where the
+              Clausly explains the document you uploaded: what it says, where the
               dates land, which clauses tilt against you. It does not interpret
               state-specific law or recommend what an attorney would.
             </p>
@@ -137,7 +137,7 @@ export default function WelcomePage() {
         <CheckCircle2 className="size-4 text-[var(--accent)] shrink-0" />
         <p className="text-[12.5px] text-[var(--muted)] leading-relaxed">
           After you upload, Clausly takes a minute or two to read. We&apos;ll surface a
-          summary, the key clauses, and suggested reminders — you stay in control of
+          summary, the key clauses, and suggested reminders. You stay in control of
           what gets sent.
         </p>
       </div>

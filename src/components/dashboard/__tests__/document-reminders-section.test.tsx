@@ -117,7 +117,7 @@ describe("DocumentRemindersSection", () => {
 
     expect(screen.getByRole("button", { name: /^Approve$/ })).toBeDisabled();
     expect(
-      screen.getByText("This date has already passed — edit it to a future date to approve.")
+      screen.getByText("This date has already passed. Edit it to a future date to approve.")
     ).toBeInTheDocument();
   });
 

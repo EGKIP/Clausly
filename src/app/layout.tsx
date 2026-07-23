@@ -27,11 +27,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://clausly.app"),
   applicationName: "Clausly",
   title: {
-    default: "Clausly — Understand what you signed.",
+    default: "Clausly, understand what you signed.",
     template: "%s · Clausly",
   },
   description:
-    "Clausly turns leases, contracts and agreements into clear summaries, surfaced clauses, and approved reminders — so you never miss what you signed.",
+    "Clausly turns leases, contracts and agreements into clear summaries, surfaced clauses, and approved reminders, so you never miss what you signed.",
   keywords: [
     "contract management",
     "lease tracking",
@@ -54,7 +54,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
-    title: "Clausly — Understand what you signed.",
+    title: "Clausly, understand what you signed.",
     description:
       "AI-powered contract intelligence. Summaries, clauses, deadlines, and approved reminders for the documents that matter.",
     url: "https://clausly.app",
@@ -70,7 +70,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clausly — Understand what you signed.",
+    title: "Clausly, understand what you signed.",
     description:
       "AI-powered contract intelligence. Summaries, clauses, deadlines, and approved reminders for the documents that matter.",
     images: ["/opengraph-image"],

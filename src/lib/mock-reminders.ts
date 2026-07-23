@@ -20,7 +20,7 @@ export const reminders: Reminder[] = [
   {
     id: "r-1",
     docId: "greenfield-lease",
-    docTitle: "Greenfield Apartments — Unit B12",
+    docTitle: "Greenfield Apartments, Unit B12",
     title: "Lease non-renewal notice deadline",
     description:
       "60 days before your lease ends. Send written notice to avoid auto-renewal.",
@@ -71,8 +71,8 @@ export const reminders: Reminder[] = [
   {
     id: "r-5",
     docId: "greenfield-lease",
-    docTitle: "Greenfield Apartments — Unit B12",
-    title: "Lease ends — confirm move-out plan",
+    docTitle: "Greenfield Apartments, Unit B12",
+    title: "Lease ends, confirm move-out plan",
     description: "Confirm renewal or moving-out logistics 30 days before end.",
     fireOn: "Aug 1, 2026",
     daysAway: 59,
@@ -85,7 +85,7 @@ export const reminders: Reminder[] = [
     docId: "verizon-wireless",
     docTitle: "Verizon Wireless Service Contract",
     title: "Verizon plan renewal",
-    description: "Two-year contract ends — re-shop plans 30 days before.",
+    description: "Two-year contract ends. Re-shop plans 30 days before.",
     fireOn: "Feb 12, 2027",
     daysAway: 254,
     status: "approved",
@@ -95,9 +95,9 @@ export const reminders: Reminder[] = [
   {
     id: "r-7",
     docId: "storage-bin-14",
-    docTitle: "Northtown Storage — Bin 14",
+    docTitle: "Northtown Storage, Bin 14",
     title: "Quarterly contents check",
-    description: "Quarterly check on stored items — Clausly suggested this.",
+    description: "Quarterly check on stored items. Clausly suggested this.",
     fireOn: "Sep 1, 2026",
     daysAway: 90,
     status: "approved",
@@ -107,7 +107,7 @@ export const reminders: Reminder[] = [
   {
     id: "r-8",
     docId: "acme-employment",
-    docTitle: "Acme Studios — Offer Letter",
+    docTitle: "Acme Studios, Offer Letter",
     title: "Sign-on bonus clawback ends",
     description: "After this date, your $12,000 sign-on bonus is no longer repayable.",
     fireOn: "Feb 3, 2026",

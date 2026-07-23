@@ -55,7 +55,7 @@ export type SeedDoc = {
 export function getDemoDocuments(): SeedDoc[] {
   return [
     {
-      title: "Demo Lease — Cedar House Unit 4B",
+      title: "Demo Lease, Cedar House Unit 4B",
       party: "Cedar House Properties LLC",
       type: "lease",
       jurisdiction: "Minnesota",
@@ -111,7 +111,7 @@ export function getDemoDocuments(): SeedDoc[] {
       },
     },
     {
-      title: "Demo Auto Policy — North Star Mutual",
+      title: "Demo Auto Policy, North Star Mutual",
       party: "North Star Mutual Insurance",
       type: "auto",
       jurisdiction: "Minnesota",
@@ -167,7 +167,7 @@ export function getDemoDocuments(): SeedDoc[] {
       },
     },
     {
-      title: "Demo NDA — Pine Labs Mutual Review",
+      title: "Demo NDA, Pine Labs Mutual Review",
       party: "Pine Labs Cooperative",
       type: "nda",
       jurisdiction: "Delaware",

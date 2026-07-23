@@ -174,7 +174,7 @@ export default function RemindersPage() {
                   </p>
                   {isPast && tab === "suggested" && (
                     <p className="mt-1.5 text-[11.5px] text-[var(--color-coral-ink)]">
-                      This date has already passed — edit it to a future date to approve.
+                      This date has already passed. Edit it to a future date to approve.
                     </p>
                   )}
                   <p className="mt-2 text-[11.5px] text-[var(--faint)]">
@@ -307,7 +307,7 @@ function EmptyState({ status, message }: { status: ReminderStatus; message?: str
   const copy =
     message ??
     status === "suggested"
-      ? "No suggestions right now — Clausly's caught up."
+      ? "No suggestions right now. Clausly's caught up."
       : status === "approved"
       ? "No approved reminders yet. Approve a suggestion to queue one up."
       : "No reminders sent yet.";

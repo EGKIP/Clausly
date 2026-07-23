@@ -18,7 +18,7 @@ const copy: Record<Variant, { eyebrow: string; title: React.ReactNode; descripti
     title: (
       <>
         Your portfolio is{" "}
-        <span className="italic text-[var(--accent-ink)]">a quiet shelf</span> — for now.
+        <span className="italic text-[var(--accent-ink)]">a quiet shelf</span> for now.
       </>
     ),
     description:
@@ -32,7 +32,7 @@ const copy: Record<Variant, { eyebrow: string; title: React.ReactNode; descripti
       </>
     ),
     description:
-      "Add a lease, an insurance policy, an employment offer — anything you've signed. Clausly handles PDFs up to 25 MB, native or scanned.",
+      "Add a lease, an insurance policy, an employment offer, or anything you've signed. Clausly handles PDFs up to 25 MB, native or scanned.",
   },
   reminders: {
     eyebrow: "Reminders",
@@ -42,7 +42,7 @@ const copy: Record<Variant, { eyebrow: string; title: React.ReactNode; descripti
       </>
     ),
     description:
-      "Reminders are generated from the documents you upload — renewal dates, notice windows, payment deadlines. Add your first document to seed the queue.",
+      "Reminders are generated from the documents you upload: renewal dates, notice windows, payment deadlines. Add your first document to seed the queue.",
   },
   insights: {
     eyebrow: "Insights",
@@ -153,7 +153,7 @@ export function PortfolioEmptyState({
 
 function Steps() {
   const steps = [
-    { icon: Upload, label: "Upload", hint: "Drop a PDF — we read it page by page." },
+    { icon: Upload, label: "Upload", hint: "Drop a PDF. We read it page by page." },
     { icon: Sparkles, label: "Review", hint: "Clausly highlights the clauses worth knowing." },
     { icon: BellRing, label: "Get reminded", hint: "Approve reminders before they fire." },
   ];

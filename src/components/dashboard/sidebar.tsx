@@ -41,7 +41,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <aside className="flex h-full w-full flex-col bg-[var(--surface)] border-r border-[var(--border)]">
       {/* Brand */}
       <div className="h-16 shrink-0 flex items-center px-5 border-b border-[var(--border)]">
-        <Logo />
+        <Logo href="/dashboard" ariaLabel="Clausly dashboard" />
       </div>
 
       {/* Nav */}

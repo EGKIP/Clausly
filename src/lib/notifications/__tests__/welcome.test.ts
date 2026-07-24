@@ -38,8 +38,8 @@ describe("welcome email", () => {
       provider: new MockProvider(),
       userId: userA.id,
       baseUrl: "https://clausly.test",
-      from: "Clausly <support@cloudly.app>",
-      supportEmail: "support@cloudly.app",
+      from: "Clausly <support@clausly.app>",
+      supportEmail: "support@clausly.app",
       now: new Date("2026-07-24T12:00:00.000Z"),
     });
     const second = await sendWelcomeEmailOnceForUser({
@@ -54,8 +54,8 @@ describe("welcome email", () => {
     expect(sentMessages).toHaveLength(1);
     expect(sentMessages[0]).toMatchObject({
       to: userA.email,
-      from: "Clausly <support@cloudly.app>",
-      replyTo: "support@cloudly.app",
+      from: "Clausly <support@clausly.app>",
+      replyTo: "support@clausly.app",
       subject: "Welcome to Clausly",
     });
     expect(sentMessages[0].html).toContain("We will not spam you.");
@@ -85,11 +85,11 @@ describe("welcome email", () => {
       userName: "Ada",
       dashboardUrl: "https://clausly.test/dashboard",
       preferencesUrl: "https://clausly.test/dashboard/settings",
-      supportEmail: "support@cloudly.app",
+      supportEmail: "support@clausly.app",
     });
 
     expect(template.text).toContain("Open your dashboard: https://clausly.test/dashboard");
     expect(template.text).toContain("Manage notification preferences: https://clausly.test/dashboard/settings");
-    expect(template.text).toContain("Support: support@cloudly.app");
+    expect(template.text).toContain("Support: support@clausly.app");
   });
 });

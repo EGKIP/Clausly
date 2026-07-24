@@ -50,7 +50,7 @@ export function MarketingFooter() {
             <Logo />
             <p className="text-sm leading-relaxed text-[var(--muted)]">
               Clausly turns the contracts you signed into clear summaries, surfaced
-              clauses, and approved reminders — so nothing important slips past you.
+              clauses, and approved reminders, so nothing important slips past you.
             </p>
             <div className="flex items-center gap-3 text-xs text-[var(--faint)]">
               <span className="inline-flex items-center gap-1.5">
@@ -92,7 +92,7 @@ export function MarketingFooter() {
             Clausly provides document organization and general contract information. Clausly is{" "}
             <span className="text-[var(--foreground)]">not a law firm</span> and does{" "}
             <span className="text-[var(--foreground)]">not provide legal advice</span>. Using Clausly does
-            not create an attorney–client relationship. For decisions that depend on legal
+            not create an attorney-client relationship. For decisions that depend on legal
             interpretation, please consult a licensed attorney in your jurisdiction.
           </p>
         </div>

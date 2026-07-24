@@ -165,7 +165,7 @@ export default async function DashboardHomePage() {
             <div className="mt-4 space-y-2">
               {needsReview.length === 0 ? (
                 <p className="text-[12.5px] text-[var(--faint)] italic">
-                  Nothing waiting — you&apos;re caught up.
+                  Nothing waiting. You&apos;re caught up.
                 </p>
               ) : (
                 needsReview.map((d) => (

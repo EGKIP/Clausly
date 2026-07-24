@@ -7,7 +7,7 @@ const TOUR_STEPS: TourStepContent[] = [
   {
     target: '[data-tour="upload"]',
     title: "Start with a contract",
-    body: "Drop a PDF you've signed. Leases, NDAs, employment offers — we read all of them.",
+    body: "Drop a PDF you've signed. Leases, NDAs, employment offers. We read all of them.",
   },
   {
     target: '[data-tour="documents"]',

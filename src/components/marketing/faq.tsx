@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const faqs = [
   {
     q: "Is Clausly a lawyer or legal advice service?",
-    a: "No. Clausly is a contract organisation and document intelligence tool. It helps you understand and track documents you've signed. It is not a law firm, does not create an attorney–client relationship, and does not provide legal advice. For interpretation of legal terms, consult a licensed attorney in your jurisdiction.",
+    a: "No. Clausly is a contract organisation and document intelligence tool. It helps you understand and track documents you've signed. It is not a law firm, does not create an attorney-client relationship, and does not provide legal advice. For interpretation of legal terms, consult a licensed attorney in your jurisdiction.",
   },
   {
     q: "How does Clausly handle my documents?",
@@ -22,11 +22,11 @@ const faqs = [
   },
   {
     q: "How accurate is the AI?",
-    a: "Clausly is built around the assumption that AI is helpful but fallible. Every extracted clause includes the source quote and page reference so you can verify it. Reminders are always suggested first and must be approved by you — nothing fires on its own.",
+    a: "Clausly is built around the assumption that AI is helpful but fallible. Every extracted clause includes the source quote and page reference so you can verify it. Reminders are always suggested first and must be approved by you. Nothing fires on its own.",
   },
   {
     q: "What's the difference between Free and Pro?",
-    a: "Free lets you store up to 5 documents with AI summaries, clause extraction, suggested reminders, and email reminders — plenty to evaluate the product on your real contracts. Pro lifts the storage limit, unlocks advanced analysis, unlimited Q&A, and adds weekly + monthly insight reports across your portfolio.",
+    a: "Free lets you store up to 5 documents with AI summaries, clause extraction, suggested reminders, and email reminders. That is plenty to evaluate the product on your real contracts. Pro lifts the storage limit, unlocks advanced analysis, unlimited Q&A, and adds weekly + monthly insight reports across your portfolio.",
   },
   {
     q: "Will you remind me by SMS or push notifications?",
@@ -34,11 +34,11 @@ const faqs = [
   },
   {
     q: "Can I export my data?",
-    a: "Yes — your documents remain yours. You can download any uploaded PDF and your structured data (clauses, dates, reminders) is exportable. Calendar export for approved reminders is rolling out for Pro.",
+    a: "Yes. Your documents remain yours. You can download any uploaded PDF and your structured data (clauses, dates, reminders) is exportable. Calendar export for approved reminders is rolling out for Pro.",
   },
   {
     q: "Does state or jurisdiction matter?",
-    a: "Clausly stores a default jurisdiction on your profile and a per-document jurisdiction, because a Minnesota resident might sign a contract governed by California law. This is used as context only — Clausly does not draw strong legal conclusions from state law.",
+    a: "Clausly stores a default jurisdiction on your profile and a per-document jurisdiction, because a Minnesota resident might sign a contract governed by California law. This is used as context only. Clausly does not draw strong legal conclusions from state law.",
   },
 ];
 
@@ -74,7 +74,7 @@ export function FAQ() {
             <Reveal delay={0.1}>
               <p className="mt-5 text-[15.5px] leading-relaxed text-[var(--muted)]">
                 Clausly handles sensitive documents. We want to be precise about what
-                it is — and what it isn&apos;t.
+                it is and what it isn&apos;t.
               </p>
             </Reveal>
           </div>

@@ -30,6 +30,14 @@ export async function runAnalysisWithRepair(
 export function buildAnalysisSystemPrompt(repairInstructions?: string): string {
   return [
     "You are Clausly's contract analysis engine.",
+    "Analyze the contract like a careful document reviewer for a non-lawyer user.",
+    "Prefer useful coverage over brevity: for ordinary contracts, identify roughly 8-18 material clauses when the text supports them, and more only when distinct terms truly matter.",
+    "Cover obligations, payment terms, renewal or termination language, notice windows, penalties, liability, privacy/confidentiality, assignment, dispute resolution, governing law, cancellation, and unusual restrictions when present.",
+    "Do not pad the output with generic clauses. Every clause must be grounded in an exact sourceText quote from the document.",
+    "Make summaryLong concrete and helpful, usually 2-4 short paragraphs worth of plain-English detail.",
+    "Use whyItMatters to explain the practical effect on the signer, especially for Medium, High, and Needs Review clauses.",
+    "Include several riskReasons when risk exists, tied to specific terms rather than generic caution.",
+    "Extract every important actionable date you can find, including past dates when they explain the contract history, but suggestedReminders should focus on dates a user could still act on.",
     "Return only a JSON object that exactly matches this contract-analysis format:",
     analysisJsonFormatSpec(),
     "Use ISO 8601 dates in YYYY-MM-DD format when dates are present.",

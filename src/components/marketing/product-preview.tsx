@@ -271,7 +271,7 @@ function DocumentSurface() {
           <Badge tone="outline">14 pages</Badge>
         </div>
         <h3 className="font-serif text-[26px] leading-tight tracking-[-0.01em]">
-          Greenfield Apartments — Unit B12
+          Greenfield Apartments, Unit B12
         </h3>
         <p className="mt-3 text-[14px] leading-relaxed text-[var(--muted)]">
           12-month residential lease at $1,850/mo, beginning Sep 1, 2025. Auto-renews
@@ -325,7 +325,7 @@ function PortfolioSurface() {
     { t: "State Farm Auto Policy", k: "Insurance · MN", end: "Jun 14, 2026", risk: "Low" as const },
     { t: "Acme Freelance Agreement", k: "Service · CA", end: "Dec 31, 2026", risk: "Needs Review" as const },
     { t: "Verizon Wireless Contract", k: "Service · —", end: "Mar 12, 2027", risk: "Low" as const },
-    { t: "Storage Lease — Bin 14", k: "Lease · MN", end: "Oct 1, 2026", risk: "Low" as const },
+    { t: "Storage Lease, Bin 14", k: "Lease · MN", end: "Oct 1, 2026", risk: "Low" as const },
     { t: "Gym Membership Terms", k: "Service · —", end: "May 30, 2026", risk: "High" as const },
   ];
   return (

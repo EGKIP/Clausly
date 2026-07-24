@@ -48,10 +48,12 @@ export function Logo({
   className,
   showWordmark = true,
   href = "/",
+  ariaLabel = "Clausly home",
 }: {
   className?: string;
   showWordmark?: boolean;
   href?: string | null;
+  ariaLabel?: string;
 }) {
   const inner = (
     <>
@@ -66,7 +68,7 @@ export function Logo({
   const cls = cn("inline-flex items-center gap-2 text-[var(--foreground)]", className);
   if (href === null) return <span className={cls}>{inner}</span>;
   return (
-    <Link href={href} className={cls} aria-label="Clausly home">
+    <Link href={href} className={cls} aria-label={ariaLabel}>
       {inner}
     </Link>
   );

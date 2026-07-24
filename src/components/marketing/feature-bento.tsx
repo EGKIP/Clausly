@@ -241,7 +241,7 @@ function QAVisual() {
           The lease appears to require written landlord consent before subletting
           (clause 14, p. 6).{" "}
           <span className="text-[var(--muted)]">
-            This isn&apos;t legal advice — consider asking your landlord directly.
+            This isn&apos;t legal advice. Consider asking your landlord directly.
           </span>
         </p>
       </div>
@@ -296,7 +296,7 @@ export function FeatureBento() {
                 icon={FileSearch}
                 eyebrow="02 · Clause library"
                 title="Important clauses, pulled into view."
-                description="Late fees, auto-renewal, termination, indemnity — pulled from the document with page references, in language you can read."
+                description="Late fees, auto-renewal, termination, indemnity. Pulled from the document with page references, in language you can read."
                 tone="iris"
               />
               <ClauseVisual />
@@ -324,7 +324,7 @@ export function FeatureBento() {
                 icon={CalendarClock}
                 eyebrow="04 · Deadlines"
                 title="A timeline of what's coming."
-                description="Notice windows, renewals, expirations — found, dated, surfaced."
+                description="Notice windows, renewals, expirations. Found, dated, surfaced."
                 tone="ember"
               />
               <DeadlineVisual />
@@ -365,7 +365,7 @@ export function FeatureBento() {
           <StaggerItem>
             <ProTeaserCard
               icon={TrendingUp}
-              title="Weekly insights — Pro"
+              title="Weekly insights, Pro"
               body="A short Monday brief: what's expiring, what's risky, what needs review."
             />
           </StaggerItem>

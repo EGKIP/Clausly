@@ -198,7 +198,7 @@ function ReminderRow({
           </p>
           {isPast && onApprove && (
             <p className="mt-1 text-[11.5px] text-[var(--color-coral-ink)]">
-              This date has already passed — edit it to a future date to approve.
+              This date has already passed. Edit it to a future date to approve.
             </p>
           )}
         </div>

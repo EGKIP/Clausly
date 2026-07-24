@@ -86,7 +86,6 @@ describe("POST /api/billing/checkout", () => {
       line_items: [{ price: "price_pro", quantity: 1 }],
       success_url: "https://clausly.test/dashboard/settings?upgraded=1",
       cancel_url: "https://clausly.test/upgrade?canceled=1",
-      automatic_tax: { enabled: true },
       billing_address_collection: "auto",
       customer_update: {
         address: "auto",

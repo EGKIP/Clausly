@@ -53,7 +53,6 @@ export async function POST() {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${baseUrl}/dashboard/settings?upgraded=1`,
       cancel_url: `${baseUrl}/upgrade?canceled=1`,
-      automatic_tax: { enabled: true },
       billing_address_collection: "auto",
       customer_update: {
         address: "auto",

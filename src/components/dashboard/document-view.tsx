@@ -22,6 +22,7 @@ import type { Reminder } from "@/lib/mock-reminders";
 import { RiskPill } from "@/components/ui/risk-pill";
 import { Badge } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
+import { AskAnswerContent } from "./ask/answer-content";
 import { PDFPreview } from "./pdf-preview";
 import { DocumentRemindersSection } from "./reminders/document-reminders-section";
 import { cn } from "@/lib/utils";
@@ -165,7 +166,7 @@ function DemoNotice() {
         </span>
         <p className="text-[12.5px] text-[var(--muted)] leading-relaxed">
           <span className="font-medium text-[var(--foreground)]">Sample contract.</span>{" "}
-          The clauses, dates, and reminders are illustrative — upload your own
+          The clauses, dates, and reminders are illustrative. Upload your own
           PDF to see real Clausly analysis.
         </p>
       </div>
@@ -778,7 +779,11 @@ export function AskPanel({ docId, docTitle }: { docId: string; docTitle: string 
               <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
                 {message.role === "user" ? "You" : "Clausly"}
               </p>
-              <p className="mt-2 text-[14px] leading-relaxed">{message.content || "Thinking..."}</p>
+              {message.role === "assistant" ? (
+                <AskAnswerContent answer={message.content} />
+              ) : (
+                <p className="mt-2 text-[14px] leading-relaxed">{message.content}</p>
+              )}
               {message.role === "assistant" && message.citations && message.citations.length > 0 && (
                 <div className="mt-4 space-y-2">
                   {message.citations.map((citation) => (
@@ -827,7 +832,7 @@ export function AskPanel({ docId, docTitle }: { docId: string; docTitle: string 
             </p>
             {loading && <span className="size-1.5 rounded-full bg-[var(--accent)] motion-safe:animate-pulse" />}
           </div>
-          <p className="mt-2 text-[14px] leading-relaxed">{result.answer}</p>
+          <AskAnswerContent answer={result.answer} />
 
           {result.citations.length > 0 && (
             <div className="mt-5 space-y-2">

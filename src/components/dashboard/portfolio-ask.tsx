@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowUpRight, Send, Sparkles } from "lucide-react";
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
+import { AskAnswerContent } from "./ask/answer-content";
 
 type PortfolioAskResult = {
   answer: string;
@@ -449,7 +450,11 @@ export function PortfolioAsk() {
               <p className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
                 {message.role === "user" ? "You" : "Clausly"}
               </p>
-              <p className="mt-2 text-[14px] leading-relaxed">{message.content || "Thinking..."}</p>
+              {message.role === "assistant" ? (
+                <AskAnswerContent answer={message.content} />
+              ) : (
+                <p className="mt-2 text-[14px] leading-relaxed">{message.content}</p>
+              )}
               {message.role === "assistant" && message.citations && message.citations.length > 0 && (
                 <div className="mt-5 grid gap-2 md:grid-cols-2">
                   {message.citations.map((citation) => (
@@ -485,7 +490,7 @@ export function PortfolioAsk() {
             </p>
             {loading && <span className="size-1.5 rounded-full bg-[var(--accent)] motion-safe:animate-pulse" />}
           </div>
-          <p className="mt-2 text-[14px] leading-relaxed">{result.answer}</p>
+          <AskAnswerContent answer={result.answer} />
 
           {result.citations.length > 0 && (
             <div className="mt-5 grid gap-2 md:grid-cols-2">

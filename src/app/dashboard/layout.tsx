@@ -5,7 +5,7 @@ import { getTourState } from "@/lib/db/onboarding-tour";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
-  title: "Clausly — Workspace",
+  title: "Clausly workspace",
   description:
     "Your contract intelligence workspace. Documents, clauses, deadlines, reminders, all in one place.",
 };

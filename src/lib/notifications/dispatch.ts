@@ -4,6 +4,7 @@ import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { recordAuditEvent } from "@/lib/audit/log";
 import type { Json } from "@/lib/supabase/types";
 import { createEmailProvider, type EmailProvider } from "./email-provider";
+import { getDefaultFromEmail } from "./support";
 import {
   createServiceSupabaseClient,
   hasServiceSupabaseEnv,
@@ -56,10 +57,9 @@ export async function dispatchDueReminderEmails(options: DispatchOptions = {}): 
   const supabase = options.supabase ?? createServiceSupabaseClient();
   const provider = options.provider ?? createEmailProvider();
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? process.env.BASE_URL ?? "http://localhost:3000");
-  const from = options.from ?? process.env.CLAUSLY_EMAIL_FROM;
+  const from = options.from ?? getDefaultFromEmail();
   const unsubscribeSecret = options.unsubscribeSecret ?? process.env.CLAUSLY_UNSUBSCRIBE_SECRET;
 
-  if (!from) throw new Error("Missing CLAUSLY_EMAIL_FROM.");
   if (!unsubscribeSecret) throw new Error("Missing CLAUSLY_UNSUBSCRIBE_SECRET.");
 
   const dueOn = (options.now ?? new Date()).toISOString().slice(0, 10);

@@ -49,7 +49,12 @@ describe("notification preference helpers", () => {
 
   it("merges patches into existing JSONB without changing unspecified flags", async () => {
     seedUser(userA, {
-      notification_preferences: { email: true, reminders: true, weekly_digest: true },
+      notification_preferences: {
+        email: true,
+        reminders: true,
+        weekly_digest: true,
+        welcome_email_sent_at: "2026-07-24T12:00:00.000Z",
+      },
     });
 
     const preferences = await updatePreferences(preferencesClient(), userA.id, {
@@ -61,6 +66,7 @@ describe("notification preference helpers", () => {
       email: true,
       reminders: false,
       weekly_digest: true,
+      welcome_email_sent_at: "2026-07-24T12:00:00.000Z",
     });
   });
 

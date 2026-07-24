@@ -28,7 +28,7 @@ type NotificationPreferencesQuery = PromiseLike<NotificationPreferencesQueryResu
   single: () => Promise<NotificationPreferencesQueryResult>;
 };
 
-const allowedStoredKeys = new Set(["email", "reminders", "weekly_digest"]);
+const allowedStoredKeys = new Set(["email", "reminders", "weekly_digest", "welcome_email_sent_at"]);
 const defaults: EmailNotificationPreferences = {
   email: true,
   reminders: true,

@@ -16,3 +16,5 @@ export type {
   WeeklyDigestTemplate,
   WeeklyDigestTemplateInput,
 } from "./weekly-digest";
+export { renderWelcomeEmail } from "./welcome-email";
+export type { WelcomeEmailTemplate, WelcomeEmailTemplateInput } from "./welcome-email";

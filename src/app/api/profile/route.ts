@@ -6,6 +6,7 @@ import { canUploadDocument } from "@/lib/billing/plan";
 import { createClient } from "@/lib/supabase/server";
 import { notificationPreferencesSchema, validationIssues } from "@/lib/validation/schemas";
 import type { PlanName } from "@/lib/billing/limits";
+import type { Json } from "@/lib/supabase/types";
 
 const profileSchema = z.object({
   displayName: z.string().trim().min(1).max(80).optional(),
@@ -84,7 +85,7 @@ export async function PATCH(request: Request) {
 
   const update: {
     full_name?: string;
-    notification_preferences?: NotificationPreferences;
+    notification_preferences?: Json;
   } = {};
 
   if (parsed.data.displayName !== undefined) {
@@ -209,7 +210,7 @@ function serializeLimit(limit: number) {
 }
 
 function normalizeNotificationPreferences(value: unknown): NotificationPreferences {
-  const parsed = notificationPreferencesSchema.safeParse(value);
+  const parsed = notificationPreferencesSchema.safeParse(publicNotificationPreferences(value));
   if (parsed.success) return parsed.data;
   return notificationPreferencesSchema.parse({});
 }
@@ -217,7 +218,8 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
 function mergeNotificationPreferences(
   storedValue: unknown,
   patch: NotificationPreferencesPatch
-): NotificationPreferences {
+): Json {
+  const stored = storedNotificationPreferences(storedValue);
   const current = normalizeNotificationPreferences(storedValue);
   const sanitizedPatch = { ...(patch ?? {}) };
   delete sanitizedPatch.version;
@@ -233,5 +235,20 @@ function mergeNotificationPreferences(
     merged.version = current.version === undefined ? 1 : current.version + 1;
   }
 
-  return merged;
+  return { ...stored, ...merged } as Json;
+}
+
+function storedNotificationPreferences(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return { ...(value as Record<string, unknown>) };
+}
+
+function publicNotificationPreferences(value: unknown): Partial<NotificationPreferences> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const stored = value as Record<string, unknown>;
+  return {
+    email: stored.email,
+    version: stored.version,
+    defaults: stored.defaults,
+  } as Partial<NotificationPreferences>;
 }

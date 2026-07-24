@@ -12,7 +12,7 @@ export type AnalysisFailureCategory =
 export const FAILURE_CATEGORY_COPY: Record<AnalysisFailureCategory, { title: string; message: string }> = {
   unsupported_file: {
     title: "This file couldn't be read",
-    message: "The uploaded file doesn't look like a valid PDF. Try re-exporting or re-scanning it and upload again.",
+    message: "The uploaded file doesn't look like a valid PDF. Try re-exporting it, or paste the contract text from the upload modal.",
   },
   storage_error: {
     title: "We couldn't retrieve the file",
@@ -20,11 +20,11 @@ export const FAILURE_CATEGORY_COPY: Record<AnalysisFailureCategory, { title: str
   },
   extraction_timeout: {
     title: "This document took too long to read",
-    message: "The PDF is unusually large or complex and timed out during text extraction. Try a smaller or simplified version of the file.",
+    message: "The PDF is unusually large or complex and timed out during text extraction. Try a simplified file, or paste the contract text from the upload modal.",
   },
   no_text: {
     title: "No readable text found",
-    message: "This looks like an image-only scan without a text layer, and OCR isn't available for it. Try a text-based PDF or enable OCR.",
+    message: "This looks like an image-only scan or a layout without readable text. Try re-analyzing, or paste the contract text from the upload modal.",
   },
   provider_error: {
     title: "Analysis failed",
@@ -32,7 +32,7 @@ export const FAILURE_CATEGORY_COPY: Record<AnalysisFailureCategory, { title: str
   },
   stuck_timeout: {
     title: "Analysis didn't finish in time",
-    message: "This document was still processing after several attempts and was stopped. Try re-analyzing, or use a smaller file if this keeps happening.",
+    message: "This document was still processing after several attempts and was stopped. Try re-analyzing, or paste the contract text if this keeps happening.",
   },
   unknown: {
     title: "We couldn't read this contract",

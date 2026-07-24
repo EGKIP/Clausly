@@ -39,6 +39,14 @@ function uploadRequest(file: File, title = "Uploaded lease") {
   return { formData: async () => formData } as Request;
 }
 
+function pastedTextRequest(text: string, title = "Copied lease") {
+  const formData = new FormData();
+  formData.set("source", "text");
+  formData.set("title", title);
+  formData.set("text", text);
+  return { formData: async () => formData } as Request;
+}
+
 describe("POST /api/upload", () => {
   beforeEach(() => resetSupabaseMock(userA));
 
@@ -99,6 +107,39 @@ describe("POST /api/upload", () => {
     // that upload claimed an analysis attempt for the new document.
     await vi.waitFor(() => expect(db().documents[0].analysis_attempts).toBe(1));
     expect(["analyzing", "ready", "failed"]).toContain(db().documents[0].status);
+  });
+
+  it("stores pasted contract text and kicks off analysis", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    const text = "Residential lease agreement. ".repeat(12);
+
+    const response = await POST(pastedTextRequest(text, "Portal lease"));
+    const body = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(body.id).toBe(db().documents[0].id);
+    expect(db().documents[0]).toMatchObject({
+      user_id: userA.id,
+      title: "Portal lease",
+      file_name: "portal-lease.txt",
+      mime_type: "text/plain",
+      document_type: "other",
+    });
+    expect(storageCalls().uploaded[0]).toMatchObject({
+      path: db().documents[0].storage_path,
+      options: { contentType: "text/plain", upsert: false },
+    });
+    await vi.waitFor(() => expect(db().documents[0].analysis_attempts).toBe(1));
+    expect(["analyzing", "ready", "failed"]).toContain(db().documents[0].status);
+  });
+
+  it("returns 400 when pasted contract text is too short", async () => {
+    const response = await POST(pastedTextRequest("too short"));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.issues).toContainEqual({ path: "text", message: "Paste at least 100 characters of contract text." });
+    expect(storageCalls().uploaded).toHaveLength(0);
   });
 
   it("returns 402 when a free user is at the document limit", async () => {

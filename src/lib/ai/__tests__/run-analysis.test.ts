@@ -5,6 +5,7 @@ import {
   resetSupabaseMock,
   seedDocument,
   seedStoredPdf,
+  storageCalls,
   userA,
 } from "@/../tests/helpers/supabase";
 import type { AnalysisResult } from "../schema";
@@ -157,6 +158,35 @@ describe("runAnalysis", () => {
         content: "Lease text with enough content.",
       }),
     ]);
+  });
+
+  it("analyzes stored text documents without PDF extraction", async () => {
+    const document = seedDocument(userA, {
+      status: "pending",
+      analysis_attempts: 0,
+      title: "Pasted service agreement",
+      file_name: "pasted-service-agreement.txt",
+      mime_type: "text/plain",
+      storage_path: `${userA.id}/doc-text/pasted-service-agreement.txt`,
+    });
+    const storedText = "Service agreement text with obligations, renewal terms, and payment details.";
+    storageCalls().files.set(document.storage_path, {
+      text: async () => storedText,
+      type: "text/plain",
+      size: storedText.length,
+    } as Blob);
+    analyzeDocumentMock.mockResolvedValue(analysisResult({ documentTitle: "Service agreement" }));
+    const client = createSupabaseClient() as never;
+
+    await runAnalysis(client, document.id, userA.id);
+
+    expect(extractPdfTextMock).not.toHaveBeenCalled();
+    expect(analyzeDocumentMock).toHaveBeenCalledWith(expect.objectContaining({
+      text: "Service agreement text with obligations, renewal terms, and payment details.",
+      fileName: "pasted-service-agreement.txt",
+      title: "Pasted service agreement",
+    }));
+    expect(db().documents[0]).toMatchObject({ status: "ready", title: "Pasted service agreement" });
   });
 
   it("keeps a user-chosen title through re-analysis but upgrades filename-derived defaults", async () => {

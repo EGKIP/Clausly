@@ -9,7 +9,14 @@ import { canUploadDocument } from "@/lib/billing/plan";
 import { isPdfSignature } from "@/lib/upload/pdf-signature";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_PASTED_TEXT_CHARS = 250_000;
 const titleSchema = boundedTextSchema(1, 200);
+const pastedTextSchema = boundedTextSchema(100, MAX_PASTED_TEXT_CHARS);
+
+type UploadValidation =
+  | { success: true; kind: "pdf"; file: File; title: string; fileName: string; mimeType: "application/pdf" }
+  | { success: true; kind: "text"; file: Blob; title: string; fileName: string; mimeType: "text/plain" }
+  | { success: false; issues: { path: string; message: string }[] };
 
 // Extends how long Vercel keeps this function alive for the after() callback
 // below. 300s fits the current Pro-tier maxDuration ceiling; raise toward
@@ -18,16 +25,47 @@ const titleSchema = boundedTextSchema(1, 200);
 // /api/admin/recover-stuck-analyses) picks those up and retries them.
 export const maxDuration = 300;
 
-async function validateUpload(formData: FormData) {
+async function validateUpload(formData: FormData): Promise<UploadValidation> {
   const rawFile = formData.get("file");
   const rawTitle = formData.get("title");
+  const rawSource = formData.get("source");
+  const rawText = formData.get("text");
+  const source = rawSource === "text" ? "text" : "pdf";
   const file = rawFile instanceof File ? rawFile : null;
-  const fallbackTitle = file?.name.replace(/\.pdf$/i, "") ?? "";
+  const pastedText = typeof rawText === "string" ? rawText : "";
+  const fallbackTitle = source === "text" ? "Pasted contract" : file?.name.replace(/\.pdf$/i, "") ?? "";
   const title = String(rawTitle || fallbackTitle);
   const titleResult = titleSchema.safeParse(title);
   const issues: { path: string; message: string }[] = [];
 
   if (!titleResult.success) issues.push(...validationIssues(titleResult.error));
+
+  if (source === "text") {
+    const textResult = pastedTextSchema.safeParse(pastedText);
+    if (!textResult.success) {
+      issues.push(...validationIssues(textResult.error).map((issue) => ({
+        ...issue,
+        path: issue.path || "text",
+        message: issue.message.includes("at least") || issue.message.includes(">=100")
+          ? "Paste at least 100 characters of contract text."
+          : issue.message,
+      })));
+    }
+
+    if (issues.length > 0 || !titleResult.success || !textResult.success) {
+      return { success: false, issues };
+    }
+
+    return {
+      success: true,
+      kind: "text",
+      file: new Blob([textResult.data], { type: "text/plain" }),
+      title: titleResult.data,
+      fileName: `${slugifyFileBase(titleResult.data)}.txt`,
+      mimeType: "text/plain",
+    };
+  }
+
   if (!file) {
     issues.push({ path: "file", message: "Upload a PDF file." });
   } else {
@@ -51,7 +89,14 @@ async function validateUpload(formData: FormData) {
     return { success: false as const, issues };
   }
 
-  return { success: true as const, file, title: titleResult.data };
+  return {
+    success: true,
+    kind: "pdf",
+    file,
+    title: titleResult.data,
+    fileName: file.name,
+    mimeType: "application/pdf",
+  };
 }
 
 export async function POST(request: Request) {
@@ -73,7 +118,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { file, title } = validation;
+  const { file, title, fileName, mimeType } = validation;
   const uploadLimit = await canUploadDocument(supabase, user.id);
   if (!uploadLimit.allowed) {
     return NextResponse.json(
@@ -89,13 +134,13 @@ export async function POST(request: Request) {
   }
 
   const id = crypto.randomUUID();
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
   const storagePath = `${user.id}/${id}/${safeName}`;
 
   const { error: uploadError } = await supabase.storage
     .from("documents")
     .upload(storagePath, file, {
-      contentType: "application/pdf",
+      contentType: mimeType,
       upsert: false,
     });
 
@@ -108,8 +153,8 @@ export async function POST(request: Request) {
       user_id: user.id,
       title,
       storage_path: storagePath,
-      file_name: file.name,
-      mime_type: file.type,
+      file_name: fileName,
+      mime_type: mimeType,
       file_size_bytes: file.size,
       status: "pending",
       document_type: "other",
@@ -131,8 +176,9 @@ export async function POST(request: Request) {
       resourceId: document.id,
       metadata: {
         title,
-        fileName: file.name,
+        fileName,
         fileSizeBytes: file.size,
+        source: validation.kind,
         ...auditRequestMetadata(request),
       },
     });
@@ -163,4 +209,14 @@ export async function POST(request: Request) {
 
 function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+function slugifyFileBase(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return slug || "pasted-contract";
 }

@@ -249,7 +249,7 @@ export function UploadModal({
                   )}
                   <div className={cn("grid grid-cols-2 gap-2", usage?.plan === "free" ? "mt-3" : "")}>
                     <SourceButton active={mode === "pdf"} onClick={() => setMode("pdf")} icon={UploadCloud}>
-                      Upload PDF
+                      Upload file
                     </SourceButton>
                     <SourceButton active={mode === "text"} onClick={() => setMode("text")} icon={ClipboardType}>
                       Paste text
@@ -274,7 +274,7 @@ export function UploadModal({
                     >
                       <input
                         type="file"
-                        accept="application/pdf"
+                        accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx,text/plain,.txt,image/png,.png,image/jpeg,.jpg,.jpeg"
                         className="sr-only"
                         disabled={atDocumentLimit}
                         onChange={(e) => {
@@ -286,12 +286,12 @@ export function UploadModal({
                         <UploadCloud className="size-5 text-[var(--accent)]" />
                       </div>
                       <p className="mt-4 font-medium text-[15px]">
-                        Drop a PDF here, or click to browse
+                        Drop a contract file here, or click to browse
                       </p>
                       <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
                         {atDocumentLimit
                           ? "Upgrade to Pro for unlimited uploads."
-                          : "Lease, insurance, employment, or any contract."}
+                          : "PDF, DOCX, TXT, PNG, or JPG. Scans use OCR when enabled."}
                       </p>
                     </label>
                   ) : (
@@ -333,7 +333,7 @@ export function UploadModal({
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-[14px] font-medium">{file?.name ?? activeTextTitle}</p>
                       <p className="text-[11.5px] text-[var(--muted)]">
-                        {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB · PDF` : "Pasted contract text"}
+                        {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB · ${describeUploadType(file)}` : "Pasted contract text"}
                       </p>
                     </div>
                   </div>
@@ -444,6 +444,15 @@ function SourceButton({
       {children}
     </button>
   );
+}
+
+function describeUploadType(file: File) {
+  const name = file.name.toLowerCase();
+  if (file.type === "application/pdf" || name.endsWith(".pdf")) return "PDF";
+  if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) return "DOCX";
+  if (file.type === "text/plain" || name.endsWith(".txt")) return "TXT";
+  if (file.type.startsWith("image/") || /\.(png|jpe?g)$/i.test(name)) return "Image";
+  return "Contract file";
 }
 
 function PlanUsageLine({ usage, atLimit }: { usage: UploadUsage; atLimit: boolean }) {

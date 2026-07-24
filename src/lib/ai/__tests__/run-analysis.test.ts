@@ -12,15 +12,17 @@ import type { AnalysisResult } from "../schema";
 
 vi.mock("@/lib/ai/pdf-text", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../pdf-text")>();
-  return { extractPdfText: vi.fn(), NoTextLayerError: actual.NoTextLayerError };
+  return { extractPdfText: vi.fn(), extractImageText: vi.fn(), NoTextLayerError: actual.NoTextLayerError };
 });
+vi.mock("@/lib/ai/docx-text", () => ({ extractDocxText: vi.fn() }));
 vi.mock("@/lib/ai/provider", () => ({
   analyzeDocument: vi.fn(),
   getAnalysisProvider: () => "mock",
   getAnalysisModel: () => "mock",
 }));
 
-import { extractPdfText } from "@/lib/ai/pdf-text";
+import { extractImageText, extractPdfText } from "@/lib/ai/pdf-text";
+import { extractDocxText } from "@/lib/ai/docx-text";
 import { analyzeDocument } from "@/lib/ai/provider";
 import {
   AlreadyAnalyzingError,
@@ -30,6 +32,8 @@ import {
 } from "../run-analysis";
 
 const extractPdfTextMock = vi.mocked(extractPdfText);
+const extractImageTextMock = vi.mocked(extractImageText);
+const extractDocxTextMock = vi.mocked(extractDocxText);
 const analyzeDocumentMock = vi.mocked(analyzeDocument);
 
 function analysisResult(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
@@ -58,6 +62,8 @@ describe("claimAnalysisAttempt", () => {
   beforeEach(() => {
     resetSupabaseMock(userA);
     extractPdfTextMock.mockReset();
+    extractImageTextMock.mockReset();
+    extractDocxTextMock.mockReset();
     analyzeDocumentMock.mockReset();
   });
 
@@ -123,6 +129,8 @@ describe("runAnalysis", () => {
   beforeEach(() => {
     resetSupabaseMock(userA);
     extractPdfTextMock.mockReset();
+    extractImageTextMock.mockReset();
+    extractDocxTextMock.mockReset();
     analyzeDocumentMock.mockReset();
   });
 
@@ -187,6 +195,44 @@ describe("runAnalysis", () => {
       title: "Pasted service agreement",
     }));
     expect(db().documents[0]).toMatchObject({ status: "ready", title: "Pasted service agreement" });
+  });
+
+  it("routes DOCX documents through DOCX extraction", async () => {
+    const document = seedDocument(userA, {
+      status: "pending",
+      analysis_attempts: 0,
+      file_name: "contract.docx",
+      mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    seedStoredPdf(document.storage_path, "PK\x03\x04docx");
+    extractDocxTextMock.mockResolvedValue("DOCX contract text.");
+    analyzeDocumentMock.mockResolvedValue(analysisResult());
+    const client = createSupabaseClient() as never;
+
+    await runAnalysis(client, document.id, userA.id);
+
+    expect(extractDocxTextMock).toHaveBeenCalledOnce();
+    expect(extractPdfTextMock).not.toHaveBeenCalled();
+    expect(analyzeDocumentMock).toHaveBeenCalledWith(expect.objectContaining({ text: "DOCX contract text." }));
+  });
+
+  it("routes image documents through OCR extraction", async () => {
+    const document = seedDocument(userA, {
+      status: "pending",
+      analysis_attempts: 0,
+      file_name: "scan.jpg",
+      mime_type: "image/jpeg",
+    });
+    seedStoredPdf(document.storage_path, new Uint8Array([0xff, 0xd8, 0xff]));
+    extractImageTextMock.mockResolvedValue("OCR contract text.");
+    analyzeDocumentMock.mockResolvedValue(analysisResult());
+    const client = createSupabaseClient() as never;
+
+    await runAnalysis(client, document.id, userA.id);
+
+    expect(extractImageTextMock).toHaveBeenCalledOnce();
+    expect(extractPdfTextMock).not.toHaveBeenCalled();
+    expect(analyzeDocumentMock).toHaveBeenCalledWith(expect.objectContaining({ text: "OCR contract text." }));
   });
 
   it("keeps a user-chosen title through re-analysis but upgrades filename-derived defaults", async () => {

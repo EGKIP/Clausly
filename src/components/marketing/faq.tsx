@@ -14,11 +14,11 @@ const faqs = [
   },
   {
     q: "How does Clausly handle my documents?",
-    a: "Your PDFs are stored privately in encrypted object storage. Only you can access them. Documents are used to generate analysis for your account and are not used to train AI models. You can delete any document at any time, which removes it from both active storage and our database references.",
+    a: "Your contracts are stored privately in encrypted object storage. Only you can access them. Documents are used to generate analysis for your account and are not used to train AI models. You can delete any document at any time, which removes it from both active storage and our database references.",
   },
   {
     q: "What file types are supported?",
-    a: "PDF for the v0.1 release. Native-text PDFs and scanned PDFs are both supported — scanned documents are routed through OCR. We're evaluating DOCX, TXT, and pasted-text support for later releases.",
+    a: "PDF, DOCX, TXT, PNG, JPG, and pasted contract text are supported. Native-text PDFs are read directly, while scanned PDFs and images are routed through OCR when it is enabled.",
   },
   {
     q: "How accurate is the AI?",

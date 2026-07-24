@@ -46,6 +46,12 @@ export type ExtractPdfTextWithOcrOptions = {
   warn?: (message: string) => void;
 };
 
+export type ExtractImageTextOptions = {
+  ocrEnabled?: boolean;
+  ocrProvider?: OcrProvider;
+  ocrTimeoutMs?: number;
+};
+
 export async function extractPdfText(blob: Blob): Promise<string> {
   const text = await extractTextLayer(blob);
   if (!text) {
@@ -92,6 +98,21 @@ export async function extractPdfTextWithOcr(file: Blob, options: ExtractPdfTextW
   }
 
   return ocrText.slice(0, maxExtractedChars);
+}
+
+export async function extractImageText(image: Blob, options: ExtractImageTextOptions = {}): Promise<string> {
+  if (!isOcrEnabled(options.ocrEnabled)) {
+    throw new NoTextLayerError("Image upload requires OCR, but OCR is disabled.");
+  }
+
+  const timeoutMs = options.ocrTimeoutMs ?? OCR_TIMEOUT_MS;
+  const ocrProvider = options.ocrProvider ?? (await loadDefaultOcrProvider());
+  const text = (await ocrProvider.recognize(image, { language: "eng", timeoutMs, pageNumber: 1 })).trim();
+  if (!text) {
+    throw new NoTextLayerError("Image OCR fallback returned no text.");
+  }
+
+  return text.slice(0, MAX_EXTRACTED_CHARS);
 }
 
 async function extractTextLayer(blob: Blob): Promise<string> {

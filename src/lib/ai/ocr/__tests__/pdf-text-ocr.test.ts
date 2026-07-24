@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { extractPdfTextWithOcr, type OcrProvider } from "../../pdf-text";
+import { extractImageText, extractPdfTextWithOcr, type OcrProvider } from "../../pdf-text";
 
 const pdfBlob = new Blob(["%PDF-test"], { type: "application/pdf" });
 
@@ -133,5 +133,30 @@ describe("extractPdfTextWithOcr", () => {
     expect(renderPageImages).toHaveBeenCalledWith(pdfBlob, { pageLimit: 20 });
     expect(provider.recognize).toHaveBeenCalledTimes(20);
     expect(warn).toHaveBeenCalledWith("OCR is limited to the first 20 pages; skipped 5 later pages.");
+  });
+});
+
+describe("extractImageText", () => {
+  it("runs OCR directly for image uploads", async () => {
+    const image = new Blob(["image"], { type: "image/png" });
+    const provider = mockOcrProvider("Image contract text");
+
+    const result = await extractImageText(image, {
+      ocrEnabled: true,
+      ocrProvider: provider,
+      ocrTimeoutMs: 3210,
+    });
+
+    expect(result).toBe("Image contract text");
+    expect(provider.recognize).toHaveBeenCalledWith(image, {
+      language: "eng",
+      timeoutMs: 3210,
+      pageNumber: 1,
+    });
+  });
+
+  it("fails clearly when image OCR is disabled", async () => {
+    await expect(extractImageText(new Blob(["image"]), { ocrEnabled: false }))
+      .rejects.toThrow("Image upload requires OCR, but OCR is disabled.");
   });
 });

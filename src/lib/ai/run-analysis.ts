@@ -6,12 +6,14 @@ import * as pdfText from "./pdf-text";
 import { recordUsage } from "./usage-metrics";
 import { embedDocumentChunks } from "./embeddings";
 import { categorizeAnalysisError, type AnalysisFailureCategory } from "./failure-categories";
+import { extractDocxText } from "./docx-text";
 
 type AnyClient = SupabaseClient<Database>;
 type PdfTextExtractor = typeof pdfText.extractPdfText;
 type PdfTextModule = {
   extractPdfText: PdfTextExtractor;
   extractPdfTextWithOcr?: PdfTextExtractor;
+  extractImageText?: PdfTextExtractor;
 };
 
 type AnalysisDocument = {
@@ -254,6 +256,16 @@ async function extractStoredDocumentText(file: Blob, doc: AnalysisDocument) {
     return text;
   }
 
+  if (isDocxDocument(doc)) {
+    return extractDocxText(file);
+  }
+
+  if (doc.mime_type.startsWith("image/")) {
+    const pdfTextModule = pdfText as PdfTextModule;
+    if (!pdfTextModule.extractImageText) throw new Error("Image OCR extractor is unavailable.");
+    return pdfTextModule.extractImageText(file);
+  }
+
   return getPdfTextExtractor()(file);
 }
 
@@ -262,4 +274,9 @@ async function readBlobText(file: Blob) {
   if (typeof Response !== "undefined") return new Response(file).text();
   const bytes = await file.arrayBuffer();
   return new TextDecoder().decode(bytes);
+}
+
+function isDocxDocument(doc: AnalysisDocument) {
+  return doc.mime_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    || doc.file_name.toLowerCase().endsWith(".docx");
 }

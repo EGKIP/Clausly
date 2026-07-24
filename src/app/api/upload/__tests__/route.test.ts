@@ -59,7 +59,7 @@ describe("POST /api/upload", () => {
   });
 
   it("returns 400 on bad mime type", async () => {
-    const response = await POST(uploadRequest(new File(["text"], "lease.txt", { type: "text/plain" })));
+    const response = await POST(uploadRequest(new File(["binary"], "lease.exe", { type: "application/octet-stream" })));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "Invalid upload." });
@@ -131,6 +131,47 @@ describe("POST /api/upload", () => {
     });
     await vi.waitFor(() => expect(db().documents[0].analysis_attempts).toBe(1));
     expect(["analyzing", "ready", "failed"]).toContain(db().documents[0].status);
+  });
+
+  it("accepts DOCX uploads by signature", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    const docx = new File(["PK\x03\x04fake-docx"], "service agreement.docx", {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+
+    const response = await POST(uploadRequest(docx, "Service agreement"));
+
+    expect(response.status).toBe(201);
+    expect(db().documents[0]).toMatchObject({
+      file_name: "service agreement.docx",
+      mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      title: "Service agreement",
+    });
+    expect(storageCalls().uploaded[0]).toMatchObject({
+      options: {
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        upsert: false,
+      },
+    });
+  });
+
+  it("accepts image uploads for OCR analysis", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    const png = new File([
+      new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    ], "scan.png", { type: "image/png" });
+
+    const response = await POST(uploadRequest(png, "Scanned lease"));
+
+    expect(response.status).toBe(201);
+    expect(db().documents[0]).toMatchObject({
+      file_name: "scan.png",
+      mime_type: "image/png",
+      title: "Scanned lease",
+    });
+    expect(storageCalls().uploaded[0]).toMatchObject({
+      options: { contentType: "image/png", upsert: false },
+    });
   });
 
   it("returns 400 when pasted contract text is too short", async () => {

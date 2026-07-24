@@ -6,16 +6,17 @@ import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { boundedTextSchema, validationIssues } from "@/lib/validation";
 import { canUploadDocument } from "@/lib/billing/plan";
-import { isPdfSignature } from "@/lib/upload/pdf-signature";
+import { isJpegSignature, isPdfSignature, isPngSignature, isZipSignature } from "@/lib/upload/pdf-signature";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
 const MAX_PASTED_TEXT_CHARS = 250_000;
 const titleSchema = boundedTextSchema(1, 200);
 const pastedTextSchema = boundedTextSchema(100, MAX_PASTED_TEXT_CHARS);
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const SUPPORTED_FILE_COPY = "PDF, DOCX, TXT, PNG, or JPG uploads are supported.";
 
 type UploadValidation =
-  | { success: true; kind: "pdf"; file: File; title: string; fileName: string; mimeType: "application/pdf" }
-  | { success: true; kind: "text"; file: Blob; title: string; fileName: string; mimeType: "text/plain" }
+  | { success: true; kind: "pdf" | "docx" | "text" | "image"; file: Blob; title: string; fileName: string; mimeType: string }
   | { success: false; issues: { path: string; message: string }[] };
 
 // Extends how long Vercel keeps this function alive for the after() callback
@@ -33,7 +34,7 @@ async function validateUpload(formData: FormData): Promise<UploadValidation> {
   const source = rawSource === "text" ? "text" : "pdf";
   const file = rawFile instanceof File ? rawFile : null;
   const pastedText = typeof rawText === "string" ? rawText : "";
-  const fallbackTitle = source === "text" ? "Pasted contract" : file?.name.replace(/\.pdf$/i, "") ?? "";
+  const fallbackTitle = source === "text" ? "Pasted contract" : file ? stripKnownExtension(file.name) : "";
   const title = String(rawTitle || fallbackTitle);
   const titleResult = titleSchema.safeParse(title);
   const issues: { path: string; message: string }[] = [];
@@ -69,18 +70,22 @@ async function validateUpload(formData: FormData): Promise<UploadValidation> {
   if (!file) {
     issues.push({ path: "file", message: "Upload a PDF file." });
   } else {
-    if (file.type !== "application/pdf") {
-      issues.push({ path: "file", message: "Only PDF uploads are supported right now." });
-    }
     if (file.size > MAX_FILE_BYTES) {
-      issues.push({ path: "file", message: "PDF must be 25 MB or smaller." });
+      issues.push({ path: "file", message: "Contract file must be 25 MB or smaller." });
     }
-    // Trust the file's actual bytes, not the client-supplied MIME type, before
-    // this ever reaches pdf-parse/OCR.
-    if (file.type === "application/pdf" && file.size <= MAX_FILE_BYTES) {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      if (!isPdfSignature(bytes)) {
-        issues.push({ path: "file", message: "This file doesn't look like a valid PDF." });
+    if (file.size <= MAX_FILE_BYTES) {
+      const fileType = await detectUploadFileType(file);
+      if (!fileType) {
+        issues.push({ path: "file", message: invalidFileTypeMessage(file) });
+      } else if (issues.length === 0 && titleResult.success) {
+        return {
+          success: true,
+          kind: fileType.kind,
+          file,
+          title: titleResult.data,
+          fileName: file.name,
+          mimeType: fileType.mimeType,
+        };
       }
     }
   }
@@ -89,14 +94,7 @@ async function validateUpload(formData: FormData): Promise<UploadValidation> {
     return { success: false as const, issues };
   }
 
-  return {
-    success: true,
-    kind: "pdf",
-    file,
-    title: titleResult.data,
-    fileName: file.name,
-    mimeType: "application/pdf",
-  };
+  return { success: false, issues: [{ path: "file", message: SUPPORTED_FILE_COPY }] };
 }
 
 export async function POST(request: Request) {
@@ -219,4 +217,52 @@ function slugifyFileBase(value: string) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
   return slug || "pasted-contract";
+}
+
+async function detectUploadFileType(file: File) {
+  const lowerName = file.name.toLowerCase();
+  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+
+  if ((file.type === "application/pdf" || lowerName.endsWith(".pdf")) && isPdfSignature(bytes)) {
+    return { kind: "pdf" as const, mimeType: "application/pdf" };
+  }
+
+  if ((file.type === DOCX_MIME || lowerName.endsWith(".docx")) && isZipSignature(bytes)) {
+    return { kind: "docx" as const, mimeType: DOCX_MIME };
+  }
+
+  if ((file.type === "text/plain" || lowerName.endsWith(".txt")) && file.size > 0) {
+    return { kind: "text" as const, mimeType: "text/plain" };
+  }
+
+  if ((file.type === "image/png" || lowerName.endsWith(".png")) && isPngSignature(bytes)) {
+    return { kind: "image" as const, mimeType: "image/png" };
+  }
+
+  if ((file.type === "image/jpeg" || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) && isJpegSignature(bytes)) {
+    return { kind: "image" as const, mimeType: "image/jpeg" };
+  }
+
+  return null;
+}
+
+function stripKnownExtension(fileName: string) {
+  return fileName.replace(/\.(pdf|docx|txt|png|jpe?g)$/i, "");
+}
+
+function invalidFileTypeMessage(file: File) {
+  const lowerName = file.name.toLowerCase();
+  if (file.type === "application/pdf" || lowerName.endsWith(".pdf")) {
+    return "This file doesn't look like a valid PDF.";
+  }
+  if (file.type === DOCX_MIME || lowerName.endsWith(".docx")) {
+    return "This file doesn't look like a valid DOCX document.";
+  }
+  if (file.type === "image/png" || lowerName.endsWith(".png")) {
+    return "This file doesn't look like a valid PNG image.";
+  }
+  if (file.type === "image/jpeg" || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+    return "This file doesn't look like a valid JPG image.";
+  }
+  return SUPPORTED_FILE_COPY;
 }

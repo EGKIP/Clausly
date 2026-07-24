@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { DashboardShell } from "@/components/dashboard/shell";
 import { TourOverlay } from "@/components/onboarding/tour-overlay";
+import type { PlanName } from "@/lib/billing/limits";
+import { getUserPlan } from "@/lib/billing/plan";
 import { getTourState } from "@/lib/db/onboarding-tour";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,33 +17,34 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const showTour = await shouldShowTour();
+  const { showTour, plan } = await getDashboardShellState();
 
   return (
-    <DashboardShell>
+    <DashboardShell plan={plan}>
       {children}
       {showTour && <TourOverlay />}
     </DashboardShell>
   );
 }
 
-async function shouldShowTour() {
-  if (!hasSupabaseEnv()) return false;
+async function getDashboardShellState(): Promise<{ showTour: boolean; plan: PlanName }> {
+  if (!hasSupabaseEnv()) return { showTour: false, plan: "free" };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return false;
+  if (!user) return { showTour: false, plan: "free" };
 
   try {
-    const [tourState, documentCount] = await Promise.all([
+    const [tourState, documentCount, plan] = await Promise.all([
       getTourState(supabase, user.id),
       countUserDocuments(supabase, user.id),
+      getUserPlan(supabase, user.id),
     ]);
-    return tourState.completedAt == null && documentCount >= 1;
+    return { showTour: tourState.completedAt == null && documentCount >= 1, plan };
   } catch {
-    return false;
+    return { showTour: false, plan: "free" };
   }
 }
 

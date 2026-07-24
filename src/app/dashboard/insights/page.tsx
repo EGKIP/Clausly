@@ -17,6 +17,7 @@ import { listReminders } from "@/lib/db/reminders";
 import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfolio-empty";
 import { InsightsUpgradeCard } from "@/components/dashboard/insights-upgrade-card";
 import { PortfolioAsk, PortfolioAskUpgradeTeaser } from "@/components/dashboard/portfolio-ask";
+import { PastRemindersArchiveCard } from "@/components/dashboard/reminders/past-reminders-archive-card";
 import { createClient } from "@/lib/supabase/server";
 import { canAccessInsights } from "@/lib/billing/plan";
 
@@ -83,6 +84,7 @@ export default async function InsightsPage() {
       />
 
       <PortfolioAsk />
+      <PastRemindersArchiveCard />
 
       {/* Hero insight */}
       <div className="mt-10 relative overflow-hidden rounded-[var(--radius-2xl)] border border-[color-mix(in_oklch,var(--accent)_28%,var(--border))] bg-gradient-to-br from-[var(--accent-soft)] via-[var(--surface)] to-[var(--surface)] p-5 sm:p-7 md:p-10">

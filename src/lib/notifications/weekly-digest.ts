@@ -3,6 +3,7 @@ import "server-only";
 import { getUserPlan } from "@/lib/billing/plan";
 import type { Json } from "@/lib/supabase/types";
 import { createEmailProvider, type EmailProvider } from "./email-provider";
+import { getDefaultFromEmail } from "./support";
 import type { ServiceSupabaseClient } from "./supabase-service";
 import { createServiceSupabaseClient } from "./supabase-service";
 import {
@@ -216,10 +217,9 @@ export async function sendWeeklyDigests(
   const provider = options.provider ?? createEmailProvider();
   const now = options.now ?? new Date();
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? process.env.BASE_URL ?? "http://localhost:3000");
-  const from = options.from ?? process.env.CLAUSLY_EMAIL_FROM;
+  const from = options.from ?? getDefaultFromEmail();
   const unsubscribeSecret = options.unsubscribeSecret ?? process.env.CLAUSLY_UNSUBSCRIBE_SECRET;
 
-  if (!from) throw new Error("Missing CLAUSLY_EMAIL_FROM.");
   if (!unsubscribeSecret) throw new Error("Missing CLAUSLY_UNSUBSCRIBE_SECRET.");
 
   const { data, error } = await supabase

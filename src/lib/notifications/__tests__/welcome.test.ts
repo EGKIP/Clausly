@@ -38,7 +38,7 @@ describe("welcome email", () => {
       provider: new MockProvider(),
       userId: userA.id,
       baseUrl: "https://clausly.test",
-      from: "Clausly <support@clausly.app>",
+      from: "Clausly <support@send.clausly.app>",
       supportEmail: "support@clausly.app",
       now: new Date("2026-07-24T12:00:00.000Z"),
     });
@@ -54,7 +54,7 @@ describe("welcome email", () => {
     expect(sentMessages).toHaveLength(1);
     expect(sentMessages[0]).toMatchObject({
       to: userA.email,
-      from: "Clausly <support@clausly.app>",
+      from: "Clausly <support@send.clausly.app>",
       replyTo: "support@clausly.app",
       subject: "Welcome to Clausly",
     });

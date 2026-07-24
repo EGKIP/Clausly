@@ -19,6 +19,7 @@ type AnalysisDocument = {
   user_id: string;
   title: string;
   file_name: string;
+  mime_type: string;
   storage_path: string;
   jurisdiction: string | null;
   status: Database["public"]["Enums"]["document_status"];
@@ -26,7 +27,7 @@ type AnalysisDocument = {
 };
 
 const ANALYSIS_DOCUMENT_COLUMNS =
-  "id, user_id, title, file_name, storage_path, jurisdiction, status, analysis_attempts";
+  "id, user_id, title, file_name, mime_type, storage_path, jurisdiction, status, analysis_attempts";
 
 export class AlreadyAnalyzingError extends Error {
   constructor() {
@@ -139,7 +140,7 @@ export async function runClaimedAnalysis(
     if (downloadError) throw new Error(downloadError.message);
     if (!file) throw new Error("Document file could not be downloaded.");
 
-    text = await getPdfTextExtractor()(file);
+    text = await extractStoredDocumentText(file, doc);
   } catch (error) {
     await markAnalysisFailed(supabase, doc.id, userId, errorMessage(error), categorizeAnalysisError(error), attemptToken);
     throw error;
@@ -244,4 +245,21 @@ function getPdfTextExtractor() {
     return pdfTextModule.extractPdfTextWithOcr ?? pdfTextModule.extractPdfText;
   }
   return pdfTextModule.extractPdfText;
+}
+
+async function extractStoredDocumentText(file: Blob, doc: AnalysisDocument) {
+  if (doc.mime_type === "text/plain" || doc.file_name.toLowerCase().endsWith(".txt")) {
+    const text = (await readBlobText(file)).trim();
+    if (!text) throw new Error("Pasted contract text was empty.");
+    return text;
+  }
+
+  return getPdfTextExtractor()(file);
+}
+
+async function readBlobText(file: Blob) {
+  if (typeof file.text === "function") return file.text();
+  if (typeof Response !== "undefined") return new Response(file).text();
+  const bytes = await file.arrayBuffer();
+  return new TextDecoder().decode(bytes);
 }

@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, UploadCloud, FileText, Sparkles, Lock, TriangleAlert } from "lucide-react";
+import { X, UploadCloud, FileText, Sparkles, Lock, TriangleAlert, ClipboardType } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,11 @@ export function UploadModal({
 }) {
   const router = useRouter();
   const [drag, setDrag] = React.useState(false);
+  const [mode, setMode] = React.useState<"pdf" | "text">("pdf");
   const [file, setFile] = React.useState<File | null>(null);
+  const [pastedTitle, setPastedTitle] = React.useState("");
+  const [pastedText, setPastedText] = React.useState("");
+  const [activeTextTitle, setActiveTextTitle] = React.useState<string | null>(null);
   const [phase, setPhase] = React.useState<"idle" | "uploading" | "analyzing" | "error">("idle");
   const [documentId, setDocumentId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -44,7 +48,11 @@ export function UploadModal({
     if (!open) {
       abortRef.current?.abort();
       abortRef.current = null;
+      setMode("pdf");
       setFile(null);
+      setPastedTitle("");
+      setPastedText("");
+      setActiveTextTitle(null);
       setPhase("idle");
       setDocumentId(null);
       setError(null);
@@ -130,10 +138,58 @@ export function UploadModal({
     };
   }, [file]);
 
+  async function uploadPastedText() {
+    if (atDocumentLimit || phase !== "idle") return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setActiveTextTitle(pastedTitle.trim() || "Pasted contract");
+    setPhase("uploading");
+    setError(null);
+    setLimitError(false);
+    setDocumentId(null);
+
+    const body = new FormData();
+    body.set("source", "text");
+    body.set("title", pastedTitle.trim() || "Pasted contract");
+    body.set("text", pastedText);
+
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return;
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: "Upload failed." }));
+        const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
+        const issueMessage = Array.isArray(payload.issues) ? payload.issues[0]?.message : undefined;
+        const message = issueMessage ?? payload.error ?? "Upload failed.";
+        setLimitError(limit);
+        setError(message);
+        setPhase("error");
+        if (!limit) toast.error(message);
+        return;
+      }
+      const payload = (await response.json()) as { id: string };
+      setDocumentId(payload.id);
+      setPhase("analyzing");
+      toast.success("Contract text uploaded. Clausly is reading it now.");
+    } catch (uploadError) {
+      if (controller.signal.aborted) return;
+      const message = uploadError instanceof Error ? uploadError.message : "Upload failed.";
+      setError(message);
+      setPhase("error");
+      toast.error(message);
+    }
+  }
+
   const resetUpload = () => {
     abortRef.current?.abort();
     abortRef.current = null;
     setFile(null);
+    setActiveTextTitle(null);
     setDocumentId(null);
     setError(null);
     setLimitError(false);
@@ -191,57 +247,93 @@ export function UploadModal({
                   {usage?.plan === "free" && (
                     <PlanUsageLine usage={usage} atLimit={atDocumentLimit} />
                   )}
-                  <label
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (!atDocumentLimit) setDrag(true);
-                    }}
-                    onDragLeave={() => setDrag(false)}
-                    onDrop={onDrop}
-                    className={cn(
-                      "block rounded-[var(--radius-lg)] border-2 border-dashed cursor-pointer transition-colors p-7 sm:p-10 text-center",
-                      usage?.plan === "free" && "mt-3",
-                      atDocumentLimit && "cursor-not-allowed opacity-65",
-                      drag
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)]"
-                        : "border-[var(--border-strong)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
-                    )}
-                  >
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="sr-only"
-                      disabled={atDocumentLimit}
-                      onChange={(e) => {
-                        if (atDocumentLimit) return;
-                        if (e.target.files?.[0]) setFile(e.target.files[0]);
+                  <div className={cn("grid grid-cols-2 gap-2", usage?.plan === "free" ? "mt-3" : "")}>
+                    <SourceButton active={mode === "pdf"} onClick={() => setMode("pdf")} icon={UploadCloud}>
+                      Upload PDF
+                    </SourceButton>
+                    <SourceButton active={mode === "text"} onClick={() => setMode("text")} icon={ClipboardType}>
+                      Paste text
+                    </SourceButton>
+                  </div>
+
+                  {mode === "pdf" ? (
+                    <label
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (!atDocumentLimit) setDrag(true);
                       }}
-                    />
-                    <div className="mx-auto inline-flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-card)]">
-                      <UploadCloud className="size-5 text-[var(--accent)]" />
+                      onDragLeave={() => setDrag(false)}
+                      onDrop={onDrop}
+                      className={cn(
+                        "mt-3 block rounded-[var(--radius-lg)] border-2 border-dashed cursor-pointer transition-colors p-7 sm:p-10 text-center",
+                        atDocumentLimit && "cursor-not-allowed opacity-65",
+                        drag
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)]"
+                          : "border-[var(--border-strong)] hover:border-[var(--accent)] hover:bg-[var(--surface-2)]"
+                      )}
+                    >
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        className="sr-only"
+                        disabled={atDocumentLimit}
+                        onChange={(e) => {
+                          if (atDocumentLimit) return;
+                          if (e.target.files?.[0]) setFile(e.target.files[0]);
+                        }}
+                      />
+                      <div className="mx-auto inline-flex size-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface)] border border-[var(--border)] shadow-[var(--shadow-card)]">
+                        <UploadCloud className="size-5 text-[var(--accent)]" />
+                      </div>
+                      <p className="mt-4 font-medium text-[15px]">
+                        Drop a PDF here, or click to browse
+                      </p>
+                      <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
+                        {atDocumentLimit
+                          ? "Upgrade to Pro for unlimited uploads."
+                          : "Lease, insurance, employment, or any contract."}
+                      </p>
+                    </label>
+                  ) : (
+                    <div className={cn("mt-3 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-4", atDocumentLimit && "opacity-65")}>
+                      <label className="block">
+                        <span className="text-[12px] font-medium text-[var(--muted)]">Document name</span>
+                        <input
+                          value={pastedTitle}
+                          onChange={(event) => setPastedTitle(event.target.value)}
+                          disabled={atDocumentLimit}
+                          placeholder="Lease pasted from portal"
+                          className="mt-1.5 h-10 w-full rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13.5px] outline-none focus:border-[var(--accent)]"
+                        />
+                      </label>
+                      <label className="mt-3 block">
+                        <span className="text-[12px] font-medium text-[var(--muted)]">Contract text</span>
+                        <textarea
+                          value={pastedText}
+                          onChange={(event) => setPastedText(event.target.value)}
+                          disabled={atDocumentLimit}
+                          placeholder="Paste the contract language here..."
+                          className="mt-1.5 min-h-[180px] w-full resize-y rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13.5px] leading-relaxed outline-none focus:border-[var(--accent)]"
+                        />
+                      </label>
+                      <p className="mt-2 text-[12px] text-[var(--muted)]">
+                        Use this when the contract is copied from a website, email, or a PDF layout that is hard to read.
+                      </p>
                     </div>
-                    <p className="mt-4 font-medium text-[15px]">
-                      Drop a PDF here, or click to browse
-                    </p>
-                    <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
-                      {atDocumentLimit
-                        ? "Upgrade to Pro for unlimited uploads."
-                        : "Lease, insurance, employment, or any contract."}
-                    </p>
-                  </label>
+                  )}
                 </>
               )}
 
-              {phase !== "idle" && file && (
+              {phase !== "idle" && (file || activeTextTitle) && (
                 <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-4">
                   <div className="flex items-center gap-3">
                     <span className="inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface)] border border-[var(--border)]">
                       <FileText className="size-4 text-[var(--muted)]" />
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="truncate text-[14px] font-medium">{file.name}</p>
+                      <p className="truncate text-[14px] font-medium">{file?.name ?? activeTextTitle}</p>
                       <p className="text-[11.5px] text-[var(--muted)]">
-                        {(file.size / 1024 / 1024).toFixed(2)} MB · PDF
+                        {file ? `${(file.size / 1024 / 1024).toFixed(2)} MB · PDF` : "Pasted contract text"}
                       </p>
                     </div>
                   </div>
@@ -298,21 +390,59 @@ export function UploadModal({
               <Button
                 variant="primary"
                 size="sm"
-                disabled={!documentId}
+                disabled={
+                  mode === "text" && phase === "idle"
+                    ? atDocumentLimit || pastedText.trim().length < 100
+                    : !documentId
+                }
                 onClick={() => {
+                  if (mode === "text" && phase === "idle") {
+                    void uploadPastedText();
+                    return;
+                  }
                   if (!documentId) return;
                   router.push(`/dashboard/documents/${documentId}`);
                   router.refresh();
                   onClose();
                 }}
               >
-                {phase === "analyzing" ? "Open document" : "Analyze"}
+                {mode === "text" && phase === "idle"
+                  ? "Analyze pasted text"
+                  : phase === "analyzing" ? "Open document" : "Analyze"}
               </Button>
             </div>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function SourceButton({
+  active,
+  onClick,
+  icon: Icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-sm)] border px-3 text-[13px] font-medium transition-colors",
+        active
+          ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-ink)]"
+          : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--foreground)]"
+      )}
+    >
+      <Icon className="size-3.5" />
+      {children}
+    </button>
   );
 }
 

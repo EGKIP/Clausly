@@ -258,7 +258,9 @@ export default function SettingsPage() {
                   limit={profile.usage.documents.limit}
                 />
                 <p className="mt-3 text-[12.5px] leading-relaxed text-[var(--muted)]">
-                  Pro unlocks unlimited documents, portfolio insights, and priority processing.
+                  {profile.plan === "pro"
+                    ? "Your Pro plan includes unlimited documents, portfolio insights, and priority processing."
+                    : "Pro unlocks unlimited documents, portfolio insights, and priority processing."}
                 </p>
               </div>
               <div className="flex w-full flex-col gap-2 md:w-auto md:items-end">

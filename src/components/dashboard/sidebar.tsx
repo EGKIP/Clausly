@@ -32,7 +32,13 @@ const secondary = [
   { href: "/dashboard/settings/activity", label: "Activity log", icon: History, pro: true },
 ];
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({
+  onNavigate,
+  plan = "free",
+}: {
+  onNavigate?: () => void;
+  plan?: "free" | "pro";
+}) {
   const pathname = usePathname();
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(href + "/");
@@ -120,32 +126,33 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           })}
         </ul>
 
-        {/* Pro upsell */}
-        <div className="mt-7 rounded-[var(--radius-md)] border border-[color-mix(in_oklch,var(--accent)_28%,var(--border))] bg-[var(--accent-soft)] p-4 relative overflow-hidden">
-          <div
-            aria-hidden
-            className="absolute -top-8 -right-8 size-24 rounded-full opacity-30"
-            style={{
-              background:
-                "radial-gradient(circle, color-mix(in oklch, var(--accent) 40%, transparent), transparent 70%)",
-            }}
-          />
-          <div className="relative">
-            <div className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--accent-ink)]">
-              <Sparkles className="size-2.5" /> Pro
+        {plan === "free" && (
+          <div className="mt-7 rounded-[var(--radius-md)] border border-[color-mix(in_oklch,var(--accent)_28%,var(--border))] bg-[var(--accent-soft)] p-4 relative overflow-hidden">
+            <div
+              aria-hidden
+              className="absolute -top-8 -right-8 size-24 rounded-full opacity-30"
+              style={{
+                background:
+                  "radial-gradient(circle, color-mix(in oklch, var(--accent) 40%, transparent), transparent 70%)",
+              }}
+            />
+            <div className="relative">
+              <div className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--accent-ink)]">
+                <Sparkles className="size-2.5" /> Pro
+              </div>
+              <p className="mt-2 text-[13px] leading-snug text-[var(--accent-ink)]">
+                Unlock unlimited documents, full risk analysis & weekly insights.
+              </p>
+              <Link
+                href="/dashboard/settings/billing"
+                onClick={onNavigate}
+                className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--accent-ink)] hover:gap-1.5 transition-[gap]"
+              >
+                Upgrade <ChevronRight className="size-3" />
+              </Link>
             </div>
-            <p className="mt-2 text-[13px] leading-snug text-[var(--accent-ink)]">
-              Unlock unlimited documents, full risk analysis & weekly insights.
-            </p>
-            <Link
-              href="/dashboard/settings/billing"
-              onClick={onNavigate}
-              className="mt-3 inline-flex items-center gap-1 text-[12.5px] font-medium text-[var(--accent-ink)] hover:gap-1.5 transition-[gap]"
-            >
-              Upgrade <ChevronRight className="size-3" />
-            </Link>
           </div>
-        </div>
+        )}
       </nav>
 
       {/* Footer / Help */}

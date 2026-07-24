@@ -8,7 +8,13 @@ import { Topbar } from "./topbar";
 import { UploadModal } from "./upload-modal";
 import { CommandPalette } from "./command-palette";
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  children,
+  plan = "free",
+}: {
+  children: React.ReactNode;
+  plan?: "free" | "pro";
+}) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [uploadOpen, setUploadOpen] = React.useState(false);
   const [cmdOpen, setCmdOpen] = React.useState(false);
@@ -66,7 +72,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[var(--background)] flex">
       {/* Desktop sidebar */}
       <div className="hidden lg:block w-[260px] xl:w-[272px] shrink-0 h-screen sticky top-0">
-        <Sidebar />
+        <Sidebar plan={plan} />
       </div>
 
       {/* Mobile sidebar drawer */}
@@ -95,7 +101,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               onKeyDown={handleDrawerKeyDown}
               className="lg:hidden fixed inset-y-0 left-0 z-50 w-[min(280px,calc(100vw-24px))] shadow-[var(--shadow-float)] outline-none"
             >
-              <Sidebar onNavigate={() => setMobileOpen(false)} />
+              <Sidebar plan={plan} onNavigate={() => setMobileOpen(false)} />
             </motion.div>
           </>
         )}

@@ -21,8 +21,16 @@ export function useDocuments(): State {
   const [documents, setDocuments] = React.useState<ContractDoc[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  // A refetch can be triggered again (documents-changed event) before an
+  // earlier one resolves; without cancelling the stale request, an
+  // out-of-order response can overwrite newer state with old data.
+  const abortRef = React.useRef<AbortController | null>(null);
 
   const refetch = React.useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setIsLoading(true);
     setError(null);
     const url = new URL("/api/documents", window.location.origin);
@@ -30,15 +38,22 @@ export function useDocuments(): State {
       url.searchParams.set("empty", "1");
     }
 
-    const response = await fetch(url);
-    if (!response.ok) {
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (!response.ok) {
+        setError("Unable to load documents.");
+        setIsLoading(false);
+        return;
+      }
+      const payload = (await response.json()) as { documents: ContractDoc[] };
+      setDocuments(payload.documents);
+      setIsLoading(false);
+    } catch {
+      if (controller.signal.aborted) return;
       setError("Unable to load documents.");
       setIsLoading(false);
-      return;
     }
-    const payload = (await response.json()) as { documents: ContractDoc[] };
-    setDocuments(payload.documents);
-    setIsLoading(false);
   }, []);
 
   React.useEffect(() => {

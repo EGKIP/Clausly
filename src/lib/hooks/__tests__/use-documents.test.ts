@@ -26,6 +26,31 @@ describe("useDocuments", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("does not let a slow initial fetch overwrite a faster post-upload refetch that started later", async () => {
+    const initial = deferred<Response>();
+    const afterUpload = deferred<Response>();
+    const fetchMock = mockFetch(initial.promise, afterUpload.promise);
+
+    const { result } = renderHook(() => useDocuments());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      notifyDocumentsChanged();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // The newer request (post-upload) resolves first...
+    afterUpload.resolve(jsonResponse({ documents: [{ id: "doc-new" }] }));
+    await waitFor(() => expect(result.current.documents).toEqual([{ id: "doc-new" }]));
+
+    // ...then the stale mount-time request resolves late and must be ignored.
+    await act(async () => {
+      initial.resolve(jsonResponse({ documents: [] }));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(result.current.documents).toEqual([{ id: "doc-new" }]);
+  });
+
   it("exposes the same event name notifyDocumentsChanged dispatches", () => {
     const listener = vi.fn();
     window.addEventListener(DOCUMENTS_CHANGED_EVENT, listener);
@@ -47,4 +72,12 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
     status: init?.status ?? 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
 }

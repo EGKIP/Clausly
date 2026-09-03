@@ -67,6 +67,7 @@ export async function POST(request: Request) {
     .from("documents")
     .select("id")
     .eq("id", body.documentId)
+    .eq("user_id", user.id)
     .single();
 
   if (documentError || !document) {

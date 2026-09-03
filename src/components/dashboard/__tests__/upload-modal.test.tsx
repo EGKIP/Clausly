@@ -64,4 +64,25 @@ describe("UploadModal", () => {
     expect(String(body.get("text"))).toContain("Service terms with renewal");
     expect(await screen.findByText(/pasted contract text/i)).toBeInTheDocument();
   });
+
+  it("notifies mounted document lists so a new upload appears without waiting for the user to click through", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ id: "doc-text" }), {
+      status: 201,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const onDocumentsChanged = vi.fn();
+    window.addEventListener("clausly:documents-changed", onDocumentsChanged);
+
+    render(<UploadModal open onClose={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /paste text/i }));
+    fireEvent.change(screen.getByLabelText(/document name/i), { target: { value: "Website terms" } });
+    fireEvent.change(screen.getByLabelText(/contract text/i), {
+      target: { value: "Service terms with renewal, payment, cancellation, liability, notice, and privacy language. ".repeat(3) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /analyze pasted text/i }));
+
+    await waitFor(() => expect(onDocumentsChanged).toHaveBeenCalledTimes(1));
+    window.removeEventListener("clausly:documents-changed", onDocumentsChanged);
+  });
 });

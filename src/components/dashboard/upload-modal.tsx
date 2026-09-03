@@ -8,6 +8,7 @@ import { X, UploadCloud, FileText, Sparkles, Lock, TriangleAlert, ClipboardType 
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
 
 type UploadUsage = {
   plan: "free" | "pro";
@@ -122,6 +123,7 @@ export function UploadModal({
         const payload = (await response.json()) as { id: string };
         setDocumentId(payload.id);
         setPhase("analyzing");
+        notifyDocumentsChanged();
         toast.success("Document uploaded. Clausly is reading it now.");
       } catch (uploadError) {
         if (controller.signal.aborted) return;
@@ -175,6 +177,7 @@ export function UploadModal({
       const payload = (await response.json()) as { id: string };
       setDocumentId(payload.id);
       setPhase("analyzing");
+      notifyDocumentsChanged();
       toast.success("Contract text uploaded. Clausly is reading it now.");
     } catch (uploadError) {
       if (controller.signal.aborted) return;

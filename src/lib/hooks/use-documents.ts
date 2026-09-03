@@ -10,6 +10,13 @@ type State = {
   refetch: () => Promise<void>;
 };
 
+/** Fired after a document is created/deleted so every mounted useDocuments() picks it up. */
+export const DOCUMENTS_CHANGED_EVENT = "clausly:documents-changed";
+
+export function notifyDocumentsChanged() {
+  window.dispatchEvent(new Event(DOCUMENTS_CHANGED_EVENT));
+}
+
 export function useDocuments(): State {
   const [documents, setDocuments] = React.useState<ContractDoc[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -36,6 +43,12 @@ export function useDocuments(): State {
 
   React.useEffect(() => {
     void refetch();
+  }, [refetch]);
+
+  React.useEffect(() => {
+    const handleChange = () => void refetch();
+    window.addEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
+    return () => window.removeEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
   }, [refetch]);
 
   return { documents, isLoading, error, refetch };

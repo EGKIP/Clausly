@@ -396,6 +396,22 @@ export function routeContext(id: string) {
   return { params: Promise.resolve({ id }) };
 }
 
+// isVisible() unconditionally enforces per-user row scoping to simulate
+// Postgres RLS, which means an ordinary cross-tenant test still 404s even if
+// a route's own `.eq("user_id", user.id)` filter regressed. Wrap a call in
+// this to disable that simulation so the assertion actually exercises the
+// route's own ownership check rather than the mock's backstop.
+let rlsSimulationDisabled = false;
+
+export async function withoutRlsSimulation<T>(fn: () => Promise<T>): Promise<T> {
+  rlsSimulationDisabled = true;
+  try {
+    return await fn();
+  } finally {
+    rlsSimulationDisabled = false;
+  }
+}
+
 export function createSupabaseClient() {
   return createSupabaseClientForRole(false);
 }
@@ -675,7 +691,7 @@ class Query {
 }
 
 function isVisible(table: TableName, row: Row, bypassRls = false) {
-  if (bypassRls) return true;
+  if (bypassRls || rlsSimulationDisabled) return true;
   if (!currentUser) return false;
   if (table === "users") return row.id === currentUser.id;
   if (table === "document_suggestions") {

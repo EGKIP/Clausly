@@ -27,10 +27,17 @@ Daily autonomous quality/maintenance runs. Newest entries at the top. Entries ar
 - None required (no defect — code was already correct; the gap was in test coverage only).
 
 ### Tests Added/Changed
-- Added `denies approving another user's reminder` to
+- Added `denies approving another user's reminder via the route's own ownership check` to
   `src/app/api/reminders/[id]/__tests__/route.test.ts`, asserting a 404 and an unchanged reminder
   status when userB attempts to approve userA's reminder. Closes the cross-tenant coverage gap for
   the approve endpoint.
+- PR review (augmentcode bot) correctly flagged that the test harness's `isVisible()` enforces
+  per-user row scoping unconditionally, so the test above would still pass even if the route's own
+  `.eq("user_id", user.id)` filter were removed — it only proved the mock's simulated-RLS backstop
+  worked. Added `withoutRlsSimulation()` to `tests/helpers/supabase.ts` to disable that backstop
+  for a wrapped call, and updated the test to use it. Verified the fix is real by temporarily
+  deleting the route's ownership filter, confirming the test failed, then restoring it and
+  confirming the test passed again.
 
 ### Remaining Concerns
 - No Playwright/browser E2E harness exists in this repo. Core flows (auth, upload, analysis,

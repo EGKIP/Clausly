@@ -112,6 +112,16 @@ describe("/api/reminders/[id]", () => {
     expect(db().reminders[0]).toMatchObject({ status: "approved", fire_on: future });
   });
 
+  it("denies approving another user's reminder", async () => {
+    const document = seedDocument(userB);
+    const reminder = seedReminder(document.id, userB, { status: "suggested" });
+
+    const response = await APPROVE(jsonRequest({}), routeContext(reminder.id));
+
+    expect(response.status).toBe(404);
+    expect(db().reminders[0].status).toBe("suggested");
+  });
+
   it("still approves reminders with future fire dates", async () => {
     const document = seedDocument(userA);
     const future = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, routeContext, seedDocument, seedReminder, setSupabaseUser, userA, userB } from "@/../tests/helpers/supabase";
+import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, routeContext, seedDocument, seedReminder, setSupabaseUser, userA, userB, withoutRlsSimulation } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 
@@ -112,11 +112,14 @@ describe("/api/reminders/[id]", () => {
     expect(db().reminders[0]).toMatchObject({ status: "approved", fire_on: future });
   });
 
-  it("denies approving another user's reminder", async () => {
+  it("denies approving another user's reminder via the route's own ownership check", async () => {
     const document = seedDocument(userB);
     const reminder = seedReminder(document.id, userB, { status: "suggested" });
 
-    const response = await APPROVE(jsonRequest({}), routeContext(reminder.id));
+    // Runs with the mock's simulated row-level security turned off, so a 404
+    // here can only come from the route's own `.eq("user_id", user.id)`
+    // filter, not from the test harness's usual cross-tenant backstop.
+    const response = await withoutRlsSimulation(() => APPROVE(jsonRequest({}), routeContext(reminder.id)));
 
     expect(response.status).toBe(404);
     expect(db().reminders[0].status).toBe("suggested");

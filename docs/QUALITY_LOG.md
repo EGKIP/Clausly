@@ -1,33 +1,34 @@
-# Clausly Quality Log
+# Quality Log
 
-Daily entries from the autonomous quality/maintenance routine. Newest entries at the top. Do not rewrite old entries.
+Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bottom. Entries are not rewritten after the fact.
 
----
-
-## 2026-09-07
+## 2026-09-03
 
 ### Quality Gates
-- Build: PASS
-- Typecheck: PASS
-- Lint: PASS (no warnings)
-- Unit tests: PASS (526/526, was 524/524 at the start of the run)
-- E2E: not configured in this repo (no Playwright setup); relied on unit/integration coverage and manual code-level review of core flows instead
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (524/524, 97 files, vitest)
+- E2E: none configured (no Playwright in this repo yet)
 
 ### Issues Found
-- `reminderLifecycleFieldsSchema.fire_on` (src/lib/reminders/validation.ts) validated the date with a bare `\d{4}-\d{2}-\d{2}` regex, which accepts syntactically well-formed but calendrically invalid dates (e.g. `2026-02-30`, `2026-13-01`). The reminder edit UI uses a native `<input type="date">`, which browsers block from producing such values, so this was only reachable via direct API calls (PATCH `/api/reminders/[id]` or the approve endpoint) — a Postgres `date` column would reject the insert and the route would surface a raw 500 with the database error message instead of a clean 400. Severity: P3 (edge-case API robustness/UX, not reachable through normal UI use, no data loss or security impact).
-- Follow-up caught by an automated PR reviewer (augmentcode[bot]) on PR #69: the first fix (`z.string().date()`) still accepted year `0000` (e.g. `0000-01-01`, `0000-02-29`) since it's a syntactically well-formed ISO date; Postgres has no year zero and rejects it, so that value would still reach the database and produce the same raw 500 the fix was meant to prevent. Verified locally before patching. Severity: P3 (same class as above, narrower edge case).
-- No P0/P1 issues found. Reviewed RLS policies (all core tables — documents, clauses, dates, reminders, usage_metrics — have `enable row level security` plus per-action owner-scoped policies), service-role key usage (isolated to `server-only` files: webhooks, cron dispatch, admin routes, public share digest; never touches client bundles), document/reminder API routes (all mutating routes filter by `.eq("user_id", user.id)`), the public share-link path (`getShareByToken` checks `revoked_at` and expiry before returning data), and upload validation (magic-byte file-type sniffing, not just MIME/extension trust, plus a 25MB size cap). All looked correct.
+- **P3 (hardening):** Supabase security advisor flagged mutable `search_path` on `public.set_updated_at`, `public.match_document_chunks`, `public.match_portfolio_chunks`. Not exploitable today (no unqualified/shadowable references in their bodies), but pinning `search_path` is standard defense-in-depth.
+- **P3 (hardening):** `public.handle_new_user()` (the `on_auth_user_created` trigger function) was directly executable via PostgREST RPC by `anon`/`authenticated`. Calling it outside trigger context errors out (`NEW` is unset), so not exploitable, but the grant was unnecessary surface.
+- **P4 (info, no code fix):** `auth_leaked_password_protection` is disabled in Supabase Auth settings. This is a dashboard/account setting, not a migration — recommend the owner enable it in Supabase Auth → Policies.
+- **P4 (info, no code fix):** `vector` extension is installed in the `public` schema rather than a dedicated schema. Low risk; moving it is a nontrivial migration (every `vector` column/type reference would need re-qualifying) and not worth the churn right now.
+- Reviewed `sendWelcomeEmailOnceForUser` (`src/lib/notifications/welcome.ts`): read-then-write idempotency check has a narrow race if the auth callback fires twice concurrently (e.g. duplicate navigation to `/auth/callback`), which could send two welcome emails. Sequential idempotency is tested; concurrent idempotency is not. Judged P4/cosmetic (duplicate transactional email, no data or security impact) — not fixed today to avoid changing failure-handling semantics without a stronger justification. Documented for a future pass if it recurs in practice.
 
 ### Fixes Completed
-- Replaced the regex-based `fire_on` check with Zod's built-in `z.string().date()`, which validates real calendar dates (leap years included) while keeping the same YYYY-MM-DD format contract. Applies to both the reminder PATCH (edit) and approve endpoints since they share `reminderLifecycleFieldsSchema`.
-- Added a `.refine()` rejecting year `0000` on top of `z.string().date()`, closing the gap flagged by the automated PR review above.
+- Added `supabase/migrations/20260903000100_harden_function_search_path.sql`: pins `search_path = public` on `set_updated_at`, `match_document_chunks`, `match_portfolio_chunks`, and revokes the unused public/anon/authenticated execute grants on `handle_new_user`. Pure `ALTER FUNCTION`/`REVOKE` statements — no behavior change, not yet applied to the live database (ships through the normal migration/deploy path).
 
 ### Tests Added/Changed
-- `src/lib/reminders/__tests__/validation.test.ts`: added cases asserting `fire_on` rejects `2026-02-30`, `2026-13-01`, `0000-01-01`, and `0000-02-29`, and accepts the valid leap-day `2026-02-28`.
+- None. The migration has no application-code surface to unit test; correctness was verified by re-reading the live function bodies via Supabase's read-only advisor/schema tools against `clausly-prod` (no writes made to the database in this session).
 
 ### Remaining Concerns
-- No Playwright/E2E harness exists in this repo, so browser-level regression coverage (multi-step flows like upload → analyze → approve reminder) depends entirely on component/unit tests and manual review. Consider adding a minimal Playwright setup in a future run if the owner wants real browser coverage; not done today to avoid an unplanned dependency/tooling change during a routine run.
-- Did not attempt live UI/browser testing this run (no Supabase project credentials available in this environment), so verification was via code review + full automated test/build/lint/typecheck suite rather than clicking through the app.
+- No P0/P1 issues found. Auth, document upload/analysis, reminders, and tenant-isolation flows all have passing regression coverage (see `tests/integration/rls-isolation.test.ts` for cross-user isolation).
+- No E2E/browser test harness exists yet (no Playwright config, no live Supabase credentials in this environment) — UI flows were verified by reading route/component code and existing component tests, not by driving a live browser. Adding Playwright is a reasonable future investment given the app is otherwise stable.
+- Owner action recommended (not code): enable leaked-password protection in Supabase Auth settings for `clausly-prod`.
 
 ### PR/Branch
-Branch: `claude/upbeat-newton-yap617`. PR opened against `main`.
+- Branch: `claude/upbeat-newton-5i3moz`
+- PR: opened against `main` (see PR description for link)

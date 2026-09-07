@@ -11,7 +11,12 @@ export const reminderListQuerySchema = z.object({
 export const reminderLifecycleFieldsSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(500).optional(),
-  fire_on: z.string().date("Expected a valid date in YYYY-MM-DD format.").optional(),
+  fire_on: z.string()
+    .date("Expected a valid date in YYYY-MM-DD format.")
+    // z.string().date() accepts the year-zero edge case (0000-01-01), but
+    // Postgres has no year zero and rejects it, so reject it here too.
+    .refine((value) => Number(value.slice(0, 4)) > 0, "Expected a valid date in YYYY-MM-DD format.")
+    .optional(),
   reminder_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Expected HH:mm or HH:mm:ss.").nullable().optional(),
 }).strict();
 

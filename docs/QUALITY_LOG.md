@@ -1,55 +1,34 @@
-# Clausly Quality Log
+# Quality Log
 
-Daily autonomous quality/maintenance runs. Newest entries at the top. Entries are append-only — do not rewrite old ones.
+Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bottom. Entries are not rewritten after the fact.
 
----
-
-## 2026-09-06
+## 2026-09-03
 
 ### Quality Gates
-- Build: PASS (`next build`, 61 routes generated)
-- Typecheck: PASS (`tsc --noEmit`)
-- Lint: PASS (`next lint`, no warnings/errors)
-- Unit tests: PASS (97 files, 525 tests)
-- E2E: not configured (no Playwright in this repo yet — see Remaining Concerns)
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (524/524, 97 files, vitest)
+- E2E: none configured (no Playwright in this repo yet)
 
 ### Issues Found
-- `POST /api/reminders/[id]/approve` (a core step of the suggest → approve reminder flow) had no
-  regression test confirming a user cannot approve another user's reminder, even though the route
-  code correctly scopes the update with `.eq("user_id", user.id)`. Every sibling route (`GET`,
-  `PATCH`) in the same file had an explicit cross-tenant test; `approve` did not. Reviewed
-  `document_shares`, `audit_events`, `weekly_digests`, and `document_exports` RLS policies —
-  all correctly scoped to `auth.uid()`. No cross-user data access, missing auth checks, or exposed
-  secrets found in recently changed areas (welcome email, profile route, upload/file-type support,
-  dashboard polish).
+- **P3 (hardening):** Supabase security advisor flagged mutable `search_path` on `public.set_updated_at`, `public.match_document_chunks`, `public.match_portfolio_chunks`. Not exploitable today (no unqualified/shadowable references in their bodies), but pinning `search_path` is standard defense-in-depth.
+- **P3 (hardening):** `public.handle_new_user()` (the `on_auth_user_created` trigger function) was directly executable via PostgREST RPC by `anon`/`authenticated`. Calling it outside trigger context errors out (`NEW` is unset), so not exploitable, but the grant was unnecessary surface.
+- **P4 (info, no code fix):** `auth_leaked_password_protection` is disabled in Supabase Auth settings. This is a dashboard/account setting, not a migration — recommend the owner enable it in Supabase Auth → Policies.
+- **P4 (info, no code fix):** `vector` extension is installed in the `public` schema rather than a dedicated schema. Low risk; moving it is a nontrivial migration (every `vector` column/type reference would need re-qualifying) and not worth the churn right now.
+- Reviewed `sendWelcomeEmailOnceForUser` (`src/lib/notifications/welcome.ts`): read-then-write idempotency check has a narrow race if the auth callback fires twice concurrently (e.g. duplicate navigation to `/auth/callback`), which could send two welcome emails. Sequential idempotency is tested; concurrent idempotency is not. Judged P4/cosmetic (duplicate transactional email, no data or security impact) — not fixed today to avoid changing failure-handling semantics without a stronger justification. Documented for a future pass if it recurs in practice.
 
 ### Fixes Completed
-- None required (no defect — code was already correct; the gap was in test coverage only).
+- Added `supabase/migrations/20260903000100_harden_function_search_path.sql`: pins `search_path = public` on `set_updated_at`, `match_document_chunks`, `match_portfolio_chunks`, and revokes the unused public/anon/authenticated execute grants on `handle_new_user`. Pure `ALTER FUNCTION`/`REVOKE` statements — no behavior change, not yet applied to the live database (ships through the normal migration/deploy path).
 
 ### Tests Added/Changed
-- Added `denies approving another user's reminder via the route's own ownership check` to
-  `src/app/api/reminders/[id]/__tests__/route.test.ts`, asserting a 404 and an unchanged reminder
-  status when userB attempts to approve userA's reminder. Closes the cross-tenant coverage gap for
-  the approve endpoint.
-- PR review (augmentcode bot) correctly flagged that the test harness's `isVisible()` enforces
-  per-user row scoping unconditionally, so the test above would still pass even if the route's own
-  `.eq("user_id", user.id)` filter were removed — it only proved the mock's simulated-RLS backstop
-  worked. Added `withoutRlsSimulation()` to `tests/helpers/supabase.ts` to disable that backstop
-  for a wrapped call, and updated the test to use it. Verified the fix is real by temporarily
-  deleting the route's ownership filter, confirming the test failed, then restoring it and
-  confirming the test passed again.
+- None. The migration has no application-code surface to unit test; correctness was verified by re-reading the live function bodies via Supabase's read-only advisor/schema tools against `clausly-prod` (no writes made to the database in this session).
 
 ### Remaining Concerns
-- No Playwright/browser E2E harness exists in this repo. Core flows (auth, upload, analysis,
-  reminders) are well covered by Vitest route/unit/component tests, but there is no automated
-  browser-level regression check for full user journeys or mobile (375px) layout. Recommend
-  standing up Playwright in a dedicated future run rather than bundling it into a daily pass.
-- A few dialogs (`reminder-edit-modal`, `delete-document-button`) are not fully consistent in
-  close affordances — some support Escape/overlay-click-to-close (`shell.tsx` sidebar drawer),
-  others only expose an explicit close/cancel button. All dialogs remain closeable; this is a
-  minor (P4) consistency polish item, not a functional defect, and was left alone today per
-  change-discipline guidance (small targeted fixes only).
+- No P0/P1 issues found. Auth, document upload/analysis, reminders, and tenant-isolation flows all have passing regression coverage (see `tests/integration/rls-isolation.test.ts` for cross-user isolation).
+- No E2E/browser test harness exists yet (no Playwright config, no live Supabase credentials in this environment) — UI flows were verified by reading route/component code and existing component tests, not by driving a live browser. Adding Playwright is a reasonable future investment given the app is otherwise stable.
+- Owner action recommended (not code): enable leaked-password protection in Supabase Auth settings for `clausly-prod`.
 
 ### PR/Branch
-- Branch: `claude/upbeat-newton-763jh1`
-- PR: opened against `main` (docs + test-only change, no application code changed)
+- Branch: `claude/upbeat-newton-5i3moz`
+- PR: opened against `main` (see PR description for link)

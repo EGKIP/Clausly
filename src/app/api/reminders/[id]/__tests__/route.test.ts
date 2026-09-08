@@ -73,6 +73,42 @@ describe("/api/reminders/[id]", () => {
     expect(db().reminders[0].title).toBe("Already sent");
   });
 
+  it("rejects editing an approved reminder's date into the past", async () => {
+    const document = seedDocument(userA);
+    const future = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+    const reminder = seedReminder(document.id, userA, { status: "approved", fire_on: future });
+
+    const response = await PATCH(jsonRequest({ fire_on: "2026-01-05" }, { method: "PATCH" }), routeContext(reminder.id));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toMatchObject({ code: "REMINDER_PAST" });
+    expect(db().reminders[0].fire_on).toBe(future);
+  });
+
+  it("rejects any edit to an already-past approved reminder unless the same edit moves it forward", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "approved", fire_on: "2026-01-05" });
+
+    const withoutDateChange = await PATCH(jsonRequest({ title: "Renamed" }, { method: "PATCH" }), routeContext(reminder.id));
+    expect(withoutDateChange.status).toBe(409);
+
+    const future = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+    const withDateChange = await PATCH(jsonRequest({ fire_on: future }, { method: "PATCH" }), routeContext(reminder.id));
+    expect(withDateChange.status).toBe(200);
+    expect(db().reminders[0].fire_on).toBe(future);
+  });
+
+  it("still allows editing a suggested reminder's date into the past (approval catches it later)", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "suggested", fire_on: "2026-11-15" });
+
+    const response = await PATCH(jsonRequest({ fire_on: "2026-01-05" }, { method: "PATCH" }), routeContext(reminder.id));
+
+    expect(response.status).toBe(200);
+    expect(db().reminders[0].fire_on).toBe("2026-01-05");
+  });
+
   it("approves suggested reminders and is idempotent for approved reminders with overrides", async () => {
     const document = seedDocument(userA);
     const reminder = seedReminder(document.id, userA, { status: "suggested" });
@@ -145,5 +181,15 @@ describe("/api/reminders/[id]", () => {
     expect(response.status).toBe(200);
     expect(db().reminders).toHaveLength(1);
     expect(db().reminders[0].status).toBe("ignored");
+  });
+
+  it("returns 409 when dismissing a sent reminder", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "sent" });
+
+    const response = await DELETE(new Request("http://localhost.test/api/reminders/" + reminder.id, { method: "DELETE" }), routeContext(reminder.id));
+
+    expect(response.status).toBe(409);
+    expect(db().reminders[0].status).toBe("sent");
   });
 });

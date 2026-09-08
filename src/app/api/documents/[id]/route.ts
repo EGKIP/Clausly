@@ -108,18 +108,28 @@ export async function DELETE(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { error: storageError } = await supabase.storage
-    .from("documents")
-    .remove([document.storage_path]);
-
-  if (storageError) return NextResponse.json({ error: storageError.message }, { status: 500 });
-
+  // Delete the DB row first: it's the source of truth for what the user
+  // sees, so it must be the step that can't half-fail. If storage cleanup
+  // below fails after this succeeds, the user still sees the document gone
+  // everywhere; the orphaned storage object is invisible operational debt
+  // rather than a broken document stuck in the UI.
   const { error: deleteError } = await supabase
     .from("documents")
     .delete()
     .eq("id", id)
     .eq("user_id", user.id);
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 });
+
+  const { error: storageError } = await supabase.storage
+    .from("documents")
+    .remove([document.storage_path]);
+  if (storageError) {
+    console.warn("Failed to remove storage object after document delete.", {
+      documentId: id,
+      userId: user.id,
+      message: storageError.message,
+    });
+  }
 
   try {
     await recordAuditEvent(supabase, {

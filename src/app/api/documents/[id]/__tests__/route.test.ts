@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
   db,
+  failNextStorageRemove,
   resetSupabaseMock,
   routeContext,
   seedClause,
@@ -118,6 +119,18 @@ describe("/api/documents/[id]", () => {
     expect(response.status).toBe(404);
     expect(db().documents).toHaveLength(1);
     expect(storageCalls().removed).toEqual([]);
+  });
+
+  it("still deletes the document row when storage cleanup fails", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const document = seedDocument(userA);
+    failNextStorageRemove("Storage object already gone.");
+
+    const response = await DELETE(new Request("http://localhost.test", { method: "DELETE" }), routeContext(document.id));
+
+    expect(response.status).toBe(200);
+    expect(db().documents).toHaveLength(0);
+    warn.mockRestore();
   });
 
   it("returns 403 when the storage path does not belong to the user", async () => {

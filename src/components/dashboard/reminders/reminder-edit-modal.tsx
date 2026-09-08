@@ -64,6 +64,11 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
       return;
     }
 
+    if (currentReminder.status === "approved" && (patch.fire_on ?? currentFireOn) < todayUtcDate()) {
+      setLocalError("Reminders can't be saved with a date that's already passed.");
+      return;
+    }
+
     const saved = await onSave(currentReminder.id, patch);
 
     if (saved) onClose();
@@ -153,6 +158,10 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
       </div>
     </div>
   );
+}
+
+function todayUtcDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function dateForInput(value: string) {

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeleteDocumentButton } from "../delete-document-button";
+import { DOCUMENTS_CHANGED_EVENT } from "@/lib/hooks/use-documents";
 
 const router = vi.hoisted(() => ({
   push: vi.fn(),
@@ -57,6 +58,22 @@ describe("DeleteDocumentButton", () => {
     expect(toast.success).toHaveBeenCalledWith("Document deleted.");
     expect(router.push).toHaveBeenCalledWith("/dashboard/documents");
     expect(router.refresh).toHaveBeenCalled();
+  });
+
+  it("notifies other mounted document lists after deleting", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    const handleChange = vi.fn();
+    window.addEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
+
+    render(<DeleteDocumentButton documentId="doc-1" documentTitle="Apartment lease" />);
+    fireEvent.click(screen.getByRole("button", { name: /delete document/i }));
+    fireEvent.click(screen.getByRole("button", { name: /delete permanently/i }));
+
+    await waitFor(() => expect(handleChange).toHaveBeenCalledOnce());
+    window.removeEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
   });
 
   it("keeps the user on the document when deletion fails", async () => {

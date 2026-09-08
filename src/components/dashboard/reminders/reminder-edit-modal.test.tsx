@@ -3,13 +3,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReminderEditModal } from "./reminder-edit-modal";
 import type { Reminder } from "@/lib/mock-reminders";
 
+const futureFireOn = new Date(Date.now() + 23 * 86_400_000).toISOString().slice(0, 10);
+
 const reminder: Reminder = {
   id: "reminder-1",
   docId: "document-1",
   docTitle: "Lease agreement",
   title: "Review renewal",
   description: "Check renewal language.",
-  fireOn: "2026-07-01",
+  fireOn: futureFireOn,
   daysAway: 23,
   status: "approved",
   channel: "Email",
@@ -72,5 +74,25 @@ describe("ReminderEditModal", () => {
       expect(onSave).toHaveBeenCalledWith("reminder-1", { reminder_time: "10:15" });
     });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("blocks saving an approved reminder with a date moved into the past", async () => {
+    const onClose = vi.fn();
+    const onSave = vi.fn();
+    render(
+      <ReminderEditModal
+        reminder={reminder}
+        isSaving={false}
+        onClose={onClose}
+        onSave={onSave}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Fire date"), { target: { value: "2026-01-05" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText(/date that's already passed/i)).toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

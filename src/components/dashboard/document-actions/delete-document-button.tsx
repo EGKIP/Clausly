@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
 
 export function DeleteDocumentButton({
   documentId,
@@ -32,6 +33,7 @@ export function DeleteDocumentButton({
 
       toast.success("Document deleted.");
       setOpen(false);
+      notifyDocumentsChanged();
       router.push("/dashboard/documents");
       router.refresh();
     } catch {

@@ -53,6 +53,21 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const body = parsed.data;
 
+  // An approved reminder edited backward into the past would sit forever
+  // with no way to fire on time; block it the same way approval does.
+  if (existing.status === "approved") {
+    const effectiveFireOn = body.fire_on ?? String(existing.fire_on).slice(0, 10);
+    if (effectiveFireOn < todayUtcDate()) {
+      return NextResponse.json(
+        {
+          error: "Reminders can't be saved with a date that's already passed.",
+          code: "REMINDER_PAST",
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from("reminders")
     .update({
@@ -97,6 +112,10 @@ export async function DELETE(request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Reminder not found." }, { status: 404 });
     }
     return NextResponse.json({ error: existingError.message }, { status: 500 });
+  }
+
+  if (existing.status === "sent") {
+    return NextResponse.json({ error: "Sent reminders cannot be dismissed." }, { status: 409 });
   }
 
   const { error } = await supabase
@@ -169,6 +188,10 @@ async function logReminderLifecycle(supabase: Awaited<ReturnType<typeof createCl
   } catch {
     // usage_metrics is best-effort here; reminder state is the source of truth.
   }
+}
+
+function todayUtcDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function hasSupabaseEnv() {

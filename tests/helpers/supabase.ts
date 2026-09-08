@@ -56,6 +56,7 @@ const storage = {
 
 let currentUser: TestUser | null = null;
 let failure: Failure | null = null;
+let storageRemoveFailure: string | null = null;
 let uuidCounter = 0;
 const rpcCallsList: { name: string; args: Row }[] = [];
 
@@ -74,6 +75,7 @@ export function resetSupabaseMock(user: TestUser | null = userA) {
   storage.files = new Map();
   currentUser = user;
   failure = null;
+  storageRemoveFailure = null;
   uuidCounter = 0;
   rpcCallsList.length = 0;
   vi.spyOn(crypto, "randomUUID").mockImplementation(() => nextUuid() as any);
@@ -96,6 +98,10 @@ export function setSupabaseEnv(enabled: boolean) {
 
 export function failNext(operation: Failure["operation"], table: TableName, message = "Forced Supabase error.") {
   failure = { operation, table, message, once: true };
+}
+
+export function failNextStorageRemove(message = "Forced storage error.") {
+  storageRemoveFailure = message;
 }
 
 export function db() {
@@ -494,6 +500,11 @@ function createSupabaseClientForRole(bypassRls: boolean) {
             return { data: file, error: null };
           }),
           remove: vi.fn(async (paths: string[]) => {
+            if (storageRemoveFailure) {
+              const message = storageRemoveFailure;
+              storageRemoveFailure = null;
+              return { data: null, error: { message } };
+            }
             storage.removed.push(...paths);
             paths.forEach((path) => storage.files.delete(path));
             return { data: paths.map((path) => ({ name: path })), error: null };

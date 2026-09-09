@@ -1,5 +1,6 @@
 import { AuthCard } from "@/components/auth/auth-card";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 
 type PageProps = {
   searchParams: Promise<{ next?: string }>;
@@ -7,7 +8,7 @@ type PageProps = {
 
 export default async function LoginPage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const next = params.next?.startsWith("/") ? params.next : "/dashboard";
+  const next = safeNextPath(params.next);
 
   return (
     <AuthShell

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Mail, Lock, UserRound, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { cn } from "@/lib/utils";
 
 type Mode = "login" | "signup" | "forgot";
@@ -44,7 +45,7 @@ export function AuthCard({ mode, next = "/dashboard" }: { mode: Mode; next?: str
 
       if (isForgot) {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/login`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`,
         });
         if (resetError) throw resetError;
         setStatus("sent");
@@ -52,7 +53,7 @@ export function AuthCard({ mode, next = "/dashboard" }: { mode: Mode; next?: str
       }
 
       if (isSignup) {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -61,6 +62,14 @@ export function AuthCard({ mode, next = "/dashboard" }: { mode: Mode; next?: str
           },
         });
         if (signUpError) throw signUpError;
+        if (!signUpData.session) {
+          // Email confirmation is required before a session exists — there is
+          // nothing to redirect into yet, so show the same "check your inbox"
+          // state as the magic-link/reset flows instead of bouncing the user
+          // straight to a dashboard route the middleware will just reject.
+          setStatus("sent");
+          return;
+        }
         window.location.href = "/dashboard/welcome";
         return;
       }
@@ -70,7 +79,7 @@ export function AuthCard({ mode, next = "/dashboard" }: { mode: Mode; next?: str
         password,
       });
       if (signInError) throw signInError;
-      window.location.href = next;
+      window.location.href = safeNextPath(next);
     } catch (authError) {
       setError(authError instanceof Error ? authError.message : "Something went wrong.");
       setStatus("idle");

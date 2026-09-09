@@ -108,6 +108,17 @@ describe("/auth/callback", () => {
     expect(response.headers.get("location")).toBe("https://clausly.test/dashboard");
   });
 
+  it("ignores backslash-based next URLs that browsers resolve to another host", async () => {
+    mocks.exchangeCodeForSession.mockResolvedValue({ error: null });
+    const { GET } = await import("../route");
+
+    const response = await GET(
+      new Request("https://clausly.test/auth/callback?code=abc&next=%2F%5Cevil.test")
+    );
+
+    expect(response.headers.get("location")).toBe("https://clausly.test/dashboard");
+  });
+
   it("does not schedule welcome email when the service role env is missing", async () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     mocks.exchangeCodeForSession.mockResolvedValue({ error: null });

@@ -2,11 +2,12 @@ import { after, NextResponse } from "next/server";
 import { sendWelcomeEmailOnceForUser } from "@/lib/notifications/welcome";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const next = safeNextPath(requestUrl.searchParams.get("next"));
+  const next = safeNextPath(requestUrl.searchParams.get("next"), "/dashboard");
   let authenticatedUserId: string | null = null;
 
   if (code && hasSupabaseEnv()) {
@@ -68,7 +69,3 @@ function scheduleWelcomeEmail(userId: string) {
   });
 }
 
-function safeNextPath(next: string | null) {
-  if (!next?.startsWith("/") || next.startsWith("//")) return "/dashboard";
-  return next;
-}

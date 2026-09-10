@@ -17,7 +17,10 @@ export const reminderLifecycleFieldsSchema = z.object({
     // Postgres has no year zero and rejects it, so reject it here too.
     .refine((value) => Number(value.slice(0, 4)) > 0, "Expected a valid date in YYYY-MM-DD format.")
     .optional(),
-  reminder_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, "Expected HH:mm or HH:mm:ss.").nullable().optional(),
+  reminder_time: z.string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, "Expected a valid HH:mm or HH:mm:ss time.")
+    .nullable()
+    .optional(),
 }).strict();
 
 export const reminderPatchLifecycleSchema = reminderLifecycleFieldsSchema.refine(

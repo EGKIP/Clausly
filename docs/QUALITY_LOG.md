@@ -76,3 +76,44 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-0ayodt`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-10
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (545/545, 100 files, vitest — 7 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `RenameableTitle` (`src/components/dashboard/document-actions/rename-title.tsx`) renamed a document via `PATCH /api/documents/[id]` and called `router.refresh()`, but never `notifyDocumentsChanged()`. Every other mounted `useDocuments()` consumer (command palette, reminders page) kept showing the old title until an unrelated delete/upload elsewhere happened to fire the event — the same bug class fixed for delete in the 2026-09-08 run, just missed for rename. `AnalysisGate` had the identical gap: when analysis finished while the user sat on the detail page, other document lists didn't pick up the freshly analyzed title/risk either.
+- **P3:** The "Analyzing" skeleton (`analysis-gate.tsx`) always said "This usually takes a few seconds," with no escalation if it kept polling for minutes — the stuck-analysis recovery cron only requeues after ~10 minutes, so a genuinely slow or stuck analysis left the user staring at an unchanging skeleton with no signal anything unusual was happening.
+- **P3:** `reminder_time`'s API validation regex (`src/lib/reminders/validation.ts`) checked digit format (`\d{2}:\d{2}`) but not value range, so `"99:99"` passed Zod validation and only failed downstream at the Postgres `time` column, surfacing as a raw 500 DB error instead of a clean 400. Not reachable from the UI (`<input type="time">` already constrains values) but a real API-boundary gap.
+- **P3:** Dashboard home's "Upcoming attention" list (`src/app/dashboard/page.tsx`) had no empty state — when a user has documents but zero pending reminders, the bordered list rendered as a blank box, unlike the adjacent "Fresh summaries" panel which explicitly handles the same condition.
+- **P3 (documented, not fixed today):** Escape-key and backdrop-click-to-close are inconsistent across the app's overlays. The global Escape handler in `shell.tsx` only covers the command palette and upload modal; the reminder edit modal, the settings delete-account confirmation, and the Share/Export panels manage their own state and don't listen for Escape. Backdrop-click is similarly inconsistent (delete-document confirmation has it; reminder edit and delete-account modals don't; Share/Export panels have no backdrop at all). Verified every affected modal has an explicit Cancel/Close/X button, so nothing is actually unclosable — this is UX-convention polish, not a broken workflow. Spans five components; deferred to a future run to keep today's diff scoped.
+- Re-checked Supabase security/performance advisors on `clausly-prod`: no new findings. Same three warnings as prior runs (vector extension in `public` schema, `delete_account` executable by `authenticated` — intentional, self-service-only via `auth.uid()` check, leaked-password protection still disabled in Auth settings — owner dashboard action, not code). Performance advisor shows only INFO-level unindexed-FK and unused-index notices on a low-traffic database; no evidence of actual slow queries, so no migration added today.
+- `npm audit`: the one remaining vulnerability (postcss, via Next.js's own vendored dependency) requires a Next.js 16 major-version upgrade to clear (`npm audit fix --force`); Next is already pinned to the latest 15.5.x (15.5.25, patched in the 2026-09-07 run). Deferred — a major framework bump is out of scope for a daily maintenance pass.
+
+### Fixes Completed
+- `src/components/dashboard/document-actions/rename-title.tsx`: calls `notifyDocumentsChanged()` after a successful rename.
+- `src/components/dashboard/analysis-gate.tsx`: calls `notifyDocumentsChanged()` when analysis transitions to `ready`/`failed`, alongside the existing `router.refresh()`. Also added escalating copy in the analyzing skeleton — after 20s, "taking a little longer than usual"; after 90s, reassurance that it's safe to leave the page and analysis continues in the background.
+- `src/lib/reminders/validation.ts`: tightened the `reminder_time` regex to validate actual HH/MM/SS ranges (`00-23` / `00-59`) instead of digit-shape only.
+- `src/app/dashboard/page.tsx`: added an explicit empty state to the "Upcoming attention" list, matching the sibling "Fresh summaries" panel's pattern.
+
+### Tests Added/Changed
+- `src/components/dashboard/document-actions/__tests__/rename-title.test.tsx`: new file — asserts a successful rename notifies other document-list listeners and refreshes the router, and that a failed rename does neither.
+- `src/components/dashboard/__tests__/analysis-gate.test.tsx`: new case for the escalating "taking longer" copy (fake timers at 20s/90s), and a new case asserting `notifyDocumentsChanged()` fires once the poll observes a `ready` status.
+- `src/lib/reminders/__tests__/validation.test.ts`: new case rejecting out-of-range `reminder_time` values (`24:00`, `12:60`, `99:99`) while still accepting valid ones.
+- `src/app/dashboard/__tests__/page.test.tsx`: new file — covers the new "Upcoming attention" empty state and confirms it disappears once a pending reminder exists.
+
+### Remaining Concerns
+- No P0/P1 issues found or introduced.
+- Escape-key/backdrop-click consistency across modals (reminder edit, delete-account confirmation, Share/Export panels) — real but P3 polish, every affected modal already has an explicit close control; worth a dedicated pass rather than folding into today's diff.
+- Same three Supabase advisor items as previous runs remain outstanding, none newly actionable: `vector` extension in `public` schema (non-trivial migration, low severity), leaked-password protection (owner dashboard setting), `delete_account` executable by `authenticated` (intentional, self-scoped).
+- `npm audit`'s one remaining finding (postcss via Next's vendored dependency) needs a Next.js 16 major upgrade; not attempted today per change-discipline guidance against unscoped major version bumps.
+- No E2E/browser test harness exists yet — flows were verified by reading route/component code and by adding/running targeted unit + integration tests (including new server-component-rendering tests for the dashboard home page, following the pattern already used for `settings/activity`). Playwright remains a reasonable future investment.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-smtvd7`
+- PR: opened against `main` (see PR description for link)

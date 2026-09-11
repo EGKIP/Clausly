@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Reminder } from "@/lib/mock-reminders";
 import type { ReminderMutationPatch } from "@/lib/hooks/use-reminders";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 type Props = {
   reminder: Reminder | null;
@@ -29,6 +30,8 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
     setReminderTime(timeForInput(reminder.reminderTime));
     setLocalError(null);
   }, [reminder]);
+
+  useDismissOnEscape(!!reminder && !isSaving, onClose);
 
   if (!reminder) return null;
 
@@ -77,7 +80,13 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
   const visibleError = localError ?? error;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(0%_0_0/0.45)] px-4 py-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(0%_0_0/0.45)] px-4 py-6"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSaving) onClose();
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"

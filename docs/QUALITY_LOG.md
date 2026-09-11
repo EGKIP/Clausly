@@ -76,3 +76,39 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-0ayodt`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-11
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (552/552, 100 files, vitest — 14 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2 (recurring, documented but unfixed in the 2026-09-09 and 2026-09-10 runs — both still open as unmerged PRs #71/#72):** Several dialogs/dropdowns across the app couldn't be dismissed with Escape, and two had no click-outside-to-close either, inconsistent with the rest of the app (upload modal, command palette, mobile nav drawer all support Escape via `shell.tsx`). Specifically: `ReminderEditModal` (no Escape, no backdrop click), the settings "Delete account" confirmation (no Escape, no backdrop click — the backdrop `<div>` had no dismiss handler at all), `DeleteDocumentButton`'s confirmation (had backdrop click, no Escape), and the `ShareDialog`/`ExportButton` popovers (absolutely-positioned dropdowns with no backdrop and no outside-click handling of any kind — clicking anywhere else on the page left them open). Every affected dialog already had an explicit close control, so nothing was truly unclosable, but the inconsistency is real UX friction and a WAI-ARIA dialog-pattern gap.
+- Verified `notification-preferences-card.tsx` (flagged as dead code in the 2026-09-09 run) was in fact unused except for one type-only import in `settings/page.tsx`; the component it was superseded by (`notification-preferences.tsx`) is the only one actually rendered.
+- Re-checked Supabase security/performance advisors on `clausly-prod`: no new findings since the 2026-09-08 run (same three: `vector` extension in `public` schema, `delete_account` executable by `authenticated` — intentional, self-scoped via `auth.uid()` — and leaked-password protection disabled, an owner Auth-settings action, not code). Performance advisor shows only INFO-level unindexed-FK/unused-index notices on a low-traffic database.
+- No new P0/P1s found. PRs #71 and #72 from the two prior runs remain open and unmerged (owner review pending); this run built on `main` independently rather than stacking on top of them, to avoid depending on unreviewed changes.
+
+### Fixes Completed
+- Added `src/lib/hooks/use-dismiss-on-escape.ts` and `src/lib/hooks/use-click-outside.ts` — small, single-purpose hooks (Escape-to-close, and click-outside-to-close for elements with no full-screen backdrop).
+- Wired Escape + backdrop-click into `ReminderEditModal` and the settings "Delete account" modal (both previously had neither); added Escape to `DeleteDocumentButton`'s confirmation (already had backdrop click); added Escape + click-outside to the `ShareDialog` and `ExportButton` popovers. All respect in-flight saving/deleting state the same way the existing Cancel buttons already did (no dismiss mid-mutation).
+- Deleted the dead `notification-preferences-card.tsx` component and its test; `settings/page.tsx` now derives its `NotificationPreferences` type directly from `notificationPreferencesSchema` in `@/lib/validation/schemas` instead of importing a type from the otherwise-unused file.
+
+### Tests Added/Changed
+- `src/lib/hooks/__tests__/use-dismiss-on-escape.test.ts`, `src/lib/hooks/__tests__/use-click-outside.test.tsx`: new, cover both hooks directly (active/inactive, Escape vs. other keys, inside vs. outside clicks).
+- `reminder-edit-modal.test.tsx`, `delete-document-button.test.tsx`, `export-button.test.tsx`, `share-dialog.test.tsx`: new cases asserting Escape (and, where applicable, backdrop/outside click) closes each dialog, and that the reminder modal does not close on Escape while a save is in flight.
+- `src/app/dashboard/settings/__tests__/page.test.tsx`: new file — first test coverage for this page, covering the delete-account confirmation's Escape and backdrop-click dismissal.
+
+### Remaining Concerns
+- No P0/P1 issues found or introduced.
+- Same three Supabase advisor items as previous runs, none newly actionable (see Issues Found).
+- `npm audit` still reports a moderate/high PostCSS advisory reachable only through Next.js's bundled dependency; the only fix path is a Next.js 16 major upgrade, out of scope for a targeted daily pass.
+- PRs #71 and #72 (2026-09-09 and 2026-09-10 runs) remain open awaiting owner review; today's fixes are independent of both and shouldn't conflict, but all three will need to be merged in some order.
+- No E2E/browser test harness exists yet, and this session had no live Supabase credentials configured (`.env.local` not present), so UI flows were verified by reading route/component code and by adding/running targeted unit + integration tests rather than driving a real browser. Playwright remains a reasonable future investment.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-wfnwuy`
+- PR: opened against `main` (see PR description for link)

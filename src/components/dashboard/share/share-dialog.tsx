@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/primitives";
 import type { PlanName } from "@/lib/billing/limits";
 import { cn } from "@/lib/utils";
+import { useClickOutside } from "@/lib/hooks/use-click-outside";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 type Share = {
   id: string;
@@ -48,6 +50,9 @@ export function ShareDialog({
   const [revokingId, setRevokingId] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const panelRef = useClickOutside<HTMLDivElement>(open, () => setOpen(false));
+  useDismissOnEscape(open, () => setOpen(false));
 
   React.useEffect(() => {
     if (!open || plan !== "pro") return;
@@ -152,7 +157,10 @@ export function ShareDialog({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(92vw,380px)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)]">
+        <div
+          ref={panelRef}
+          className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(92vw,380px)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)]"
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">Read-only digest</p>

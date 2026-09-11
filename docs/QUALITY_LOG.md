@@ -96,11 +96,13 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - Added `src/lib/hooks/use-dismiss-on-escape.ts` and `src/lib/hooks/use-click-outside.ts` — small, single-purpose hooks (Escape-to-close, and click-outside-to-close for elements with no full-screen backdrop).
 - Wired Escape + backdrop-click into `ReminderEditModal` and the settings "Delete account" modal (both previously had neither); added Escape to `DeleteDocumentButton`'s confirmation (already had backdrop click); added Escape + click-outside to the `ShareDialog` and `ExportButton` popovers. All respect in-flight saving/deleting state the same way the existing Cancel buttons already did (no dismiss mid-mutation).
 - Deleted the dead `notification-preferences-card.tsx` component and its test; `settings/page.tsx` now derives its `NotificationPreferences` type directly from `notificationPreferencesSchema` in `@/lib/validation/schemas` instead of importing a type from the otherwise-unused file.
+- **Follow-up (same PR, caught by automated review on #73):** the `ShareDialog`/`ExportButton` click-outside ref initially wrapped only the popup panel, not its trigger button — clicking the trigger again to close the popup fired the outside-click dismiss on `mousedown` and then the trigger's own `onClick` toggled it back open, so the trigger could no longer close its own menu. Moved the ref to the wrapping container (trigger + panel) in both files; added a regression test to each asserting the trigger can close its own popup.
 
 ### Tests Added/Changed
 - `src/lib/hooks/__tests__/use-dismiss-on-escape.test.ts`, `src/lib/hooks/__tests__/use-click-outside.test.tsx`: new, cover both hooks directly (active/inactive, Escape vs. other keys, inside vs. outside clicks).
 - `reminder-edit-modal.test.tsx`, `delete-document-button.test.tsx`, `export-button.test.tsx`, `share-dialog.test.tsx`: new cases asserting Escape (and, where applicable, backdrop/outside click) closes each dialog, and that the reminder modal does not close on Escape while a save is in flight.
 - `src/app/dashboard/settings/__tests__/page.test.tsx`: new file — first test coverage for this page, covering the delete-account confirmation's Escape and backdrop-click dismissal.
+- `export-button.test.tsx`, `share-dialog.test.tsx`: added a case asserting the trigger button can still close its own popup (the follow-up fix above).
 
 ### Remaining Concerns
 - No P0/P1 issues found or introduced.

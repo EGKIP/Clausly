@@ -146,7 +146,7 @@ export function ShareDialog({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={panelRef}>
       <Button
         variant="ghost"
         size="sm"
@@ -157,10 +157,7 @@ export function ShareDialog({
       </Button>
 
       {open && (
-        <div
-          ref={panelRef}
-          className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(92vw,380px)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)]"
-        >
+        <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(92vw,380px)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">Read-only digest</p>

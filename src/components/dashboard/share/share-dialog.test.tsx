@@ -45,6 +45,19 @@ describe("ShareDialog", () => {
     expect(screen.queryByText("Share links are a Pro feature.")).not.toBeInTheDocument();
   });
 
+  it("closes when the trigger button is clicked again", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
+
+    const trigger = screen.getByRole("button", { name: /share document/i });
+    fireEvent.click(trigger);
+    expect(screen.getByText("Share links are a Pro feature.")).toBeInTheDocument();
+
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.queryByText("Share links are a Pro feature.")).not.toBeInTheDocument();
+  });
+
   it("closes on an outside click", () => {
     render(
       <div>

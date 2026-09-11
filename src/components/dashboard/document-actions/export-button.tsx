@@ -78,7 +78,7 @@ export function ExportButton({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={panelRef}>
       <Button
         variant="ghost"
         size="sm"
@@ -91,10 +91,7 @@ export function ExportButton({
       </Button>
 
       {open && (
-        <div
-          ref={panelRef}
-          className="absolute right-0 top-[calc(100%+8px)] z-40 w-[260px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]"
-        >
+        <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[260px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]">
           <ExportOption
             icon={FileText}
             title="PDF digest"

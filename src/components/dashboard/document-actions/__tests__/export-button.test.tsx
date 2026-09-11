@@ -57,6 +57,19 @@ describe("ExportButton", () => {
     expect(screen.queryByRole("button", { name: /pdf digest/i })).not.toBeInTheDocument();
   });
 
+  it("closes the export menu when the trigger button is clicked again", () => {
+    render(<ExportButton documentId="doc-1" usage={usage} />);
+
+    const trigger = screen.getByRole("button", { name: /export document/i });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("button", { name: /pdf digest/i })).toBeInTheDocument();
+
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.queryByRole("button", { name: /pdf digest/i })).not.toBeInTheDocument();
+  });
+
   it("closes the export menu on an outside click", () => {
     render(
       <div>

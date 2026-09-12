@@ -76,3 +76,34 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-0ayodt`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-12
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (539/539, 98 files, vitest — 1 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P3 (UX, previously noted 2026-09-08):** The "Reading your contract…" analyzing skeleton (`AnalysisGate`/`AnalyzingState`) gave no signal that anything was still happening beyond a spinner, no matter how long analysis took. The stuck-analysis cron bounds real failures to ~10 minutes, but a slow-but-healthy analysis (large file, scanned/OCR document) could leave a user staring at an unchanging skeleton with no indication it hadn't frozen.
+- Re-checked Supabase security/performance advisors against `clausly-prod`: no new findings since 2026-09-08. Remaining items (`vector` extension in `public` schema, `delete_account` callable by `authenticated`, leaked-password protection disabled) are the same previously-reviewed, accepted, or owner-action items — not re-litigated today.
+- Re-reviewed `sendWelcomeEmailOnceForUser` (`src/lib/notifications/welcome.ts`): the read-then-write idempotency race noted on 2026-09-03 is still present and still judged P4 (duplicate transactional email only, no data/security impact) — not fixed today for the same reason (would require changing failure-handling semantics without a stronger justification).
+- No P0/P1/P2 issues found this run. `grep` for `TODO`/`FIXME`/`XXX` across `src/` returned nothing.
+
+### Fixes Completed
+- `src/components/dashboard/analysis-gate.tsx`: `AnalyzingState` now tracks client-side elapsed time and, after 20s, shows an additional reassurance message ("Still working — this is taking longer than usual…") so a slow analysis doesn't look indistinguishable from a stuck one. Purely additive UI; no change to polling behavior or the stuck-analysis recovery cron.
+
+### Tests Added/Changed
+- `src/components/dashboard/__tests__/analysis-gate.test.tsx`: new case using fake timers to assert the slow-analysis message is absent initially and appears once 20s of analyzing time have elapsed.
+
+### Remaining Concerns
+- No P0/P1 issues found or introduced.
+- No E2E/browser test harness exists yet — still a reasonable future investment, not attempted today given no Playwright config or live browser credentials in this environment.
+- Owner action still recommended (dashboard setting, not code): enable leaked-password protection in Supabase Auth → Policies for `clausly-prod`.
+- `npm audit` flags 6 dev-dependency vulnerabilities (vitest/@vitest/mocker path traversal, esbuild dev-server file read on Windows, postcss XSS/sourcemap issues bundled inside `next`). All require breaking major-version bumps (`vitest@5`, `next@16`) to fully resolve via `npm audit fix --force`; none are runtime-exposed in this app's production build (dev/build-time tooling only). Deferred as dependency churn outside today's scope — worth a dedicated, tested upgrade pass rather than a reflexive `--force`.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-zhaujr`
+- PR: opened against `main` (see PR description for link)

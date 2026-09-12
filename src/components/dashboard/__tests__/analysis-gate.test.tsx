@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnalysisGate } from "../analysis-gate";
 import { FAILURE_CATEGORY_COPY } from "@/lib/ai/failure-categories";
@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("AnalysisGate", () => {
@@ -57,6 +58,30 @@ describe("AnalysisGate", () => {
     expect(screen.getByText("We couldn't read this contract.")).toBeInTheDocument();
     expect(screen.getByText("Some technical failure detail")).toBeInTheDocument();
     expect(screen.getByText(/Common causes:/)).toBeInTheDocument();
+  });
+
+  it("shows a slow-analysis reassurance message after the analyzing state has been visible for a while", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("network unavailable in test");
+      })
+    );
+
+    render(
+      <AnalysisGate documentId="doc-1" initialStatus="analyzing" initialErrorMessage={null} initialFailureCategory={null}>
+        <div>Document content</div>
+      </AnalysisGate>
+    );
+
+    expect(screen.queryByText(/taking longer than usual/i)).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    expect(screen.getByText(/taking longer than usual/i)).toBeInTheDocument();
   });
 
   it("retries analysis and switches back to the analyzing view", async () => {

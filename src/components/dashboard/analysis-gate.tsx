@@ -55,7 +55,22 @@ export function AnalysisGate({
   return <AnalyzingState />;
 }
 
+/* Client-perceived elapsed time since this skeleton mounted. Server-side stuck
+ * jobs are recovered by the /api/admin/recover-stuck-analyses cron (10-min
+ * threshold); this is just an in-UI reassurance so a slow-but-healthy
+ * analysis doesn't look frozen. */
+const SLOW_ANALYSIS_THRESHOLD_SECONDS = 20;
+
 function AnalyzingState() {
+  const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isSlow = elapsedSeconds >= SLOW_ANALYSIS_THRESHOLD_SECONDS;
+
   return (
     <div className="mt-8 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 md:p-10">
       <div className="flex items-center gap-2">
@@ -71,6 +86,12 @@ function AnalyzingState() {
         Clausly is extracting clauses, dates, and risks. This usually takes a few seconds.
         We&apos;ll refresh the page automatically when it&apos;s done.
       </p>
+      {isSlow && (
+        <p className="mt-2 max-w-xl text-[13px] text-[var(--accent-ink)]" role="status">
+          Still working — this is taking longer than usual. Large or scanned documents can take
+          a minute or two. No need to refresh; we&apos;ll update this page automatically.
+        </p>
+      )}
 
       <div className="mt-7 flex items-center gap-2 text-[12px] text-[var(--faint)]">
         <Loader2 className="size-3.5 animate-spin text-[var(--accent)]" />

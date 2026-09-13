@@ -34,6 +34,17 @@ describe("ShareDialog", () => {
     expect(screen.getByRole("link", { name: /upgrade to pro/i })).toHaveAttribute("href", "/upgrade");
   });
 
+  it("closes on Escape and never leaves the panel's dialog role stuck open", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /share document/i }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("loads existing shares for Pro users", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       shares: [{

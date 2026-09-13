@@ -50,6 +50,15 @@ export function ShareDialog({
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  React.useEffect(() => {
     if (!open || plan !== "pro") return;
     let cancelled = false;
 
@@ -152,11 +161,23 @@ export function ShareDialog({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(92vw,380px)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)]">
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-[oklch(0%_0_0/0.42)] px-3 py-4 sm:items-center sm:px-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-dialog-title"
+            className="max-h-[85vh] w-full max-w-[380px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)]"
+          >
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">Read-only digest</p>
-              <h2 className="mt-1 font-serif text-[22px] leading-none">Share contract</h2>
+              <h2 id="share-dialog-title" className="mt-1 font-serif text-[22px] leading-none">Share contract</h2>
             </div>
             <button
               type="button"
@@ -252,6 +273,7 @@ export function ShareDialog({
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
     </div>

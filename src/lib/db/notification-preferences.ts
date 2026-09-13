@@ -28,7 +28,18 @@ type NotificationPreferencesQuery = PromiseLike<NotificationPreferencesQueryResu
   single: () => Promise<NotificationPreferencesQueryResult>;
 };
 
-const allowedStoredKeys = new Set(["email", "reminders", "weekly_digest", "welcome_email_sent_at"]);
+/* "version" and "defaults" are written by PATCH /api/profile's
+ * mergeNotificationPreferences (see notificationPreferencesSchema) onto this
+ * same column; they must stay allowed here or a prior /api/profile update
+ * permanently breaks every later PATCH /api/settings/notifications call. */
+const allowedStoredKeys = new Set([
+  "email",
+  "reminders",
+  "weekly_digest",
+  "welcome_email_sent_at",
+  "version",
+  "defaults",
+]);
 const defaults: EmailNotificationPreferences = {
   email: true,
   reminders: true,

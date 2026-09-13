@@ -69,6 +69,18 @@ describe("useReminders", () => {
     expect(result.current.error).toBe("Unauthorized");
   });
 
+  it("recovers from a network failure instead of loading forever", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError("fetch failed"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useReminders());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.reminders).toEqual([]);
+    expect(result.current.error).toBe("Unable to load reminders.");
+  });
+
   it("treats mock-mode 503 as empty without a hard error", async () => {
     mockFetch(jsonResponse({ error: "Supabase is not configured." }, { status: 503 }));
 

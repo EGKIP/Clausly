@@ -53,23 +53,29 @@ export function useReminders(filters: ReminderFilters = {}): State {
     if (status) url.searchParams.set("status", status);
     if (documentId) url.searchParams.set("document_id", documentId);
 
-    const response = await fetch(url);
-    if (response.status === 503) {
-      setReminders([]);
-      setIsLoading(false);
-      return;
-    }
+    try {
+      const response = await fetch(url);
+      if (response.status === 503) {
+        setReminders([]);
+        setIsLoading(false);
+        return;
+      }
 
-    if (!response.ok) {
-      setReminders([]);
-      setError(await responseError(response, "Unable to load reminders."));
-      setIsLoading(false);
-      return;
-    }
+      if (!response.ok) {
+        setReminders([]);
+        setError(await responseError(response, "Unable to load reminders."));
+        setIsLoading(false);
+        return;
+      }
 
-    const payload = (await response.json()) as ReminderPayload;
-    setReminders((payload.reminders ?? []).map(normalizeReminder));
-    setIsLoading(false);
+      const payload = (await response.json()) as ReminderPayload;
+      setReminders((payload.reminders ?? []).map(normalizeReminder));
+      setIsLoading(false);
+    } catch {
+      setReminders([]);
+      setError("Unable to load reminders.");
+      setIsLoading(false);
+    }
   }, [documentId, status]);
 
   React.useEffect(() => {

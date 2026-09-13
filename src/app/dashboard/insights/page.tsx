@@ -53,7 +53,10 @@ export default async function InsightsPage() {
     );
   }
 
-  const monthlySpend = 2054;
+  const monthlySpend = documents.reduce(
+    (sum, d) => sum + (Number(d.monthly?.replace(/[^0-9.]/g, "")) || 0),
+    0
+  );
   const renewalsSoon = documents.filter((d) => d.tags.includes("Auto-renew")).length;
   const flagged = documents.filter((d) => d.risk === "High" || d.risk === "Needs Review");
   const noticeWindows = reminders.filter((r) => r.type === "Notice" && r.status !== "sent");

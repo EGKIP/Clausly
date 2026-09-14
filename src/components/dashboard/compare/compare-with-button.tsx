@@ -38,6 +38,15 @@ export function CompareWithButton({
   }, [currentDocument.id, currentDocument.type, documents, query]);
   const hasCandidates = documents.some((document) => document.id !== currentDocument.id);
 
+  React.useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   function selectDocument(documentId: string) {
     setOpen(false);
     router.push(`/dashboard/compare?a=${currentDocument.id}&b=${documentId}`);

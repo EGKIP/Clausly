@@ -72,6 +72,19 @@ export default function SettingsPage() {
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
+  React.useEffect(() => {
+    if (!confirmOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || deleteStatus === "deleting") return;
+      setConfirmOpen(false);
+      setConfirmEmail("");
+      setDeleteMessage(null);
+      setDeleteStatus("idle");
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmOpen, deleteStatus]);
+
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (profile.mockMode) return;
@@ -356,7 +369,12 @@ export default function SettingsPage() {
       </div>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-account-heading"
+        >
           <form
             onSubmit={deleteAccount}
             className="max-h-[calc(100vh-2rem)] w-full max-w-[460px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-float)] sm:p-6"
@@ -364,7 +382,7 @@ export default function SettingsPage() {
             <div className="inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)]">
               <AlertTriangle className="size-4" />
             </div>
-            <h2 className="mt-4 font-serif text-[24px] leading-tight tracking-[-0.01em]">
+            <h2 id="delete-account-heading" className="mt-4 font-serif text-[24px] leading-tight tracking-[-0.01em]">
               Delete account
             </h2>
             <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--muted)]">

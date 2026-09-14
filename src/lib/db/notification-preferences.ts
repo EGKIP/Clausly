@@ -28,7 +28,19 @@ type NotificationPreferencesQuery = PromiseLike<NotificationPreferencesQueryResu
   single: () => Promise<NotificationPreferencesQueryResult>;
 };
 
-const allowedStoredKeys = new Set(["email", "reminders", "weekly_digest", "welcome_email_sent_at"]);
+// "version" is written by the Resend bounce/complaint webhook
+// (src/lib/notifications/webhook.ts) to invalidate old one-click unsubscribe
+// links, and "defaults" by the profile notification-preferences endpoint
+// (src/app/api/profile/route.ts) — both share this same JSONB column, so a
+// user hit by either of those code paths must not break this endpoint too.
+const allowedStoredKeys = new Set([
+  "email",
+  "reminders",
+  "weekly_digest",
+  "welcome_email_sent_at",
+  "version",
+  "defaults",
+]);
 const defaults: EmailNotificationPreferences = {
   email: true,
   reminders: true,

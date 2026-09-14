@@ -79,4 +79,37 @@ describe("notification preference helpers", () => {
       .rejects
       .toThrow("Unsupported notification preference key: sms");
   });
+
+  it("tolerates a stored 'version' key written by the unsubscribe webhook", async () => {
+    // src/lib/notifications/webhook.ts writes { ...preferences, version }
+    // into this same column when Resend reports a bounce/spam complaint.
+    // A user hit by that webhook must still be able to use the settings
+    // page's notification toggles afterwards.
+    seedUser(userA, {
+      notification_preferences: { email: false, reminders: true, version: 3 },
+    });
+
+    const preferences = await updatePreferences(preferencesClient(), userA.id, {
+      email: true,
+    });
+
+    expect(preferences).toEqual({ email: true, reminders: true, weeklyDigest: true });
+    expect(db().users[0].notification_preferences).toEqual({
+      email: true,
+      reminders: true,
+      version: 3,
+    });
+  });
+
+  it("tolerates a stored 'defaults' key written by the profile endpoint", async () => {
+    // src/app/api/profile/route.ts writes a "defaults" key into this same
+    // column; the settings-page toggle endpoint must not crash on it.
+    seedUser(userA, {
+      notification_preferences: { email: true, defaults: { email: true } },
+    });
+
+    await expect(
+      updatePreferences(preferencesClient(), userA.id, { reminders: false })
+    ).resolves.toEqual({ email: true, reminders: false, weeklyDigest: true });
+  });
 });

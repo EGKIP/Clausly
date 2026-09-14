@@ -76,3 +76,45 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-0ayodt`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-14
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (552/552, 102 files, vitest — 14 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2 (security, open redirect):** `/login?next=...` only checked `next.startsWith("/")` before rendering it into `AuthCard`, which does `window.location.href = next` immediately after a successful password sign-in. `//evil.test` passes that check but browsers resolve a protocol-relative URL as `https://evil.test`, so a crafted `https://clausly.app/login?next=//evil.test` link sends a victim through a real, legitimate Clausly login and then off to an attacker-controlled site right after — a classic phishing/open-redirect primitive (CWE-601). `/auth/callback` already had the correct `//`-blocking check (`safeNextPath`), so OAuth/magic-link sign-in (which always round-trips through that route) was never affected — only the direct password-login redirect on the login page itself.
+- **P2 (functional/self-triggerable 500):** `notification_preferences` is a single JSONB column shared by three independent writers with incompatible key sets: the settings-page toggle endpoint (`src/lib/db/notification-preferences.ts`, keys `email`/`reminders`/`weekly_digest`/`welcome_email_sent_at`) hard-throws on any other key via `assertAllowedStoredKeys`; the Resend bounce/spam-complaint webhook (`src/lib/notifications/webhook.ts`) writes a `version` key into the same column to invalidate old one-click-unsubscribe links; and `/api/profile`'s notification path writes a `defaults` key. Once a real production event (an email bounce, or any direct call to `/api/profile` with a `notification_preferences` body) touched a user's row, that user's next `PATCH /api/settings/notifications` — the live toggle switches on `/dashboard/settings` — threw an uncaught `Error` and 500'd, permanently breaking their notification toggles.
+- **P3 (accessibility):** The account-deletion confirmation dialog (`src/app/dashboard/settings/page.tsx`) — the app's most destructive, irreversible action — had no `role="dialog"`/`aria-modal` and no Escape-key close; keyboard users could Tab out into background content and Escape did nothing. `CompareWithButton`'s document picker had correct dialog markup but the same missing Escape handling. Neither has a full focus trap yet (the app's own reference pattern lives in `shell.tsx`'s mobile drawer) — left as a follow-up, not blocking.
+- Reviewed billing (`src/app/api/billing/`, `src/lib/billing/`), contract compare, and document sharing end-to-end via a focused sub-review: compare and sharing look solid (per-document/per-token ownership checks, share tokens are `randomBytes(32)`, expired/revoked tokens fail closed). Found one real gap not fixed today: the Stripe webhook only reacts to `checkout.session.completed` and `customer.subscription.deleted` — `customer.subscription.updated` (e.g. a renewal charge going `past_due`) isn't handled, so a user whose card is declined on renewal keeps Pro access indefinitely. Left for a future run since the right behavior (immediate downgrade vs. a grace period) is a product decision, not a pure bug fix.
+- Confirmed via Supabase advisors (`clausly-prod`): no new findings since the last run. `delete_account` remains intentionally callable by `authenticated` (enforces `auth.uid()` internally), `vector` extension is still in `public` (low severity, non-trivial migration), and leaked-password protection is still disabled (owner-side Auth dashboard setting, not code).
+- `npm audit`: one high/moderate pair, both from `postcss` bundled inside Next.js's own build tooling (`node_modules/next/node_modules/postcss`), fixable only via a Next 16 major bump. Build-time-only exposure (source-map/CSS-stringify parsing during `next build`, not a runtime code path), so not worth the major-version churn today; worth revisiting when a routine Next upgrade is otherwise due.
+
+### Fixes Completed
+- Added `src/lib/auth/safe-next-path.ts` (a single shared `safeNextPath` helper) and used it in both `/login` (`src/app/(auth)/login/page.tsx`) and `/auth/callback` (`src/app/auth/callback/route.ts`, replacing its local duplicate of the same check) so a `//`-style protocol-relative redirect target is rejected everywhere `next` is trusted, not just in the one place it happened to already be checked.
+- `src/lib/db/notification-preferences.ts`: widened `assertAllowedStoredKeys` to also accept `version` and `defaults` — the two extra keys legitimately written elsewhere in this codebase into the same column — instead of hard-failing the settings-toggle endpoint on them. The guard still rejects genuinely unrecognized keys (existing `sms` test case still passes).
+- `src/app/dashboard/settings/page.tsx`: delete-account modal now has `role="dialog"`/`aria-modal`/`aria-labelledby` and closes on Escape (guarded so Escape can't be used to dodge an in-flight delete request).
+- `src/components/dashboard/compare/compare-with-button.tsx`: the compare picker now closes on Escape, matching its existing backdrop-click-to-close behavior.
+
+### Tests Added/Changed
+- `src/lib/auth/__tests__/safe-next-path.test.ts`: new — same-origin path allowed, missing/absolute/protocol-relative `next` all fall back to `/dashboard`.
+- `src/app/(auth)/login/__tests__/page.test.tsx`: new — asserts the exact `next` value `LoginPage` hands to `AuthCard` (the value that ends up in `window.location.href`) is sanitized for `//evil.test`, `https://evil.test`, and a missing `next`.
+- `src/app/auth/callback/__tests__/route.test.ts`: added a protocol-relative-URL regression case alongside the existing absolute-URL one.
+- `src/lib/db/__tests__/notification-preferences.test.ts`: added cases reproducing the webhook-written `version` key and the profile-endpoint-written `defaults` key no longer crashing `updatePreferences`.
+- `src/app/dashboard/settings/__tests__/page.test.tsx`: new — delete-account dialog has `aria-modal` and closes on Escape.
+- `src/components/dashboard/compare/__tests__/compare-with-button.test.tsx`: new — compare picker dialog closes on Escape.
+
+### Remaining Concerns
+- No P0 issues found. No P1s found or introduced.
+- Billing webhook doesn't react to `customer.subscription.updated` (see Issues Found) — needs a product decision on grace-period vs. immediate downgrade before implementing; documented for a future run.
+- Neither the delete-account dialog nor the compare picker has a full focus trap yet (Escape-to-close is fixed; Tab can still leave the dialog). `shell.tsx`'s mobile drawer already has the app's correct reference implementation — worth reusing as a shared hook in a future pass instead of re-implementing per-modal.
+- `postcss` advisory via Next's bundled build tooling remains open pending a Next 16 upgrade (build-time only, not a runtime risk).
+- No E2E/browser test harness exists yet, and this sandbox has no live Supabase credentials, so protected-route/auth behavior was verified by dev-server smoke checks plus code + unit/integration tests, not a live authenticated browser session. Playwright remains a reasonable future investment.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-355qe4`
+- PR: opened against `main` (see PR description for link)

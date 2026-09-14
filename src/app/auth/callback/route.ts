@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { sendWelcomeEmailOnceForUser } from "@/lib/notifications/welcome";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 
@@ -66,9 +67,4 @@ function scheduleWelcomeEmail(userId: string) {
       });
     }
   });
-}
-
-function safeNextPath(next: string | null) {
-  if (!next?.startsWith("/") || next.startsWith("//")) return "/dashboard";
-  return next;
 }

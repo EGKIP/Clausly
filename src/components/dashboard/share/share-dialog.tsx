@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/primitives";
 import type { PlanName } from "@/lib/billing/limits";
 import { cn } from "@/lib/utils";
-import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 type Share = {
@@ -52,13 +51,11 @@ export function ShareDialog({
   const [error, setError] = React.useState<string | null>(null);
   const panelRef = React.useRef<HTMLDivElement>(null);
 
+  useDismissOnEscape(open, () => setOpen(false));
+
   React.useEffect(() => {
     if (!open) return;
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        return;
-      }
       if (event.key !== "Tab") return;
       const panel = panelRef.current;
       if (!panel) return;
@@ -88,9 +85,6 @@ export function ShareDialog({
     const focusable = getFocusableElements(panel);
     (focusable[0] ?? panel).focus();
   }, [open, plan]);
-
-  const panelRef = useClickOutside<HTMLDivElement>(open, () => setOpen(false));
-  useDismissOnEscape(open, () => setOpen(false));
 
   React.useEffect(() => {
     if (!open || plan !== "pro") return;
@@ -184,7 +178,7 @@ export function ShareDialog({
   }
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative">
       <Button
         variant="ghost"
         size="sm"

@@ -6,6 +6,7 @@ import { AlertTriangle, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocumentStatus } from "@/lib/db/types";
 import { useDocumentStatusPoll } from "@/lib/hooks/use-document";
+import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
 import { FAILURE_CATEGORY_COPY, type AnalysisFailureCategory } from "@/lib/ai/failure-categories";
 
 /* Branches the document detail page rendering on the document.status field.
@@ -37,6 +38,7 @@ export function AnalysisGate({
    * the detail page hydrates with the freshly-persisted clauses/dates. */
   React.useEffect(() => {
     if (status !== initialStatus && (status === "ready" || status === "failed")) {
+      notifyDocumentsChanged();
       router.refresh();
     }
   }, [router, status, initialStatus]);
@@ -55,21 +57,23 @@ export function AnalysisGate({
   return <AnalyzingState />;
 }
 
-/* Client-perceived elapsed time since this skeleton mounted. Server-side stuck
- * jobs are recovered by the /api/admin/recover-stuck-analyses cron (10-min
- * threshold); this is just an in-UI reassurance so a slow-but-healthy
- * analysis doesn't look frozen. */
-const SLOW_ANALYSIS_THRESHOLD_SECONDS = 20;
+/* Thresholds (ms) after which the "still working" copy escalates. Tuned
+ * against the normal case (a few seconds) and the stuck-analysis recovery
+ * cron, which requeues anything stuck past ~10 minutes. */
+const SLOW_NOTICE_MS = 20_000;
+const VERY_SLOW_NOTICE_MS = 90_000;
 
 function AnalyzingState() {
-  const [elapsedSeconds, setElapsedSeconds] = React.useState(0);
+  const [elapsedTier, setElapsedTier] = React.useState<"normal" | "slow" | "verySlow">("normal");
 
   React.useEffect(() => {
-    const timer = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
-    return () => clearInterval(timer);
+    const slowTimer = setTimeout(() => setElapsedTier("slow"), SLOW_NOTICE_MS);
+    const verySlowTimer = setTimeout(() => setElapsedTier("verySlow"), VERY_SLOW_NOTICE_MS);
+    return () => {
+      clearTimeout(slowTimer);
+      clearTimeout(verySlowTimer);
+    };
   }, []);
-
-  const isSlow = elapsedSeconds >= SLOW_ANALYSIS_THRESHOLD_SECONDS;
 
   return (
     <div className="mt-8 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 md:p-10">
@@ -86,10 +90,11 @@ function AnalyzingState() {
         Clausly is extracting clauses, dates, and risks. This usually takes a few seconds.
         We&apos;ll refresh the page automatically when it&apos;s done.
       </p>
-      {isSlow && (
-        <p className="mt-2 max-w-xl text-[13px] text-[var(--accent-ink)]" role="status">
-          Still working — this is taking longer than usual. Large or scanned documents can take
-          a minute or two. No need to refresh; we&apos;ll update this page automatically.
+      {elapsedTier !== "normal" && (
+        <p className="mt-2 max-w-xl text-[13px] text-[var(--muted)]">
+          {elapsedTier === "slow"
+            ? "This one's taking a little longer than usual — large or scanned documents can need extra time."
+            : "Still working. It's safe to leave this page — analysis continues in the background, and this page will show your results automatically next time you open it."}
         </p>
       )}
 

@@ -24,6 +24,14 @@ describe("reminder lifecycle validation", () => {
     expect(reminderPatchLifecycleSchema.safeParse({ fire_on: "0000-02-29" }).success).toBe(false);
   });
 
+  it("rejects reminder_time values with an out-of-range hour or minute", () => {
+    expect(reminderPatchLifecycleSchema.safeParse({ reminder_time: "09:30" }).success).toBe(true);
+    expect(reminderPatchLifecycleSchema.safeParse({ reminder_time: "23:59:59" }).success).toBe(true);
+    expect(reminderPatchLifecycleSchema.safeParse({ reminder_time: "24:00" }).success).toBe(false);
+    expect(reminderPatchLifecycleSchema.safeParse({ reminder_time: "12:60" }).success).toBe(false);
+    expect(reminderPatchLifecycleSchema.safeParse({ reminder_time: "99:99" }).success).toBe(false);
+  });
+
   it("maps API dismissed status to the current database enum", () => {
     const parsed = reminderListQuerySchema.parse({ status: "dismissed" });
 

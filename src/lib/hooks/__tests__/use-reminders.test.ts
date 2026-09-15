@@ -128,6 +128,50 @@ describe("useReminders", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/reminders/reminder-1", { method: "DELETE" });
   });
 
+  it("drops an approved reminder from a list filtered to suggested status", async () => {
+    const approved = { ...reminder, status: "approved" as const };
+    mockFetch(
+      jsonResponse({ reminders: [reminder] }),
+      jsonResponse({ reminder: approved })
+    );
+
+    const { result } = renderHook(() => useReminders({ status: "suggested" }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.reminders).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.approve(reminder.id);
+    });
+
+    expect(result.current.reminders).toHaveLength(0);
+  });
+
+  it("keeps an approved reminder that failed to save in the suggested list", async () => {
+    const approval = deferred<Response>();
+    mockFetch(
+      jsonResponse({ reminders: [reminder] }),
+      approval.promise
+    );
+
+    const { result } = renderHook(() => useReminders({ status: "suggested" }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let approvePromise: Promise<Reminder | null>;
+    act(() => {
+      approvePromise = result.current.approve(reminder.id);
+    });
+
+    await waitFor(() => expect(result.current.reminders).toHaveLength(0));
+
+    approval.resolve(jsonResponse({ error: "Approval failed" }, { status: 500 }));
+    await act(async () => {
+      await approvePromise;
+    });
+
+    expect(result.current.reminders).toHaveLength(1);
+    expect(result.current.reminders[0].status).toBe("suggested");
+  });
+
   it("rolls back optimistic approval when the mutation fails", async () => {
     const approval = deferred<Response>();
     mockFetch(

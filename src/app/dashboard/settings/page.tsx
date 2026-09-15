@@ -3,8 +3,11 @@
 import * as React from "react";
 import { AlertTriangle, CheckCircle2, LogOut, Mail, Save, ShieldAlert, Sparkles, User } from "lucide-react";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
-import type { NotificationPreferences as NotificationPreferencesShape } from "@/components/dashboard/settings/notification-preferences-card";
 import { NotificationPreferences } from "@/components/dashboard/settings/notification-preferences";
+import type { notificationPreferencesSchema } from "@/lib/validation/schemas";
+import type { z } from "zod";
+
+type NotificationPreferencesShape = z.infer<typeof notificationPreferencesSchema>;
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -12,6 +15,7 @@ import { signOut } from "@/lib/auth/actions";
 import type { PlanName } from "@/lib/billing/limits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 type Profile = {
   displayName: string;
@@ -123,6 +127,15 @@ export default function SettingsPage() {
 
     window.location.assign("/?account=deleted");
   }
+
+  function closeDeleteConfirm() {
+    setConfirmOpen(false);
+    setConfirmEmail("");
+    setDeleteMessage(null);
+    setDeleteStatus("idle");
+  }
+
+  useDismissOnEscape(confirmOpen && deleteStatus !== "deleting", closeDeleteConfirm);
 
   async function startCheckout() {
     await startBillingRedirect("/api/billing/checkout", "Checkout could not be started.");
@@ -356,7 +369,13 @@ export default function SettingsPage() {
       </div>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && deleteStatus !== "deleting") closeDeleteConfirm();
+          }}
+        >
           <form
             onSubmit={deleteAccount}
             className="max-h-[calc(100vh-2rem)] w-full max-w-[460px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-float)] sm:p-6"
@@ -394,12 +413,7 @@ export default function SettingsPage() {
                 variant="ghost"
                 size="sm"
                 className="min-h-11 w-full sm:min-h-0 sm:w-auto"
-                onClick={() => {
-                  setConfirmOpen(false);
-                  setConfirmEmail("");
-                  setDeleteMessage(null);
-                  setDeleteStatus("idle");
-                }}
+                onClick={closeDeleteConfirm}
                 disabled={deleteStatus === "deleting"}
               >
                 Close

@@ -44,6 +44,17 @@ describe("DeleteDocumentButton", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("closes the confirmation on Escape", () => {
+    render(<DeleteDocumentButton documentId="doc-1" documentTitle="Apartment lease" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /delete document/i }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("deletes the document and redirects after confirmation", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), {
       status: 200,

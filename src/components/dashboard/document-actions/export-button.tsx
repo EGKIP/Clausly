@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { ExportUsage } from "@/lib/exports/limits";
 import { cn } from "@/lib/utils";
+import { useClickOutside } from "@/lib/hooks/use-click-outside";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 type ExportFormat = "pdf" | "csv";
 
@@ -21,6 +23,9 @@ export function ExportButton({
   const [status, setStatus] = React.useState<"idle" | "loading">("idle");
   const [error, setError] = React.useState<string | null>(null);
   const disabled = currentUsage.remaining <= 0;
+
+  const panelRef = useClickOutside<HTMLDivElement>(open, () => setOpen(false));
+  useDismissOnEscape(open, () => setOpen(false));
 
   async function download(format: ExportFormat) {
     if (disabled) {
@@ -73,7 +78,7 @@ export function ExportButton({
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={panelRef}>
       <Button
         variant="ghost"
         size="sm"

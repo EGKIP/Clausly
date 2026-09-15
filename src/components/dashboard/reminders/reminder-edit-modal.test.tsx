@@ -37,6 +37,54 @@ describe("ReminderEditModal", () => {
     expect(screen.getByLabelText("Time")).toHaveValue("09:30");
   });
 
+  it("closes on Escape", () => {
+    const onClose = vi.fn();
+    render(
+      <ReminderEditModal
+        reminder={reminder}
+        isSaving={false}
+        onClose={onClose}
+        onSave={vi.fn()}
+      />
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("does not close on Escape while saving", () => {
+    const onClose = vi.fn();
+    render(
+      <ReminderEditModal
+        reminder={reminder}
+        isSaving={true}
+        onClose={onClose}
+        onSave={vi.fn()}
+      />
+    );
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes on backdrop click", () => {
+    const onClose = vi.fn();
+    render(
+      <ReminderEditModal
+        reminder={reminder}
+        isSaving={false}
+        onClose={onClose}
+        onSave={vi.fn()}
+      />
+    );
+
+    fireEvent.mouseDown(screen.getByRole("dialog").parentElement as Element);
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
   it("closes without saving when values are unchanged", () => {
     const onClose = vi.fn();
     const onSave = vi.fn();

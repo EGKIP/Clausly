@@ -92,9 +92,12 @@ export function useReminders(filters: ReminderFilters = {}): State {
   const approve = React.useCallback((id: string, overrides: ReminderMutationPatch = {}) => {
     const previous = reminders;
     setError(null);
-    setReminders((current) => current.map((reminder) =>
-      reminder.id === id ? applyPatchToReminder({ ...reminder, status: "approved" }, overrides) : reminder
-    ));
+    setReminders((current) => {
+      const next = current.map((reminder) =>
+        reminder.id === id ? applyPatchToReminder({ ...reminder, status: "approved" }, overrides) : reminder
+      );
+      return dropIfStatusChanged(next, status);
+    });
 
     return withPending(id, async () => {
       const response = await fetch(`/api/reminders/${encodeURIComponent(id)}/approve`, {
@@ -112,12 +115,12 @@ export function useReminders(filters: ReminderFilters = {}): State {
       const payload = (await response.json()) as ReminderPayload;
       if (payload.reminder) {
         const nextReminder = normalizeReminder(payload.reminder);
-        setReminders((current) => replaceReminder(current, nextReminder));
+        setReminders((current) => dropIfStatusChanged(replaceReminder(current, nextReminder), status));
         return nextReminder;
       }
       return null;
     });
-  }, [reminders, withPending]);
+  }, [reminders, withPending, status]);
 
   const update = React.useCallback((id: string, patch: ReminderMutationPatch) => {
     setError(null);
@@ -167,6 +170,17 @@ function replaceReminder(reminders: Reminder[], next: Reminder) {
   const exists = reminders.some((reminder) => reminder.id === next.id);
   if (!exists) return reminders;
   return reminders.map((reminder) => reminder.id === next.id ? next : reminder);
+}
+
+/**
+ * This hook's list is fetched filtered by `filters.status`. A mutation like
+ * `approve` can flip a reminder's status to something outside that filter
+ * (e.g. "suggested" -> "approved"), which would otherwise leave a stale
+ * duplicate sitting in this list until the next full refetch.
+ */
+function dropIfStatusChanged(reminders: Reminder[], status: ReminderFilters["status"]) {
+  if (!status) return reminders;
+  return reminders.filter((reminder) => reminder.status === status);
 }
 
 function applyPatchToReminder(reminder: Reminder, patch: ReminderMutationPatch) {

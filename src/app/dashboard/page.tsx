@@ -103,6 +103,11 @@ export default async function DashboardHomePage() {
             }
           />
           <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--border)] overflow-hidden">
+            {upcoming.length === 0 && (
+              <p className="px-4 py-5 text-[12.5px] text-[var(--faint)] italic sm:px-5">
+                Nothing needs attention right now. You&apos;re caught up.
+              </p>
+            )}
             {upcoming.map((r) => {
               const tone = r.daysAway < 14 ? "coral" : r.daysAway < 30 ? "ember" : "iris";
               return (

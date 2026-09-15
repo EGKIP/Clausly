@@ -77,40 +77,44 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - Branch: `claude/upbeat-newton-0ayodt`
 - PR: opened against `main` (see PR description for link)
 
-## 2026-09-11
+## 2026-09-09
 
 ### Quality Gates
 - Build: pass
 - Typecheck: pass (`tsc --noEmit`)
 - Lint: pass (`next lint`, no warnings)
-- Unit tests: pass (552/552, 100 files, vitest — 14 new)
+- Unit tests: pass (557/557, 101 files, vitest — 19 new)
 - E2E: none configured (still no Playwright in this repo)
 
 ### Issues Found
-- **P2 (recurring, documented but unfixed in the 2026-09-09 and 2026-09-10 runs — both still open as unmerged PRs #71/#72):** Several dialogs/dropdowns across the app couldn't be dismissed with Escape, and two had no click-outside-to-close either, inconsistent with the rest of the app (upload modal, command palette, mobile nav drawer all support Escape via `shell.tsx`). Specifically: `ReminderEditModal` (no Escape, no backdrop click), the settings "Delete account" confirmation (no Escape, no backdrop click — the backdrop `<div>` had no dismiss handler at all), `DeleteDocumentButton`'s confirmation (had backdrop click, no Escape), and the `ShareDialog`/`ExportButton` popovers (absolutely-positioned dropdowns with no backdrop and no outside-click handling of any kind — clicking anywhere else on the page left them open). Every affected dialog already had an explicit close control, so nothing was truly unclosable, but the inconsistency is real UX friction and a WAI-ARIA dialog-pattern gap.
-- Verified `notification-preferences-card.tsx` (flagged as dead code in the 2026-09-09 run) was in fact unused except for one type-only import in `settings/page.tsx`; the component it was superseded by (`notification-preferences.tsx`) is the only one actually rendered.
-- Re-checked Supabase security/performance advisors on `clausly-prod`: no new findings since the 2026-09-08 run (same three: `vector` extension in `public` schema, `delete_account` executable by `authenticated` — intentional, self-scoped via `auth.uid()` — and leaked-password protection disabled, an owner Auth-settings action, not code). Performance advisor shows only INFO-level unindexed-FK/unused-index notices on a low-traffic database.
-- No new P0/P1s found. PRs #71 and #72 from the two prior runs remain open and unmerged (owner review pending); this run built on `main` independently rather than stacking on top of them, to avoid depending on unreviewed changes.
+- **P1:** The "forgot password" flow was completely non-functional. `resetPasswordForEmail` sent a link redirecting to `/login`; middleware forwarded the recovery `code` to `/auth/callback`, which exchanged it for a live session and redirected straight to `/dashboard`. No page anywhere called `supabase.auth.updateUser`, so a user could request a reset, click the email, land fully signed in, and never be shown a form to actually set a new password — their old password stayed unchanged with no error or explanation.
+- **P1:** Open redirect via the `next` query param on `/login` and in `/auth/callback`. Both only checked `next.startsWith("/")` (`/auth/callback` also excluded literal `"//"`), which a backslash-based payload like `next=/\evil.test` bypasses — `new URL("/\\evil.test", origin)` resolves to `https://evil.test/` in both Node and browsers. On `/login`, a successful password sign-in did `window.location.href = next` directly with no sanitization at all, so a crafted `/login?next=%2F%5Cevil.test` link could send a user to an attacker-controlled site immediately after they authenticated with real credentials.
+- **P1:** Approving a suggested reminder left a stale duplicate behind. `useReminders({status: "suggested"})`'s optimistic update (and the subsequent server-response merge) flipped the approved item's `status` in place without removing it from the array, so the reminders page — which renders each hook's `reminders` array directly — showed the same reminder simultaneously under "Suggested" (with live Approve/Edit/Ignore buttons) and "Approved", and the tab count badges were wrong until a full remount.
+- **P2:** Signup unconditionally redirected to `/dashboard/welcome` after `supabase.auth.signUp`, ignoring whether the response actually included a session. When email confirmation is required, `signUp` succeeds with `session: null`; the user was bounced straight to a route the middleware then rejected (no session found), landing them back on `/login` with zero explanation — unlike the magic-link and reset flows, which correctly show a "check your inbox" state.
+- Two independent read-only audits (dashboard/settings/mobile, and the upload/analysis pipeline) found no other P0/P1s: file-type/size validation, ownership scoping (`.eq('user_id', ...)` on every reminder/document query), analysis attempt-fencing, and the stuck-analysis recovery cron all checked out. Noted for a future pass (P2/P3, not fixed today): the delete-account and reminder-edit modals don't close on Escape or backdrop click (only their explicit Close/Cancel buttons work), and `notification-preferences-card.tsx` is a dead, unused component superseded by `notification-preferences.tsx`.
+- Supabase security/performance advisors re-checked against `clausly-prod`: no new findings since the last run (`vector` extension in `public` schema, `delete_account` callable by `authenticated` — both previously reviewed and judged intentional/low-risk; leaked-password protection still disabled, dashboard setting, owner action). `npm audit` flags a moderate/high PostCSS advisory that only resolves via a Next.js 16 major bump — not attempted today, logged as a known dependency risk.
 
 ### Fixes Completed
-- Added `src/lib/hooks/use-dismiss-on-escape.ts` and `src/lib/hooks/use-click-outside.ts` — small, single-purpose hooks (Escape-to-close, and click-outside-to-close for elements with no full-screen backdrop).
-- Wired Escape + backdrop-click into `ReminderEditModal` and the settings "Delete account" modal (both previously had neither); added Escape to `DeleteDocumentButton`'s confirmation (already had backdrop click); added Escape + click-outside to the `ShareDialog` and `ExportButton` popovers. All respect in-flight saving/deleting state the same way the existing Cancel buttons already did (no dismiss mid-mutation).
-- Deleted the dead `notification-preferences-card.tsx` component and its test; `settings/page.tsx` now derives its `NotificationPreferences` type directly from `notificationPreferencesSchema` in `@/lib/validation/schemas` instead of importing a type from the otherwise-unused file.
-- **Follow-up (same PR, caught by automated review on #73):** the `ShareDialog`/`ExportButton` click-outside ref initially wrapped only the popup panel, not its trigger button — clicking the trigger again to close the popup fired the outside-click dismiss on `mousedown` and then the trigger's own `onClick` toggled it back open, so the trigger could no longer close its own menu. Moved the ref to the wrapping container (trigger + panel) in both files; added a regression test to each asserting the trigger can close its own popup.
+- Added `src/lib/auth/safe-next-path.ts`: resolves the candidate `next` value against a sentinel origin via `new URL()` and rejects anything that doesn't resolve back to that same origin (catches `//`, backslash, and absolute-URL bypasses in one check, not just a `startsWith` heuristic). Wired into `/login` (`src/app/(auth)/login/page.tsx`), `/auth/callback` (replacing its narrower local `safeNextPath`), and `auth-card.tsx`'s client-side password-sign-in redirect as defense-in-depth.
+- Added `/reset-password` (`src/app/(auth)/reset-password/page.tsx` + `src/components/auth/reset-password-card.tsx`): the forgot-password email now redirects through `/auth/callback?next=/reset-password` (matching the existing magic-link/OAuth pattern) so the recovery code is exchanged for a session before the user lands on a real "choose a new password" form that calls `supabase.auth.updateUser`. Shows a "link expired" state with a link back to `/forgot-password` if the page is reached without a valid session.
+- `src/lib/hooks/use-reminders.ts`: `approve()` now drops the mutated item from the hook's own array whenever its new status no longer matches the `status` filter the hook was fetched with, both in the optimistic update and after the server response — the stale-duplicate row disappears from "Suggested" the moment it's approved instead of waiting for a remount.
+- `src/components/auth/auth-card.tsx`: signup now checks `data.session` from `supabase.auth.signUp` and shows the existing "Check your inbox" state when confirmation is required, instead of redirecting into a route the middleware immediately rejects.
 
 ### Tests Added/Changed
-- `src/lib/hooks/__tests__/use-dismiss-on-escape.test.ts`, `src/lib/hooks/__tests__/use-click-outside.test.tsx`: new, cover both hooks directly (active/inactive, Escape vs. other keys, inside vs. outside clicks).
-- `reminder-edit-modal.test.tsx`, `delete-document-button.test.tsx`, `export-button.test.tsx`, `share-dialog.test.tsx`: new cases asserting Escape (and, where applicable, backdrop/outside click) closes each dialog, and that the reminder modal does not close on Escape while a save is in flight.
-- `src/app/dashboard/settings/__tests__/page.test.tsx`: new file — first test coverage for this page, covering the delete-account confirmation's Escape and backdrop-click dismissal.
-- `export-button.test.tsx`, `share-dialog.test.tsx`: added a case asserting the trigger button can still close its own popup (the follow-up fix above).
+- `src/lib/auth/__tests__/safe-next-path.test.ts`: new, covers same-origin passthrough plus every bypass shape identified above (`//`, backslash, absolute URL, non-http scheme) and the custom-fallback parameter.
+- `src/app/auth/callback/__tests__/route.test.ts`: new case asserting the backslash bypass is rejected.
+- `src/components/auth/__tests__/auth-card.test.tsx`: new file — sanitized vs. safe `next` redirect after password sign-in, signup with/without an active session, and that the forgot-password request now points at `/auth/callback?next=/reset-password`.
+- `src/components/auth/__tests__/reset-password-card.test.tsx`: new file — expired-link state with no session, mismatched-password rejection, successful `updateUser` + redirect, and surfacing an `updateUser` error.
+- `src/lib/hooks/__tests__/use-reminders.test.ts`: new cases confirming an approved reminder is dropped from a `status: "suggested"`-filtered list on success, and put back if the approval request fails.
 
 ### Remaining Concerns
-- No P0/P1 issues found or introduced.
-- Same three Supabase advisor items as previous runs, none newly actionable (see Issues Found).
-- `npm audit` still reports a moderate/high PostCSS advisory reachable only through Next.js's bundled dependency; the only fix path is a Next.js 16 major upgrade, out of scope for a targeted daily pass.
-- PRs #71 and #72 (2026-09-09 and 2026-09-10 runs) remain open awaiting owner review; today's fixes are independent of both and shouldn't conflict, but all three will need to be merged in some order.
-- No E2E/browser test harness exists yet, and this session had no live Supabase credentials configured (`.env.local` not present), so UI flows were verified by reading route/component code and by adding/running targeted unit + integration tests rather than driving a real browser. Playwright remains a reasonable future investment.
+- No P0 issues found. The three P1s above are fixed and tested.
+- Delete-account and reminder-edit confirmation modals don't dismiss on Escape or backdrop click (P2/P3, only their own Close/Cancel buttons work) — worth centralizing into a shared dismiss hook in a future pass; not fixed today to keep this change set focused on the P1 auth/reminders issues.
+- `notification-preferences-card.tsx` + its test are dead code, superseded by `notification-preferences.tsx` — safe to delete in a future pass (P4).
+- Owner action still recommended (dashboard setting, not code): enable leaked-password protection in Supabase Auth → Policies for `clausly-prod`.
+- `npm audit` reports a moderate/high-severity PostCSS advisory reachable only through Next.js's bundled dependency; the only fix path is a Next.js 16 major upgrade, which is out of scope for a targeted daily pass — flagging for a deliberate, tested upgrade rather than attempting it here.
+- No E2E/browser test harness exists yet — flows were verified by reading route/component code and adding/running targeted unit + component tests. Playwright remains a reasonable future investment, especially now that the auth flows (signup/login/reset) have more surface area worth covering end-to-end.
 
 ### PR/Branch
-- Branch: `claude/upbeat-newton-wfnwuy`
+- Branch: `claude/upbeat-newton-f5ki7h`
 - PR: opened against `main` (see PR description for link)

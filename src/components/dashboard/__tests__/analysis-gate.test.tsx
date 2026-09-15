@@ -76,13 +76,13 @@ describe("AnalysisGate", () => {
       </AnalysisGate>
     );
 
-    expect(screen.queryByText(/taking longer than usual/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/taking a little longer than usual/i)).not.toBeInTheDocument();
 
     act(() => {
       vi.advanceTimersByTime(20_000);
     });
 
-    expect(screen.getByText(/taking longer than usual/i)).toBeInTheDocument();
+    expect(screen.getByText(/taking a little longer than usual/i)).toBeInTheDocument();
   });
 
   it("retries analysis and switches back to the analyzing view", async () => {

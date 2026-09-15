@@ -58,20 +58,34 @@ describe("ShareDialog", () => {
     expect(screen.queryByText("Share links are a Pro feature.")).not.toBeInTheDocument();
   });
 
-  it("closes on an outside click", () => {
-    render(
-      <div>
-        <ShareDialog documentId="doc-1" plan="free" />
-        <button type="button">Elsewhere</button>
-      </div>
-    );
+  it("closes when the backdrop is clicked", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
 
     fireEvent.click(screen.getByRole("button", { name: /share document/i }));
     expect(screen.getByText("Share links are a Pro feature.")).toBeInTheDocument();
 
-    fireEvent.mouseDown(screen.getByRole("button", { name: /elsewhere/i }));
+    fireEvent.mouseDown(screen.getByRole("presentation"));
 
     expect(screen.queryByText("Share links are a Pro feature.")).not.toBeInTheDocument();
+  });
+
+  it("traps Tab focus inside the dialog so the page behind it isn't reachable", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /share document/i }));
+
+    const closeButton = screen.getByRole("button", { name: /close share dialog/i });
+    const upgradeLink = screen.getByRole("link", { name: /upgrade to pro/i });
+
+    expect(document.activeElement).toBe(closeButton);
+
+    upgradeLink.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(closeButton);
+
+    closeButton.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(upgradeLink);
   });
 
   it("loads existing shares for Pro users", async () => {

@@ -1,8 +1,9 @@
 import React from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnalysisGate } from "../analysis-gate";
 import { FAILURE_CATEGORY_COPY } from "@/lib/ai/failure-categories";
+import { DOCUMENTS_CHANGED_EVENT } from "@/lib/hooks/use-documents";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn() }),
@@ -78,5 +79,61 @@ describe("AnalysisGate", () => {
 
     await waitFor(() => expect(screen.getByText("Reading your contract.")).toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledWith("/api/documents/doc-1/reanalyze", { method: "POST" });
+  });
+
+  it("escalates the analyzing copy the longer it takes", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <AnalysisGate documentId="doc-1" initialStatus="analyzing" initialErrorMessage={null} initialFailureCategory={null}>
+          <div>Document content</div>
+        </AnalysisGate>
+      );
+
+      expect(screen.queryByText(/taking a little longer/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/safe to leave this page/i)).not.toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      expect(screen.getByText(/taking a little longer/i)).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(70_000);
+      });
+      expect(screen.getByText(/safe to leave this page/i)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("notifies other mounted document lists once analysis finishes", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ status: "ready", errorMessage: null, failureCategory: null }), {
+            status: 200,
+          })
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const handleChange = vi.fn();
+      window.addEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
+
+      render(
+        <AnalysisGate documentId="doc-1" initialStatus="analyzing" initialErrorMessage={null} initialFailureCategory={null}>
+          <div>Document content</div>
+        </AnalysisGate>
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+
+      expect(handleChange).toHaveBeenCalledOnce();
+      window.removeEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

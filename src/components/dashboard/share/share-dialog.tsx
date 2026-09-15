@@ -50,6 +50,44 @@ export function ShareDialog({
   const [revokingId, setRevokingId] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = getFocusableElements(panel);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const focusable = getFocusableElements(panel);
+    (focusable[0] ?? panel).focus();
+  }, [open, plan]);
 
   const panelRef = useClickOutside<HTMLDivElement>(open, () => setOpen(false));
   useDismissOnEscape(open, () => setOpen(false));
@@ -157,11 +195,25 @@ export function ShareDialog({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[min(92vw,380px)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)]">
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-[oklch(0%_0_0/0.42)] px-3 py-4 sm:items-center sm:px-6"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setOpen(false);
+          }}
+        >
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="share-dialog-title"
+            tabIndex={-1}
+            className="max-h-[85vh] w-full max-w-[380px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-float)] outline-none"
+          >
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--muted)]">Read-only digest</p>
-              <h2 className="mt-1 font-serif text-[22px] leading-none">Share contract</h2>
+              <h2 id="share-dialog-title" className="mt-1 font-serif text-[22px] leading-none">Share contract</h2>
             </div>
             <button
               type="button"
@@ -257,6 +309,7 @@ export function ShareDialog({
               </div>
             </div>
           )}
+          </div>
         </div>
       )}
     </div>
@@ -316,4 +369,12 @@ function shareStatus(share: Share) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
 }

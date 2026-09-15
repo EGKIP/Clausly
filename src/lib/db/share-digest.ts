@@ -10,6 +10,7 @@ type ShareDigestClient = Parameters<typeof getShareByToken>[0] & {
 type ShareDigestQueryResult = { data: unknown; error: { code?: string; message: string } | null };
 type ShareDigestQuery = PromiseLike<ShareDigestQueryResult> & {
   eq: (column: string, value: unknown) => ShareDigestQuery;
+  in: (column: string, value: unknown[]) => ShareDigestQuery;
   order: (column: string, options?: { ascending?: boolean }) => ShareDigestQuery;
   single: () => Promise<ShareDigestQueryResult>;
 };
@@ -114,6 +115,7 @@ export async function getPublicShareDigest(
       .from("reminders")
       .select("id, title, description, fire_on, status")
       .eq("document_id", share.documentId)
+      .in("status", ["approved", "sent"])
       .order("fire_on", { ascending: true }) as PromiseLike<{ data: ReminderRow[] | null; error: { message: string } | null }>,
   ]);
 

@@ -79,4 +79,24 @@ describe("notification preference helpers", () => {
       .rejects
       .toThrow("Unsupported notification preference key: sms");
   });
+
+  it("tolerates the version/defaults keys written by PATCH /api/profile's unsubscribe-token versioning", async () => {
+    seedUser(userA, {
+      notification_preferences: {
+        email: false,
+        reminders: true,
+        weekly_digest: true,
+        version: 2,
+        defaults: { renewal_offsets: ["30d"] },
+      },
+    });
+
+    const preferences = await updatePreferences(preferencesClient(), userA.id, { reminders: false });
+
+    expect(preferences).toEqual({ email: false, reminders: false, weeklyDigest: true });
+    expect(db().users[0].notification_preferences).toMatchObject({
+      version: 2,
+      defaults: { renewal_offsets: ["30d"] },
+    });
+  });
 });

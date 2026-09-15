@@ -76,3 +76,39 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-0ayodt`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-15
+
+### Quality Gates
+- Build: pass (`next build`)
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (538/538, 98 files, vitest)
+- E2E: none configured (still no Playwright in this repo)
+- `npm audit` (prod deps): 1 high/1 moderate, both the same PostCSS advisory vendored inside `next`, only fixable via a Next.js 16 major bump — unchanged from prior runs, still deferred to a dedicated upgrade pass.
+
+### Issues Found
+No new defects were found in `main` itself (currently at `cc4f12c`, PR #70). The real finding today is process, not code:
+
+- **P1 (process, blocking real fixes from shipping):** Six consecutive daily-run PRs — **#71** (2026-09-09) through **#76** (2026-09-14) — are still open and unreviewed, all branched independently from the same `main` commit (`cc4f12c`). Because each run starts fresh from unmerged `main`, several bugs were independently rediscovered and re-fixed in more than one PR:
+  - The `next=` open-redirect bug (`safeNextPath`) was fixed once in **#71** and, since #71 was never merged, fixed again from scratch in **#76**.
+  - The `notification_preferences` JSONB key allow-list 500 (`version`/`defaults` keys) was fixed independently in both **#75** and **#76**.
+  - Inconsistent modal Escape/backdrop dismissal was flagged in **#72**, fixed in **#73**, and partially re-touched again in **#75**/**#76**.
+  - Several PRs also touch the same files (`share-dialog.tsx`, `notification-preferences.ts`, various dialog components), so the longer these sit unmerged, the more they will conflict with each other on merge.
+  - Most importantly: **#71 fixes a real P1 — password reset was completely non-functional** (`resetPasswordForEmail` redirected into a flow that never called `updateUser`, so the "reset" link never actually changed the password). Confirmed today that `main`'s build output still has no `/reset-password` route, i.e. **this P1 has been sitting broken in production for 6+ days** with a working fix idle in an unreviewed PR.
+
+### Fixes Completed
+None. Given six overlapping, unreviewed PRs already exist against this exact `main` commit, opening a seventh independent PR today would add to the pile and risk yet more duplicate/conflicting fixes rather than improving the situation. No new code defect was found that isn't already covered by #71–#76.
+
+### Tests Added/Changed
+None.
+
+### Remaining Concerns
+- **Recommend the owner review and merge PRs #71–#76 promptly, in creation order, rebasing/resolving conflicts as needed** — starting with **#71** since it fixes the still-broken password-reset flow. Every day this backlog grows, more duplicate work and merge conflicts accumulate.
+- No new P0/P1 introduced or found in `main` itself; `main` passes every automated quality gate as of this run.
+- Prior outstanding items are unchanged and still owner-actionable, not code: leaked-password protection disabled in Supabase Auth → Policies; `vector` extension installed in `public` schema; PostCSS advisory requires a Next 16 major bump.
+- Still no committed Playwright/E2E suite.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-lw8zvq`
+- PR: documentation-only (this log entry); no code changes were made — see Issues Found for why.

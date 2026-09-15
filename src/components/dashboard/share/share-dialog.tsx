@@ -50,17 +50,13 @@ export function ShareDialog({
   const [revokingId, setRevokingId] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const panelRef = React.useRef<HTMLDivElement>(null);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (!open) return;
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        return;
-      }
       if (event.key !== "Tab") return;
-      const panel = panelRef.current;
+      const panel = dialogRef.current;
       if (!panel) return;
       const focusable = getFocusableElements(panel);
       if (focusable.length === 0) {
@@ -83,7 +79,7 @@ export function ShareDialog({
 
   React.useEffect(() => {
     if (!open) return;
-    const panel = panelRef.current;
+    const panel = dialogRef.current;
     if (!panel) return;
     const focusable = getFocusableElements(panel);
     (focusable[0] ?? panel).focus();
@@ -203,7 +199,7 @@ export function ShareDialog({
           }}
         >
           <div
-            ref={panelRef}
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="share-dialog-title"

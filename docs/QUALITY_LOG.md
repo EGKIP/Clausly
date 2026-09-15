@@ -118,3 +118,33 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-f5ki7h`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-15
+
+### Quality Gates
+- Build: **fail → fixed → pass** (see below)
+- Typecheck: **fail → fixed → pass** (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: **fail → fixed → pass** (587/587, 107 files, vitest)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P0 (production build broken on `main`):** `src/components/dashboard/share/share-dialog.tsx` declared `panelRef` twice (`TS2451: Cannot redeclare block-scoped variable 'panelRef'`) — a hard compile error that fails both `tsc --noEmit` and `next build`. Root cause: two different daily-run branches independently added dialog-dismissal behavior to the same component around the same time — PR #73 added a clean `useClickOutside`/`useDismissOnEscape`-based implementation, while a different branch (merged shortly after) added its own manual `useRef` + Tab-focus-trap + autofocus implementation on top of an older `main` that didn't yet have #73's change. Both diffs were textually non-overlapping (different line ranges), so GitHub's merge/squash produced no conflict warning, but the combined file was invalid TypeScript. This had already reached `main` (verified directly against `origin/main`, independent of this branch) before this run started.
+- **P1 (this branch's own history, not `main`):** This branch's PR (#74) had picked up a similar collision earlier in the day: a same-day branch (merged as #72) shipped a more complete version of this branch's own "slow analysis" UX fix. A `main`-into-branch merge on this branch correctly kept #72's superior code, but left a stale test behind (asserting copy text the merged component no longer renders) and dropped this branch's own 2026-09-12 log entry. A follow-up commit fixing this was pushed to the PR branch, but GitHub had already squash-merged the PR in its broken, pre-fix state moments earlier, so the stale test (not the fix) is what landed in `main` as part of #74's squash commit — reproducing the same class of bug as above, on the exact same file this run had already touched once today.
+- No other content-loss found: every file touched by #71–#75 was diffed directly against a fresh checkout of `origin/main` and found internally consistent (i.e., the two bugs above were the only casualties of this run of concurrent same-repo activity).
+
+### Fixes Completed
+- `src/components/dashboard/share/share-dialog.tsx`: removed the duplicate `panelRef` declaration. Kept both behaviors that were competing for the name: `useClickOutside` (bound to the outer trigger+panel wrapper, as #73 intended) stays `panelRef`; the Tab-focus-trap and autofocus-on-open logic now targets a separate `dialogRef` bound to the actual dialog panel node. Escape-to-close is handled once, via the existing `useDismissOnEscape` call (the duplicate manual Escape handler inside the Tab-trap effect was removed).
+- `src/components/dashboard/__tests__/analysis-gate.test.tsx`: removed the stale test that had leaked into `main` via #74's squash-merge (asserted "taking longer than usual" copy that the actual merged component — #72's two-tier version — never renders). The file's remaining tests already cover the merged component's real behavior more thoroughly.
+
+### Tests Added/Changed
+- None new — both fixes above are corrections to already-existing code/tests, not new functionality. Full suite re-run after each fix to confirm 0 regressions (587/587 passing; up from 580 reported by #75 due to the file restorations above).
+
+### Remaining Concerns
+- **Process risk, not app risk:** with multiple autonomous daily-run sessions apparently operating against this same repository concurrently, GitHub's squash-merge does not reliably catch same-file, non-overlapping-diff collisions — it produced two invalid-code merges into `main` in a single day (this entry and the one it fixes). Recommend either serializing these runs, or adding a required CI check effect that would have caught both of today's breaks before merge (both were plain `tsc --noEmit` failures) — that CI gate already exists per `.github/workflows` ("Lint, typecheck, and test"), so the real gap is that both PRs were squash-merged before/without waiting for or heeding that check on the final squashed content reaching `main`. Worth the owner's attention: a branch-protection rule requiring the check to pass **on `main` after merge**, or simply not merging same-day PRs that touch overlapping files without an explicit rebase, would have prevented both incidents.
+- Owner action still recommended (dashboard setting, not code): enable leaked-password protection in Supabase Auth → Policies for `clausly-prod`.
+- No E2E/browser test harness exists yet — still a reasonable future investment.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-zhaujr` (restarted from `main` after PR #74 merged)
+- PR: opened against `main` (see PR description for link)

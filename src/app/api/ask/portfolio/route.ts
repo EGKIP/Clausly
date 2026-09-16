@@ -149,7 +149,8 @@ export async function POST(request: Request) {
   const { data: documents, error: documentsError } = await supabase
     .from("documents")
     .select("id, title")
-    .in("id", documentIds);
+    .in("id", documentIds)
+    .eq("user_id", user.id);
 
   if (documentsError) return NextResponse.json({ error: documentsError.message }, { status: 500 });
 

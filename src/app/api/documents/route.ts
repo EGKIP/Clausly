@@ -19,6 +19,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from("documents")
     .select("*")
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

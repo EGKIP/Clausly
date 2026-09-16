@@ -17,7 +17,8 @@ export async function POST() {
 
   const { count, error: countError } = await supabase
     .from("documents")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
 
   if (countError) return NextResponse.json({ error: countError.message }, { status: 500 });
   if ((count ?? 0) > 0) {

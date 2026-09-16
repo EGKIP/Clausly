@@ -85,4 +85,14 @@ describe("UploadModal", () => {
     await waitFor(() => expect(onDocumentsChanged).toHaveBeenCalledTimes(1));
     window.removeEventListener("clausly:documents-changed", onDocumentsChanged);
   });
+
+  it("closes on Escape", async () => {
+    const onClose = vi.fn();
+    render(<UploadModal open onClose={onClose} />);
+
+    await screen.findByRole("dialog");
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });

@@ -161,4 +161,52 @@ describe("AnalysisGate", () => {
       vi.useRealTimers();
     }
   });
+
+  it("notifies other mounted document lists when a retried analysis fails again", async () => {
+    // Regression test: comparing against the original `initialStatus` prop
+    // (instead of the previous poll) suppressed the refresh whenever a
+    // retry landed back on the same status it started from.
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes("/reanalyze")) {
+          return new Response(JSON.stringify({ ok: true }), { status: 200 });
+        }
+        return new Response(
+          JSON.stringify({ status: "failed", errorMessage: "boom again", failureCategory: "unknown" }),
+          { status: 200 }
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const handleChange = vi.fn();
+      window.addEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
+
+      render(
+        <AnalysisGate
+          documentId="doc-1"
+          initialStatus="failed"
+          initialErrorMessage="boom"
+          initialFailureCategory="unknown"
+        >
+          <div>Document content</div>
+        </AnalysisGate>
+      );
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /re-analyze/i }));
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByText("Reading your contract.")).toBeInTheDocument();
+      expect(handleChange).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+
+      expect(handleChange).toHaveBeenCalledOnce();
+      window.removeEventListener(DOCUMENTS_CHANGED_EVENT, handleChange);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

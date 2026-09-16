@@ -154,14 +154,23 @@ export function useReminders(filters: ReminderFilters = {}): State {
   }, [withPending]);
 
   const dismiss = React.useCallback((id: string) => {
-    const previous = reminders;
+    // Captures the single removed item rather than the whole `reminders`
+    // snapshot: a batch of concurrent dismiss() calls (e.g. "archive all
+    // past reminders") would otherwise all roll back to the same pre-batch
+    // array on any one failure, silently reinstating rows whose delete had
+    // already succeeded.
+    const removed = reminders.find((reminder) => reminder.id === id) ?? null;
     setError(null);
     setReminders((current) => current.filter((reminder) => reminder.id !== id));
 
     return withPending(id, async () => {
       const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!response.ok) {
-        setReminders(previous);
+        if (removed) {
+          setReminders((current) =>
+            current.some((reminder) => reminder.id === id) ? current : [...current, removed]
+          );
+        }
         setError(await responseError(response, "Unable to ignore reminder."));
         return false;
       }

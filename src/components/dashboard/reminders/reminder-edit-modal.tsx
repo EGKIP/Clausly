@@ -173,8 +173,22 @@ function todayUtcDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const DISPLAY_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function dateForInput(value: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  // The API formats dates as "Jan 5, 2026" in UTC (see adapters.ts formatDate). Parsing that
+  // string with `new Date()` reinterprets it in the browser's local timezone, which shifts the
+  // date by a day for any timezone ahead of UTC. Parse the known format directly instead.
+  const match = /^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{4})$/.exec(value.trim());
+  if (match) {
+    const monthIndex = DISPLAY_MONTHS.indexOf(match[1]);
+    if (monthIndex !== -1) {
+      const month = String(monthIndex + 1).padStart(2, "0");
+      const day = match[2].padStart(2, "0");
+      return `${match[3]}-${month}-${day}`;
+    }
+  }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toISOString().slice(0, 10);

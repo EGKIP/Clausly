@@ -209,6 +209,41 @@ describe("useReminders", () => {
     expect(result.current.reminders[0].status).toBe("suggested");
     expect(result.current.error).toBe("Approval failed");
   });
+
+  it("doesn't reinstate an already-succeeded dismiss when a concurrent dismiss in the same batch fails", async () => {
+    // Mirrors PastRemindersArchiveCard's Promise.all(pastReminders.map(dismiss)):
+    // two dismiss() calls fired before either resolves.
+    const reminderTwo: Reminder = { ...reminder, id: "reminder-2" };
+    const firstDelete = deferred<Response>();
+    const secondDelete = deferred<Response>();
+    mockFetch(
+      jsonResponse({ reminders: [reminder, reminderTwo] }),
+      firstDelete.promise,
+      secondDelete.promise
+    );
+
+    const { result } = renderHook(() => useReminders());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let dismissOne: Promise<boolean>;
+    let dismissTwo: Promise<boolean>;
+    act(() => {
+      dismissOne = result.current.dismiss(reminder.id);
+      dismissTwo = result.current.dismiss(reminderTwo.id);
+    });
+
+    await waitFor(() => expect(result.current.reminders).toHaveLength(0));
+
+    firstDelete.resolve(jsonResponse({ ok: true }));
+    secondDelete.resolve(jsonResponse({ error: "Already sent" }, { status: 409 }));
+    await act(async () => {
+      await Promise.all([dismissOne, dismissTwo]);
+    });
+
+    // reminder-1's delete succeeded and must stay gone; only reminder-2's
+    // failed delete should be reinstated.
+    expect(result.current.reminders.map((item) => item.id)).toEqual([reminderTwo.id]);
+  });
 });
 
 function mockFetch(...responses: Array<Response | Promise<Response>>) {

@@ -187,7 +187,7 @@ export default async function InsightsPage() {
                   <CalendarClock className="size-2.5" /> {r.type}
                 </Badge>
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--faint)]">
-                  in {r.daysAway} days
+                  {r.daysAway < 0 ? `${Math.abs(r.daysAway)} days late` : `in ${r.daysAway} days`}
                 </span>
               </div>
               <p className="font-serif text-[18px] leading-tight tracking-[-0.005em] line-clamp-2">

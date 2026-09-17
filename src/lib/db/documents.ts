@@ -5,33 +5,23 @@ import { getClausesFor } from "@/lib/mock-clauses";
 import { documents as mockDocuments } from "@/lib/mock-data";
 import { reminders as mockReminders } from "@/lib/mock-reminders";
 import { toApiDate, toUiClause, toUiDocument, toUiReminder } from "./adapters";
-import type { DocumentDetail, DocumentRow, ReminderRow } from "./types";
+import type { DocumentDetail, ReminderRow } from "./types";
 import type { AnalysisFailureCategory } from "@/lib/ai/failure-categories";
 
+// RLS already scopes `documents` to `auth.uid() = user_id`; the explicit
+// `.eq("user_id", ...)` below is defense-in-depth against a future RLS
+// regression, not the only guard.
 export async function listDocuments() {
   if (!hasSupabaseEnv()) return mockDocuments;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const { data: { user } } = await supabase.auth.getUser();
+  let query = supabase.from("documents").select("*").order("created_at", { ascending: false });
+  if (user) query = query.eq("user_id", user.id);
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []).map(toUiDocument);
-}
-
-export async function listDocumentRows() {
-  if (!hasSupabaseEnv()) return [];
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("documents")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []) as DocumentRow[];
 }
 
 export async function getDocumentDetail(id: string): Promise<DocumentDetail | null> {

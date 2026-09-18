@@ -65,6 +65,22 @@ describe("UploadModal", () => {
     expect(await screen.findByText(/pasted contract text/i)).toBeInTheDocument();
   });
 
+  it("shows a clear message when the upload is rejected before it reaches the app (e.g. an infra-level 413)", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("Request Entity Too Large", {
+      status: 413,
+      headers: { "Content-Type": "text/plain" },
+    }));
+
+    const { container } = render(<UploadModal open onClose={vi.fn()} />);
+
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(["x".repeat(1024)], "contract.pdf", { type: "application/pdf" });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByText(/too large to upload/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^upload failed\.?$/i)).not.toBeInTheDocument();
+  });
+
   it("notifies mounted document lists so a new upload appears without waiting for the user to click through", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ id: "doc-text" }), {
       status: 201,

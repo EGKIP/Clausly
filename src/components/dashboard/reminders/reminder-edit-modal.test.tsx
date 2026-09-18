@@ -124,6 +124,24 @@ describe("ReminderEditModal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("pre-populates the fire date without a timezone-driven off-by-one", () => {
+    vi.stubEnv("TZ", "Asia/Tokyo");
+    try {
+      render(
+        <ReminderEditModal
+          reminder={{ ...reminder, fireOn: "Sep 20, 2026" }}
+          isSaving={false}
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
+      );
+
+      expect(screen.getByLabelText("Fire date")).toHaveValue("2026-09-20");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("blocks saving an approved reminder with a date moved into the past", async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();

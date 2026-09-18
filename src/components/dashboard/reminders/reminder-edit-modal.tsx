@@ -175,7 +175,10 @@ function todayUtcDate() {
 
 function dateForInput(value: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parsed = new Date(value);
+  // `value` is a human-readable string like "Sep 20, 2026" formatted in UTC
+  // (see formatDate in adapters.ts). Without a timezone, `new Date(...)`
+  // parses it as local midnight, shifting the date for anyone east of UTC.
+  const parsed = new Date(`${value} UTC`);
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toISOString().slice(0, 10);
 }

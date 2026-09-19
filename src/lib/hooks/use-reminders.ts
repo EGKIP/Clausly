@@ -96,7 +96,7 @@ export function useReminders(filters: ReminderFilters = {}): State {
   }, []);
 
   const approve = React.useCallback((id: string, overrides: ReminderMutationPatch = {}) => {
-    const previous = reminders;
+    const original = reminders.find((reminder) => reminder.id === id);
     setError(null);
     setReminders((current) => {
       const next = current.map((reminder) =>
@@ -113,7 +113,7 @@ export function useReminders(filters: ReminderFilters = {}): State {
       });
 
       if (!response.ok) {
-        setReminders(previous);
+        setReminders((current) => restoreReminder(current, original));
         setError(await responseError(response, "Unable to approve reminder."));
         return null;
       }
@@ -154,23 +154,14 @@ export function useReminders(filters: ReminderFilters = {}): State {
   }, [withPending]);
 
   const dismiss = React.useCallback((id: string) => {
-    // Captures the single removed item rather than the whole `reminders`
-    // snapshot: a batch of concurrent dismiss() calls (e.g. "archive all
-    // past reminders") would otherwise all roll back to the same pre-batch
-    // array on any one failure, silently reinstating rows whose delete had
-    // already succeeded.
-    const removed = reminders.find((reminder) => reminder.id === id) ?? null;
+    const original = reminders.find((reminder) => reminder.id === id);
     setError(null);
     setReminders((current) => current.filter((reminder) => reminder.id !== id));
 
     return withPending(id, async () => {
       const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!response.ok) {
-        if (removed) {
-          setReminders((current) =>
-            current.some((reminder) => reminder.id === id) ? current : [...current, removed]
-          );
-        }
+        setReminders((current) => restoreReminder(current, original));
         setError(await responseError(response, "Unable to ignore reminder."));
         return false;
       }
@@ -185,6 +176,19 @@ function replaceReminder(reminders: Reminder[], next: Reminder) {
   const exists = reminders.some((reminder) => reminder.id === next.id);
   if (!exists) return reminders;
   return reminders.map((reminder) => reminder.id === next.id ? next : reminder);
+}
+
+/**
+ * Rolls back a single failed optimistic mutation by restoring `original` in
+ * place (or re-adding it if the optimistic update had removed it), without
+ * touching any other mutation that may have completed on `reminders` in the
+ * meantime.
+ */
+function restoreReminder(reminders: Reminder[], original: Reminder | undefined) {
+  if (!original) return reminders;
+  const exists = reminders.some((reminder) => reminder.id === original.id);
+  if (exists) return reminders.map((reminder) => reminder.id === original.id ? original : reminder);
+  return [...reminders, original];
 }
 
 /**

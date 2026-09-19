@@ -4,6 +4,7 @@ import {
   createSupabaseClient,
   resetSupabaseMock,
   seedDocument,
+  seedReminder,
   seedUser,
   userA,
 } from "@/../tests/helpers/supabase";
@@ -24,6 +25,22 @@ describe("/dashboard/insights", () => {
     render(await InsightsPage());
 
     expect(screen.getByText("$1,550/mo")).toBeInTheDocument();
+  });
+
+  it("labels an overdue notice window as late instead of showing a negative day count", async () => {
+    seedUser(userA, { subscription_tier: "pro" });
+    const doc = seedDocument(userA, { id: "doc-1", title: "Office lease", monthly_value: 1200 });
+    seedReminder(doc.id, userA, {
+      title: "Send renewal opt-out notice",
+      reminder_type: "Notice",
+      status: "suggested",
+      fire_on: "2020-01-01",
+    });
+
+    render(await InsightsPage());
+
+    expect(screen.getByText(/days late/)).toBeInTheDocument();
+    expect(screen.queryByText(/in -/)).not.toBeInTheDocument();
   });
 
   it("renders the upgrade teaser for free users instead of real spend data", async () => {

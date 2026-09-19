@@ -19,6 +19,10 @@ type MatchChunk = {
 };
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Generation (embedding + up to two OpenAI calls, each with a 60s timeout)
+// can run longer than the client's poll interval. A lock older than this is
+// assumed abandoned (crashed function, etc.) and safe to retry.
+const GENERATION_LOCK_MS = 4 * 60 * 1000;
 const anchor = "key terms, dates, obligations, renewal, notice, fees, termination";
 const canned = [
   "What's the termination clause?",
@@ -54,8 +58,9 @@ export async function GET(_request: Request, context: RouteContext) {
   }
   if (!document) return NextResponse.json({ error: "Document not found." }, { status: 404 });
 
-  const cached = await getCachedSuggestions(supabase, document.id);
-  if (cached) return NextResponse.json({ suggestions: cached, pending: false });
+  const existing = await getSuggestionRow(supabase, document.id);
+  if (existing.cached) return NextResponse.json({ suggestions: existing.cached, pending: false });
+  if (existing.locked) return NextResponse.json({ suggestions: [], pending: true });
 
   const gate = await canAskQuestion(supabase, user.id);
   if (!gate.allowed) {
@@ -72,6 +77,12 @@ export async function GET(_request: Request, context: RouteContext) {
     );
   }
 
+  // Claim the generation lock before kicking off work so the client's own
+  // polling (every 2.5s, see document-view.tsx) doesn't re-trigger another
+  // full generation — and another usage_metrics charge — before this one
+  // finishes and persists.
+  await acquireGenerationLock(supabase, document.id, existing.exists);
+
   // after() keeps the serverless function alive until generation finishes —
   // a bare detached promise dies with the response on Vercel, which left
   // suggestions permanently ungenerated and the UI stuck on "pending".
@@ -83,26 +94,54 @@ export async function GET(_request: Request, context: RouteContext) {
         documentId: document.id,
         message: error instanceof Error ? error.message : "Unknown suggestion generation error.",
       });
+      await clearGenerationLock(supabase, document.id);
     }
   });
 
   return NextResponse.json({ suggestions: [], pending: true });
 }
 
-async function getCachedSuggestions(supabase: Awaited<ReturnType<typeof createClient>>, documentId: string) {
+async function getSuggestionRow(supabase: Awaited<ReturnType<typeof createClient>>, documentId: string) {
   const { data, error } = await supabase
     .from("document_suggestions")
-    .select("suggestions, generated_at")
+    .select("suggestions, generated_at, generating_at")
     .eq("document_id", documentId)
     .single();
 
   if (error) {
-    if (error.code === "PGRST116") return null;
+    if (error.code === "PGRST116") return { exists: false, cached: null, locked: false };
     throw new Error(error.message);
   }
-  if (!data) return null;
-  if (Date.now() - new Date(data.generated_at).getTime() > CACHE_TTL_MS) return null;
-  return sanitizeSuggestions(data.suggestions);
+  if (!data) return { exists: false, cached: null, locked: false };
+
+  const suggestions = sanitizeSuggestions(data.suggestions);
+  const fresh = Date.now() - new Date(data.generated_at).getTime() <= CACHE_TTL_MS;
+  const locked = Boolean(data.generating_at) && Date.now() - new Date(data.generating_at as string).getTime() < GENERATION_LOCK_MS;
+
+  return {
+    exists: true,
+    cached: fresh && suggestions.length > 0 ? suggestions : null,
+    locked,
+  };
+}
+
+async function acquireGenerationLock(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  documentId: string,
+  rowExists: boolean
+) {
+  const generatingAt = new Date().toISOString();
+  if (rowExists) {
+    await supabase.from("document_suggestions").update({ generating_at: generatingAt }).eq("document_id", documentId);
+  } else {
+    await supabase
+      .from("document_suggestions")
+      .insert({ document_id: documentId, suggestions: [], generated_at: generatingAt, generating_at: generatingAt });
+  }
+}
+
+async function clearGenerationLock(supabase: Awaited<ReturnType<typeof createClient>>, documentId: string) {
+  await supabase.from("document_suggestions").update({ generating_at: null }).eq("document_id", documentId);
 }
 
 async function generateAndPersistSuggestions(
@@ -143,6 +182,7 @@ async function persistSuggestions(
   const payload = {
     suggestions,
     generated_at: new Date().toISOString(),
+    generating_at: null,
   };
 
   const result = existing.data

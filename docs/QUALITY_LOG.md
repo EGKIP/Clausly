@@ -249,3 +249,35 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-3c65cz`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-19
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (611/611, 110 files, vitest — 3 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `/dashboard/reminders` could show its inline fetch-error banner ("Unable to load reminders.") and the "No suggestions right now. Clausly's caught up." empty state at the same time for the same tab. `useReminders()` clears the list to `[]` on a failed fetch and sets `error`, but the page only guarded the loading state, not the error state, before falling through to the empty-state render — so a real backend error was visually indistinguishable from "you're all caught up," undercutting the one thing this page exists to communicate accurately.
+- **P2 (quota/billing correctness):** Neither `/api/documents/[id]/suggested-questions` nor `/api/ask/portfolio/suggested-questions` guarded against concurrent generation. Both endpoints are polled by the client every 2.5s (`document-view.tsx`, `portfolio-ask.tsx`) while a suggestion generation job runs in the background via `after()`. Since generation (an embedding call plus up to two OpenAI calls, each with a 60s timeout) routinely takes longer than one poll interval, every poll landing before the first job persisted its result independently passed the cache-miss check and kicked off its own full generation — each one inserting its own `usage_metrics` row against the user's daily Q&A quota. A single document view could silently burn several quota slots for what the UI presents as one suggestion fetch. This was called out as a remaining concern in the 2026-09-18 entry without a fix; today's run finally addressed it.
+
+### Fixes Completed
+- `src/app/dashboard/reminders/page.tsx`: the empty-state render now requires the absence of a fetch error, so a genuine error is no longer masked by (or shown alongside) the "caught up" copy.
+- `supabase/migrations/20260919120000_suggestion_generation_lock.sql`: added a nullable `generating_at` column to `document_suggestions` and `portfolio_suggestions` (applied live to `clausly-prod`; advisors re-checked, no new findings).
+- `src/app/api/documents/[id]/suggested-questions/route.ts` and `src/app/api/ask/portfolio/suggested-questions/route.ts`: before kicking off generation, the route now claims the lock (`generating_at = now()`) after passing the Q&A rate-limit gate. A poll that lands while a lock less than 4 minutes old is present returns `{ pending: true }` immediately instead of re-checking the gate and starting another generation/usage charge. The lock is cleared on both successful persistence and on a caught generation failure, so a crashed or errored job doesn't permanently block retries. `src/lib/supabase/types.ts` updated to match the new column.
+
+### Tests Added/Changed
+- `src/app/dashboard/reminders/__tests__/page.test.tsx` (new): asserts a fetch error renders the error message and not the "caught up" empty state; confirmed it fails against the pre-fix page.
+- `src/app/api/documents/[id]/suggested-questions/__tests__/route.test.ts` and `src/app/api/ask/portfolio/suggested-questions/__tests__/route.test.ts`: new case holds generation open on a deferred embedding-provider promise, issues a second request while the first is still in flight, and asserts only one `usage_metrics` row and one persisted suggestions row exist once generation completes. Confirmed both fail (2 usage rows) against the pre-fix routes.
+
+### Remaining Concerns
+- No P0/P1 issues found; the two P2s above are fixed and tested.
+- A failed Ask/QA answer still records a usage row that counts toward the daily limit while the client hides the failure from the user (from the 2026-09-18 entry) — not addressed today; still worth a dedicated pass.
+- The generation lock is a best-effort DB row, not a fully atomic distributed lock — a request racing between the lock-read and lock-write on two different warm instances could in principle still double-fire once. This is a large reduction (the common single-tab polling case, which was the actual reported failure mode, is now fully deduped) rather than a perfect guarantee; a `select ... for update`-style conditional write would close the remaining gap if it's ever observed in practice.
+- Same recurring items as every prior entry: `vector` extension in `public` schema, `delete_account` SECURITY DEFINER (verified safe/intentional), leaked-password protection disabled (owner action, Supabase dashboard), `npm audit` PostCSS finding blocked on a Next.js 16 major bump, no Playwright/E2E harness.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-suphbo`
+- PR: opened against `main` (see PR description for link)

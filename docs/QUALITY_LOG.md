@@ -170,6 +170,47 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - Branch: `claude/upbeat-newton-pcaigp`
 - PR: opened against `main` (see PR description for link)
 
+## 2026-09-17
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (596/596, 109 files, vitest — 7 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** The ⌘K command palette (`command-palette.tsx`) displays an "Esc" keyboard hint next to its search input, but no Escape handler was ever wired up — pressing Escape did nothing, contradicting the UI's own affordance. The component also had zero test coverage and no `role="dialog"`/`aria-modal`, unlike every other dialog in the app.
+- **P2:** `useReminders().approve()` had the same "stale full-array rollback" bug already found (and fixed on an unmerged PR) in `dismiss()`: it captured the whole pre-mutation `reminders` array before its optimistic update and restored that entire snapshot on failure. Concrete failure: approve one reminder while dismissing another in the same list (both plausible from `/dashboard/reminders` or `DocumentRemindersSection`); if the approve request fails, its rollback silently reinstates the reminder that was just successfully dismissed. `dismiss()` has the identical bug on this branch (the fix for it hasn't merged yet), so both were fixed together with one shared rollback helper.
+- **P2:** `/dashboard/insights`'s "Notice windows you need to hit" cards render `in {daysAway} days` unconditionally. Once a suggested-or-approved-but-not-yet-sent notice reminder's fire date passes (a real, reachable state — the filter is `status !== "sent"`), the card reads "in -3 days" instead of the "X days late" phrasing already used consistently on the reminders page and document detail view. Confusing copy on the page whose core value prop is surfacing opt-out deadlines.
+- **P3 (defense-in-depth):** `listDocuments()` and `listReminders()` (`src/lib/db/documents.ts`, `src/lib/db/reminders.ts`) — used directly by the dashboard, insights, compare, and document-detail SSR pages — relied solely on RLS with no explicit `user_id` scope, unlike the pattern already established elsewhere in the codebase (and in the still-unmerged PR that added it to `getDocumentDetail`/several API routes). Not currently exploitable (RLS correctly scopes both tables), but a hardening gap on two of the highest-traffic pages.
+- **P4 (dead code):** `listDocumentRows()` (`src/lib/db/documents.ts`) was exported but had zero callers anywhere in the repo. `src/components/marketing/problem-solution.tsx` (171 lines) was likewise fully unreferenced.
+- A broader adversarial pass (insights aggregation, settings persistence, duplicate-submission guards on every form, mobile layout at 375px for dialogs/modals, and ownership/validation on every API route not already covered by open PR #82) found nothing else concrete worth reporting — duplicate-submission is guarded everywhere via a pending/saving disabled state, mobile dialog widths are all fluid with safe gutters, and every other route scopes its queries by `user_id` and validates input.
+- Two PRs from prior daily runs are still open and unmerged, awaiting owner review: #81 (Escape-to-close on the compare picker) and #82 (export-limit RLS bypass, reminder-date timezone bug, the `dismiss()` half of this run's rollback bug, stuck-analysis UX, upload hardening). Both are green (lint/typecheck/tests/build) and mergeable against current `main`. Not re-implemented here to avoid duplicate/conflicting work; today's fixes are additive and independent.
+- Supabase security advisors re-checked against `clausly-prod`: no new findings (`vector` extension in `public` schema, `delete_account` callable by `authenticated` — both previously reviewed and judged safe; leaked-password protection still disabled — dashboard setting, owner action, not code). `npm audit`'s remaining moderate/high PostCSS finding still only resolves via a Next.js 16 major bump — deferred as in every prior run.
+
+### Fixes Completed
+- `src/components/dashboard/command-palette.tsx`: wired `useDismissOnEscape` and added `role="dialog"`/`aria-modal`/`aria-label` to match the app's other dialogs.
+- `src/lib/hooks/use-reminders.ts`: added a shared `restoreReminder()` helper that rolls back only the single reminder a failed `approve()`/`dismiss()` was mutating (re-inserting it if the optimistic update had removed it), instead of overwriting the whole list with a stale snapshot that could clobber an unrelated, already-succeeded mutation.
+- `src/app/dashboard/insights/page.tsx`: notice-window cards now show "N days late" once `daysAway` goes negative, matching the phrasing used on `/dashboard/reminders` and the document detail view.
+- `src/lib/db/documents.ts` / `src/lib/db/reminders.ts`: `listDocuments()`/`listReminders()` now add an explicit `.eq("user_id", user.id)` on top of RLS. Removed the dead `listDocumentRows()` export.
+- Deleted the unreferenced `src/components/marketing/problem-solution.tsx`.
+
+### Tests Added/Changed
+- `src/components/dashboard/__tests__/command-palette.test.tsx` (new): Escape closes the palette (and is a no-op while closed), dialog semantics are exposed, backdrop click closes while an inside click doesn't. Confirmed 3 of 4 fail against the pre-fix component.
+- `src/lib/hooks/__tests__/use-reminders.test.ts`: two new cases — a failed `approve()` no longer reinstates a different reminder that a concurrent `dismiss()` just removed, and a failed `dismiss()` no longer undoes a different reminder's successful `approve()`. Confirmed both fail against the pre-fix rollback logic.
+- `src/app/dashboard/insights/__tests__/page.test.tsx`: new case seeds an overdue "Notice" reminder and asserts the card reads "days late", not a negative day count. Confirmed it fails against the pre-fix copy.
+
+### Remaining Concerns
+- No P0 issues found. No new P1s.
+- PRs #81 and #82 remain open, green, and mergeable — still awaiting the owner's review; the owner should merge whichever lands first, since #82 and today's `use-reminders.ts` change both touch `dismiss()`'s rollback (same intent, will need a trivial conflict resolution on merge, not a behavior conflict).
+- Same recurring items as every prior entry, unchanged: `vector` extension in `public` schema (low-risk, non-trivial migration), `delete_account` callable by `authenticated` (verified safe/intentional), leaked-password protection disabled (owner action in Supabase Auth → Policies, not code), `npm audit` PostCSS finding blocked on a Next.js 16 major bump.
+- No E2E/browser test harness exists yet. This has now been logged as a remaining concern in every entry since 2026-09-03 without being acted on — worth a deliberate future pass to stand up a minimal Playwright config and a handful of smoke specs (login, upload, approve-reminder) rather than continuing to defer it indefinitely.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-8mrzzl`
+- PR: opened against `main` (see PR description for link)
+
 ## 2026-09-18
 
 ### Quality Gates

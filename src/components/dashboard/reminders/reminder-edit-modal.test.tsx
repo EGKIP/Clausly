@@ -124,6 +124,29 @@ describe("ReminderEditModal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it("shows the correct fire date for timezones ahead of UTC", () => {
+    // The API formats fireOn as e.g. "Jan 5, 2026" in UTC (adapters.ts
+    // formatDate). Re-parsing that string with `new Date()` interprets it in
+    // the *local* timezone, which used to shift the date back a day for any
+    // timezone ahead of UTC (e.g. Asia/Kolkata, UTC+5:30).
+    const originalTz = process.env.TZ;
+    process.env.TZ = "Asia/Kolkata";
+    try {
+      render(
+        <ReminderEditModal
+          reminder={{ ...reminder, fireOn: "Jan 5, 2026" }}
+          isSaving={false}
+          onClose={vi.fn()}
+          onSave={vi.fn()}
+        />
+      );
+
+      expect(screen.getByLabelText("Fire date")).toHaveValue("2026-01-05");
+    } finally {
+      process.env.TZ = originalTz;
+    }
+  });
+
   it("blocks saving an approved reminder with a date moved into the past", async () => {
     const onClose = vi.fn();
     const onSave = vi.fn();

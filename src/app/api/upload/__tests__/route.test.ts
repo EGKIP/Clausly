@@ -75,6 +75,20 @@ describe("POST /api/upload", () => {
     expect(body.issues).toContainEqual({ path: "file", message: "This file doesn't look like a valid PDF." });
   });
 
+  it("returns 400 when a binary file is renamed with a .txt extension", async () => {
+    // A PDF's binary body (unlike its ASCII header) is full of NUL/control
+    // bytes; renaming it to .txt used to slip past validation entirely and
+    // get silently mis-decoded as garbled text instead of a clear error.
+    const pdfBytes = new Uint8Array(256).map((_, index) => (index % 4 === 0 ? 0x00 : (index % 251) + 1));
+    const spoofed = new File([pdfBytes], "lease.txt", { type: "text/plain" });
+
+    const response = await POST(uploadRequest(spoofed));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.issues).toContainEqual({ path: "file", message: "This file doesn't look like plain text." });
+  });
+
   it("returns 400 when the file exceeds the size limit", async () => {
     const oversized = new File([new Uint8Array(25 * 1024 * 1024 + 1)], "large.pdf", { type: "application/pdf" });
 

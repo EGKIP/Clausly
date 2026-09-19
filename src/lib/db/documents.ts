@@ -24,7 +24,11 @@ export async function listDocuments() {
   return (data ?? []).map(toUiDocument);
 }
 
-export async function getDocumentDetail(id: string): Promise<DocumentDetail | null> {
+// `userId` is optional only because a couple of call sites predate this
+// parameter; every caller that already has an authenticated user should pass
+// it. RLS already scopes these tables to `auth.uid()`, so this is
+// defense-in-depth against a future RLS regression, not the only guard.
+export async function getDocumentDetail(id: string, userId?: string): Promise<DocumentDetail | null> {
   if (!hasSupabaseEnv()) {
     const document = mockDocuments.find((item) => item.id === id);
     if (!document) return null;
@@ -41,30 +45,36 @@ export async function getDocumentDetail(id: string): Promise<DocumentDetail | nu
   }
 
   const supabase = await createClient();
-  const { data: document, error: documentError } = await supabase
-    .from("documents")
-    .select("*")
-    .eq("id", id)
-    .single();
+  let documentQuery = supabase.from("documents").select("*").eq("id", id);
+  if (userId) documentQuery = documentQuery.eq("user_id", userId);
+  const { data: document, error: documentError } = await documentQuery.single();
 
   if (documentError) {
     if (documentError.code === "PGRST116") return null;
     throw documentError;
   }
 
+  let clausesQuery = supabase.from("clauses").select("*").eq("document_id", id);
+  let datesQuery = supabase.from("dates").select("*").eq("document_id", id);
+  let remindersQuery = supabase
+    .from("reminders")
+    .select("*, documents(title)")
+    .eq("document_id", id)
+    // Ignored reminders must stay hidden here too: toUiReminder maps
+    // 'ignored' back to 'suggested' for the UI type, so leaking them
+    // makes the detail page disagree with the reminders inbox.
+    .neq("status", "ignored");
+  if (userId) {
+    clausesQuery = clausesQuery.eq("user_id", userId);
+    datesQuery = datesQuery.eq("user_id", userId);
+    remindersQuery = remindersQuery.eq("user_id", userId);
+  }
+
   const [{ data: clauses, error: clausesError }, { data: dates, error: datesError }, { data: reminders, error: remindersError }] =
     await Promise.all([
-      supabase.from("clauses").select("*").eq("document_id", id).order("page_number", { ascending: true }),
-      supabase.from("dates").select("*").eq("document_id", id).order("date_value", { ascending: true }),
-      supabase
-        .from("reminders")
-        .select("*, documents(title)")
-        .eq("document_id", id)
-        // Ignored reminders must stay hidden here too: toUiReminder maps
-        // 'ignored' back to 'suggested' for the UI type, so leaking them
-        // makes the detail page disagree with the reminders inbox.
-        .neq("status", "ignored")
-        .order("fire_on", { ascending: true }),
+      clausesQuery.order("page_number", { ascending: true }),
+      datesQuery.order("date_value", { ascending: true }),
+      remindersQuery.order("fire_on", { ascending: true }),
     ]);
 
   if (clausesError) throw clausesError;

@@ -7,6 +7,7 @@ import type { ContractDoc } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 export function CompareWithButton({
   currentDocument,
@@ -37,6 +38,8 @@ export function CompareWithButton({
       });
   }, [currentDocument.id, currentDocument.type, documents, query]);
   const hasCandidates = documents.some((document) => document.id !== currentDocument.id);
+
+  useDismissOnEscape(open, () => setOpen(false));
 
   function selectDocument(documentId: string) {
     setOpen(false);

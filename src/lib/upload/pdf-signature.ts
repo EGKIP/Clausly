@@ -21,3 +21,24 @@ export function isPngSignature(bytes: Uint8Array): boolean {
 export function isJpegSignature(bytes: Uint8Array): boolean {
   return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
 }
+
+const MAX_NON_TEXT_BYTE_RATIO = 0.05;
+
+/** Unlike pdf/docx/png/jpg, plain-text uploads have no magic number to check, so a
+ * binary file renamed to .txt (e.g. a PDF) would otherwise be accepted and later
+ * silently mis-decoded as garbled text instead of failing with a clear error. A NUL
+ * byte, or more than a handful of other non-printable control bytes, is a reliable
+ * signal the content isn't text (see git's own binary-detection heuristic). */
+export function looksLikeTextContent(bytes: Uint8Array): boolean {
+  if (bytes.length === 0) return true;
+  let nonTextBytes = 0;
+  for (const byte of bytes) {
+    if (byte === 0x00) return false;
+    // Allow common whitespace control bytes (tab, LF, CR); anything else
+    // below 0x20, and the DEL byte, counts against the ratio.
+    const isControl = byte < 0x20 || byte === 0x7f;
+    const isAllowedWhitespace = byte === 0x09 || byte === 0x0a || byte === 0x0d;
+    if (isControl && !isAllowedWhitespace) nonTextBytes++;
+  }
+  return nonTextBytes / bytes.length <= MAX_NON_TEXT_BYTE_RATIO;
+}

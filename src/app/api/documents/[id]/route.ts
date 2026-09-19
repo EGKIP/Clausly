@@ -28,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await context.params;
-  const detail = await getDocumentDetail(id);
+  const detail = await getDocumentDetail(id, user.id);
   if (!detail) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(detail);

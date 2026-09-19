@@ -11,6 +11,22 @@ import { cn } from "@/lib/utils";
 import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
 import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
+async function parseUploadError(response: Response): Promise<{ message: string; isLimitError: boolean }> {
+  const payload = await response.json().catch(() => null) as
+    | { error?: string; code?: string; issues?: { message?: string }[] }
+    | null;
+  const isLimitError = response.status === 402 || payload?.code === "PLAN_LIMIT_DOCUMENTS";
+  const issueMessage = payload?.issues?.[0]?.message;
+  if (issueMessage) return { message: issueMessage, isLimitError };
+  if (payload?.error) return { message: payload.error, isLimitError };
+  // A non-JSON body (e.g. an infra-level 413) means the request never reached
+  // our own size check, which only rejects files over 25 MB.
+  if (response.status === 413) {
+    return { message: "That file is too large to upload. Try a smaller file.", isLimitError };
+  }
+  return { message: "Upload failed.", isLimitError };
+}
+
 type UploadUsage = {
   plan: "free" | "pro";
   documents: {
@@ -144,17 +160,11 @@ export function UploadModal({
         });
         if (controller.signal.aborted) return;
         if (!response.ok) {
-          const payload = await response.json().catch(() => ({ error: "Upload failed." }));
-          const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
-          // Validation failures carry the specific reason (wrong file type,
-          // over the size limit, not a real PDF) in issues[] — surface that
-          // instead of the generic top-level "Invalid upload." error.
-          const issueMessage = Array.isArray(payload.issues) ? payload.issues[0]?.message : undefined;
-          const message = issueMessage ?? payload.error ?? "Upload failed.";
-          setLimitError(limit);
+          const { message, isLimitError } = await parseUploadError(response);
+          setLimitError(isLimitError);
           setError(message);
           setPhase("error");
-          if (!limit) toast.error(message);
+          if (!isLimitError) toast.error(message);
           return;
         }
         const payload = (await response.json()) as { id: string };
@@ -201,14 +211,11 @@ export function UploadModal({
       });
       if (controller.signal.aborted) return;
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "Upload failed." }));
-        const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
-        const issueMessage = Array.isArray(payload.issues) ? payload.issues[0]?.message : undefined;
-        const message = issueMessage ?? payload.error ?? "Upload failed.";
-        setLimitError(limit);
+        const { message, isLimitError } = await parseUploadError(response);
+        setLimitError(isLimitError);
         setError(message);
         setPhase("error");
-        if (!limit) toast.error(message);
+        if (!isLimitError) toast.error(message);
         return;
       }
       const payload = (await response.json()) as { id: string };

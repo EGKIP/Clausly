@@ -210,3 +210,42 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-8mrzzl`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-18
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (591/591, 107 files, vitest — 2 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `dateForInput` in the reminder edit modal (`reminder-edit-modal.tsx`) parsed the display-formatted `fireOn` string (e.g. `"Sep 20, 2026"`, always rendered in UTC by `formatDate` in `adapters.ts`) with a plain `new Date(value)`, which JS interprets as *local* midnight. For any user in a timezone east of UTC (verified with `Asia/Tokyo` and `Europe/Berlin`), this pre-filled the "Fire date" field one day earlier than the real date. For an approved reminder due *today*, the shifted value then tripped the past-date guard and blocked the user from saving *any* edit — even just a title or time change — with "Reminders can't be saved with a date that's already passed."
+- **P2/P3:** `UploadModal` had no handling for a request rejected before it reached our own validation (e.g. a platform-level 413 with a non-JSON body). `response.json().catch(...)` silently fell back to a bare "Upload failed." with no indication of why, for exactly the case — a large file — where a specific reason is most useful. (App-level rejections for files over the stated 25 MB limit already returned a clear message; this only affected the non-JSON-body case.)
+- **Infra drift (no app-code impact):** `clausly-prod`'s migration history had `20260916141909_document_exports_insert_policy` (an INSERT policy on `document_exports` for `authenticated`, required by `POST /api/documents/[id]/export`, which writes via the user's session client) applied directly to the database with no matching file in `supabase/migrations/`. A fresh environment built from the repo's migrations alone would be missing this policy and exports would silently fail to record. Reconfirmed via Supabase advisors: no new security/performance findings beyond the already-documented, judged-intentional ones (`delete_account` SECURITY DEFINER, `vector` extension in `public`, leaked-password protection disabled — dashboard setting).
+- Explore-agent audit of upload, reminders, and Ask/QA flows surfaced further P2/P3 items not fixed today (see Remaining Concerns): suggested-question polling can re-trigger generation and burn daily Q&A quota just from opening a document; a failed Ask answer still consumes quota; the reminders page can show an error banner and the "all caught up" empty state at the same time; an optimistic dismiss/approve race in `use-reminders.ts` can resurrect an already-dismissed reminder on an unrelated failed request. No P0/P1s and no cross-user data-scoping gaps found — every reminder/document/suggestion query read was `.eq("user_id", …)`-scoped.
+- **Process note:** `docs/QUALITY_LOG.md` has no entries between 2026-09-09 and today, even though six PRs merged in that window are titled "Daily quality run" (#66-#75, #80). Those runs did real, tested work (see their commit messages) but didn't append a log entry as this routine requires. Flagging so future runs don't skip this step.
+
+### Fixes Completed
+- `reminder-edit-modal.tsx`: `dateForInput` now parses the non-`YYYY-MM-DD` fallback as UTC (`` `${value} UTC` ``) instead of local time, fixing the off-by-one and the resulting false past-date block.
+- `upload-modal.tsx`: extracted the duplicated upload-error handling (file upload + pasted text) into one `parseUploadError` helper, which now gives a specific "too large to upload" message when a non-JSON error body arrives with a 413 status, instead of the generic "Upload failed."
+- `supabase/migrations/20260916141909_document_exports_insert_policy.sql`: added the migration file matching the policy already live on `clausly-prod` (pure `CREATE POLICY`/`GRANT`, idempotent, no database change — closes the repo/prod drift).
+
+### Tests Added/Changed
+- `reminder-edit-modal.test.tsx`: new case rendering with `TZ=Asia/Tokyo` and a `"Sep 20, 2026"`-style `fireOn`, asserting the date input pre-fills `2026-09-20` (fails on the old code, showing `2026-09-19`).
+- `upload-modal.test.tsx`: new case asserting a 413 response with a non-JSON body surfaces "too large to upload" instead of the generic "Upload failed."
+
+### Remaining Concerns
+- No P0 issues found; the two P2s above are fixed and tested.
+- Suggested-question generation has no in-flight guard (`api/documents/[id]/suggested-questions/route.ts`), so the client's polling can schedule several duplicate generation runs — each counted against the daily Q&A quota — from a single document view. Worth a dedicated pass to add a "pending" state instead of only checking for completed results.
+- A failed Ask/QA answer still records a usage row that counts toward the daily limit, while the client hides the failure from the user — inconsistent charging for errors.
+- `dashboard/reminders/page.tsx` can render its error banner and the "all caught up" empty state together on a failed fetch.
+- `use-reminders.ts`'s optimistic approve/dismiss rollback replaces the whole list on failure, which can resurrect an unrelated reminder that was validly dismissed/approved in the meantime by a second in-flight request.
+- The 25 MB upload limit advertised in the UI and enforced in `api/upload/route.ts` is not proven reachable in production — Node.js serverless functions on Vercel are commonly capped well below that at the platform level, independent of app code, which would make today's file-size validation partially unreachable for large files. Confirming the actual deployed limit and, if it's below 25 MB, deciding between lowering the advertised/enforced limit or moving to a direct-to-storage upload path is an architecture-level call for the owner, not something to guess at in a targeted daily fix.
+- Six prior "Daily quality run" PRs (#66-#75, #80) merged between 2026-09-09 and 2026-09-15 without a matching `docs/QUALITY_LOG.md` entry (see Process note above).
+- Longstanding, previously-documented items unchanged: leaked-password protection still disabled (owner action, Supabase dashboard), `vector` extension still in `public` schema, no Playwright/E2E harness, and the Next.js/vitest major-version bumps needed to clear the remaining `npm audit` findings (postcss via Next 16, vitest 5) are still out of scope for a targeted pass.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-3c65cz`
+- PR: opened against `main` (see PR description for link)

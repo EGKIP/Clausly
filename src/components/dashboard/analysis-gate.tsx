@@ -35,13 +35,19 @@ export function AnalysisGate({
   });
 
   /* When the analysis completes (or fails), refetch the server component so
-   * the detail page hydrates with the freshly-persisted clauses/dates. */
+   * the detail page hydrates with the freshly-persisted clauses/dates.
+   * Compared against the previous poll's status (not the original `initialStatus`
+   * prop) so a retry that fails again still triggers a refresh instead of being
+   * suppressed because it landed back on the same status it started with. */
+  const prevStatusRef = React.useRef(initialStatus);
   React.useEffect(() => {
-    if (status !== initialStatus && (status === "ready" || status === "failed")) {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (status !== prevStatus && (status === "ready" || status === "failed")) {
       notifyDocumentsChanged();
       router.refresh();
     }
-  }, [router, status, initialStatus]);
+  }, [router, status]);
 
   if (status === "ready") return <>{children}</>;
   if (status === "failed") {

@@ -119,6 +119,57 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - Branch: `claude/upbeat-newton-f5ki7h`
 - PR: opened against `main` (see PR description for link)
 
+## 2026-09-16
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (599/599, 108 files, vitest — 10 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2 (billing bypass):** `document_exports` had a `SELECT`-only RLS policy with no `INSERT` policy. Every insert from the export route's request-scoped client (`recordExportAudit` in `src/app/api/documents/[id]/export/route.ts`) was silently rejected by RLS and swallowed by its own try/catch, so `getExportUsage()`/`canExport()` always saw 0 exports — free-plan users could export past the stated 5-per-30-days limit indefinitely.
+- **P2 (data correctness):** `ReminderEditModal`'s `dateForInput` re-parsed the API's display-formatted date ("Jan 5, 2026") with `new Date()`, which V8 interprets in the browser's local timezone, then serialized with `.toISOString()` (UTC). For any user in a timezone ahead of UTC, the "Fire date" field showed the day *before* the reminder's real scheduled date.
+- **P2 (state corruption):** `useReminders().dismiss()` captured the whole pre-mutation `reminders` array as its rollback snapshot. `PastRemindersArchiveCard`'s "archive all" action fires a batch of concurrent `dismiss()` calls via `Promise.all`; if any one delete in the batch failed, its rollback restored the *entire* pre-batch array, silently reinstating rows whose delete had already succeeded server-side.
+- **P2 (stale sibling UI):** `AnalysisGate`'s refresh effect compared the live poll status to the original `initialStatus` prop (fixed at mount) instead of the previous poll. A document that starts already `failed`, gets retried, and fails again lands back on the same status it started with, so the comparison was always equal and `notifyDocumentsChanged()`/`router.refresh()` never fired — sibling document lists (dashboard, command palette) never resynced after a repeat failure.
+- **P2 (upload correctness):** `.txt` uploads had no content validation, unlike pdf/docx/png/jpg (all checked by magic number). A binary file renamed to `.txt` (e.g. a PDF) was accepted and later silently mis-decoded as garbled text during analysis instead of failing with a clear error.
+- **P1→fixed as P2 in practice:** `/api/documents/[id]/reanalyze` had no `maxDuration` export, unlike every other route that runs analysis (`upload`, `admin/recover-stuck-analyses`). A slow/scanned document retried via "Re-analyze" could have its function killed mid-run under the platform default duration, leaving the document stuck at `analyzing` until the 10-minute stuck-analysis cron reclaimed it.
+- **P2/P3 (defense-in-depth):** Several routes relied solely on RLS rather than an explicit `user_id` scope on top of it — `GET /api/documents`, `getDocumentDetail` (document/clause/date/reminder queries), `POST /api/seed-demo`'s empty-portfolio count, and the document-title lookup in `POST /api/ask/portfolio`. Not currently exploitable (RLS policies in `20260604000100_contract_data_layer.sql` correctly scope every table to `auth.uid() = user_id`, confirmed against the live `clausly-prod` schema), but each would become a cross-user leak if a future RLS policy ever regressed.
+- **P4:** `src/lib/notifications/supabase-service.ts` (builds the service-role Supabase client) was missing the `import "server-only"` guard present on its twin `src/lib/supabase/service.ts`. Not currently imported from client code, but nothing would have caught it at build time if it were.
+- Reviewed dialog dismissal consistency across the app (following up on prior runs' "closes on Escape/backdrop" work): `UploadModal` — the primary upload flow — had no Escape handling, no focus trap, and no `role="dialog"`, the biggest gap found. `CompareWithButton` still lacks Escape dismissal (has backdrop-click); no dialog besides `share-dialog.tsx` traps Tab focus. Judged P3, not fixed today beyond `UploadModal` (see below) to keep this run focused.
+- Full read-only security pass over all 34 `src/app/api/**/route.ts` handlers, `middleware.ts`, the public `/api/shares/[token]` route, and both webhook routes (Stripe + Resend/notifications): no P0/P1 exploitable cross-user access or auth-bypass found. `safe-next-path.ts` is used everywhere a redirect target comes from user input; no service-role credentials are reachable from `"use client"` code; webhooks verify signatures before trusting payloads.
+
+### Fixes Completed
+- `supabase/migrations/20260916000100_document_exports_insert_policy.sql`: adds the missing `INSERT` RLS policy on `document_exports` (`auth.uid() = user_id`), applied directly to `clausly-prod` and verified live. Export-usage tracking (and therefore the free-plan export limit) now actually works.
+- `src/components/dashboard/reminders/reminder-edit-modal.tsx`: `dateForInput` now parses the known "Jan 5, 2026"-style API format directly (month-name lookup → `YYYY-MM-DD`) instead of round-tripping it through a timezone-sensitive `Date` parse, falling back to the old logic for any unrecognized format.
+- `src/lib/hooks/use-reminders.ts`: `dismiss()` now captures only the single reminder being removed and reinserts just that item (via a functional update against current state) on failure, instead of overwriting the whole list with a stale pre-batch snapshot.
+- `src/components/dashboard/analysis-gate.tsx`: the refresh effect now compares against the previous poll's status (tracked in a ref) instead of the immutable `initialStatus` prop, so a retry that fails again still triggers `notifyDocumentsChanged()`/`router.refresh()`.
+- `src/lib/upload/pdf-signature.ts`: new `looksLikeTextContent()` — rejects any NUL byte and caps other non-whitespace control bytes at 5% of a sniffed 8KB prefix (same heuristic git itself uses for binary detection). Wired into `.txt` upload validation in `src/app/api/upload/route.ts`, with a dedicated "This file doesn't look like plain text." error message.
+- `src/app/api/documents/[id]/reanalyze/route.ts`: added `export const maxDuration = 300`, matching upload/recovery-cron.
+- `src/components/dashboard/upload-modal.tsx`: added Escape-to-close, a Tab focus trap, initial-focus-on-open, and `role="dialog"`/`aria-modal`/`aria-labelledby`, matching the pattern already used by `share-dialog.tsx`.
+- Defense-in-depth `user_id` scoping added on top of RLS: `src/app/api/documents/route.ts` (GET list), `src/lib/db/documents.ts` (`getDocumentDetail`, now takes an optional `userId` threaded from both call sites — the API route and the SSR document detail page), `src/app/api/seed-demo/route.ts`, `src/app/api/ask/portfolio/route.ts`. Pure additive filters; no behavior change for legitimate users, verified by the full existing test suite still passing.
+- `src/lib/notifications/supabase-service.ts`: added the missing `import "server-only"`.
+
+### Tests Added/Changed
+- `reminder-edit-modal.test.tsx`: new case renders with a display-formatted `fireOn` under `TZ=Asia/Kolkata` and asserts the date input shows the correct calendar date; confirmed it fails against the pre-fix code (showed the wrong day).
+- `use-reminders.test.ts`: new case fires two concurrent `dismiss()` calls (mirroring the real "archive all" batch), resolves one success and one failure, and asserts the successful removal isn't reinstated; confirmed it fails against the pre-fix code.
+- `analysis-gate.test.tsx`: new case retries a `failed` document and has the retry fail again, asserting `notifyDocumentsChanged` still fires; confirmed it fails against the pre-fix code.
+- `upload-modal.test.tsx`: new case asserts Escape closes the modal.
+- `pdf-signature.test.ts`: new `looksLikeTextContent` cases (plain text, empty, NUL byte, dense control bytes, tolerated whitespace).
+- `upload/route.test.ts`: new case uploads a NUL-byte-laden buffer as `lease.txt` and asserts the specific rejection message.
+
+### Remaining Concerns
+- No P0 issues found; the P2s above are fixed and tested (or, for the RLS migration, verified live against `clausly-prod`).
+- `CompareWithButton` still lacks Escape dismissal (P3); no dialog besides `share-dialog.tsx`/`upload-modal.tsx` traps Tab focus (P3) — worth a shared focus-trap hook in a future pass instead of the third copy-pasted implementation.
+- Supabase advisors unchanged from prior runs: `vector` extension in `public` schema, `delete_account` callable by `authenticated` (verified safe — checks `auth.uid() = target_user_id` internally), leaked-password protection still disabled (dashboard setting, owner action). `npm audit`'s moderate/high findings (vitest, esbuild dev server, postcss) all require a Next.js 16 or Vitest 5 major bump to clear — still out of scope for a targeted daily pass.
+- The repo's local migration files (18) still outnumber what Supabase's migration-history table reports as applied (3, after today's) — confirmed again this is bookkeeping drift, not a schema gap: every table these migrations create exists on `clausly-prod` with RLS enabled, spot-checked via `list_tables`/`list_migrations`. Worth a real `supabase db push`-based reconciliation in a future pass so the history table stops undercounting, but not urgent.
+- No E2E/browser test harness exists yet — flows were verified by reading route/component code and adding/running targeted unit + component tests, plus live checks against `clausly-prod` via Supabase's read-only advisor/schema tools (no data written except the one RLS policy migration).
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-pcaigp`
+- PR: opened against `main` (see PR description for link)
+
 ## 2026-09-18
 
 ### Quality Gates

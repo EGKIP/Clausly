@@ -124,21 +124,26 @@ describe("ReminderEditModal", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("pre-populates the fire date without a timezone-driven off-by-one", () => {
-    vi.stubEnv("TZ", "Asia/Tokyo");
+  it("shows the correct fire date for timezones ahead of UTC", () => {
+    // The API formats fireOn as e.g. "Jan 5, 2026" in UTC (adapters.ts
+    // formatDate). Re-parsing that string with `new Date()` interprets it in
+    // the *local* timezone, which used to shift the date back a day for any
+    // timezone ahead of UTC (e.g. Asia/Kolkata, UTC+5:30).
+    const originalTz = process.env.TZ;
+    process.env.TZ = "Asia/Kolkata";
     try {
       render(
         <ReminderEditModal
-          reminder={{ ...reminder, fireOn: "Sep 20, 2026" }}
+          reminder={{ ...reminder, fireOn: "Jan 5, 2026" }}
           isSaving={false}
           onClose={vi.fn()}
           onSave={vi.fn()}
         />
       );
 
-      expect(screen.getByLabelText("Fire date")).toHaveValue("2026-09-20");
+      expect(screen.getByLabelText("Fire date")).toHaveValue("2026-01-05");
     } finally {
-      vi.unstubAllEnvs();
+      process.env.TZ = originalTz;
     }
   });
 

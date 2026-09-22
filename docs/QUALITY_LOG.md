@@ -249,3 +249,39 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-3c65cz`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-22
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (612/612, 109 files, vitest — 4 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P1 (billing correctness):** `DELETE /api/profile` (account deletion) never canceled the user's Stripe subscription. `delete_account`'s `auth.users` delete cascades to `public.users` and then `billing_customers` (`on delete cascade`), destroying the only mapping from the user to their `stripe_customer_id` before any cancellation could happen. A Pro user deleting their account kept their subscription active and kept being billed monthly, with no remaining way for the app (or, without manual Stripe-dashboard digging, the owner) to find and stop it.
+- **P2 (billing correctness, not fixed today):** The Stripe webhook (`src/app/api/billing/webhook/route.ts`) only handles `checkout.session.completed` and `customer.subscription.deleted`. It has no handler for `invoice.payment_failed` or `customer.subscription.updated` (`past_due`/`unpaid`), so a lapsed/failed-payment Pro subscription leaves `subscription_tier` at `pro` indefinitely until Stripe's retry schedule fully exhausts and deletes the subscription (if ever) — the user keeps Pro-tier access despite non-payment in the meantime. Needs a deliberate pass (new webhook branch + a decision on what tier/UX a `past_due` user gets) rather than a same-day fix bundled with the P1 above.
+- **P3 (not fixed today):** `getOrCreateStripeCustomer` (`src/lib/billing/stripe.ts`) has a race: two concurrent checkout requests with no existing `billing_customers` row both create a Stripe customer and both try to `insert`; the second insert throws (unique `user_id`), surfacing as a generic "Checkout could not be started" error even though a real (now orphaned) Stripe customer was created. Rare (needs a double-click/double-tab), and a proper fix (upsert + re-read) touches a small hand-written Supabase type shim used for test mocking — deferred rather than rushed.
+- Investigated the onboarding-tour issue flagged (but not fixed) in PR #87: confirmed steps 3–4 (`TOUR_STEPS` in `src/components/onboarding/tour-overlay.tsx`) target `[data-tour="clauses"]`/`[data-tour="reminders"]`, which only exist on `/dashboard/documents/[id]` and `/dashboard/reminders` respectively — routes the tour never navigates the user to. Not a selector bug; the tour's "Next" never moves the page. Confirmed this needs a product/UX decision (auto-navigate the user vs. redesign as single-page coachmarks vs. skip off-route steps), so left undone again, as before.
+- Verified `notification-preferences-card.tsx`, flagged as dead code in the 2026-09-16 log entry, was already deleted in commit `d4ee1c5` (#73) — no action needed; that log line is stale/resolved.
+- Supabase security/performance advisors re-checked against `clausly-prod`: no new findings. Same three previously-reviewed/judged-safe items (`vector` extension in `public`, `delete_account` SECURITY DEFINER — verified intentional, leaked-password protection disabled — owner's dashboard setting) plus routine INFO-level unindexed-FK/unused-index notices, not worth acting on for a low-traffic app.
+- `npm audit`: same 6 findings as every prior run (vitest/@vitest/mocker, esbuild dev-server-on-Windows, postcss via Next.js), all only resolvable via a Next.js 16 or Vitest 5 major bump. Tried `npm audit fix` (non-force): it re-resolved `package-lock.json` without touching the vulnerable `esbuild`/`postcss` versions at all — reverted the no-op lockfile churn rather than commit it.
+- Process note: three "Daily quality run" PRs (#85, #86, #87) from 2026-09-19 through 2026-09-21 are open, green (CI + Vercel preview passing), and mergeable against `main`, but still unreviewed — the routine skipped 2026-09-19 through 2026-09-21 in this log because those runs' entries weren't appended (same gap pattern noted on 2026-09-18). Confirmed via their PR bodies that none of the three overlap each other or today's fix.
+
+### Fixes Completed
+- `src/app/api/profile/route.ts`: `DELETE` now looks up the caller's `billing_customers` row and cancels every non-canceled Stripe subscription for that customer *before* calling the `delete_account` RPC (which cascades away the only Stripe customer mapping). Best-effort: a Stripe API failure is logged and does not block the account deletion itself, matching this route's existing best-effort audit-logging pattern.
+
+### Tests Added/Changed
+- `src/app/api/profile/__tests__/route.test.ts`: four new cases — cancels an active subscription before deleting, does not re-cancel an already-canceled subscription, still deletes the account when the Stripe call throws, and skips Stripe entirely for a user with no billing-customer mapping. First three confirmed to fail against the pre-fix code (no cancellation call at all).
+
+### Remaining Concerns
+- No P0 issues found. The P1 above is fixed and tested.
+- The P2 (webhook missing `invoice.payment_failed`/`subscription.updated` handling) and P3 (checkout customer-creation race) above are real but deliberately left for a future targeted pass.
+- Onboarding tour steps 3–4 still don't spotlight anything without the user manually navigating there first — needs a product decision (see Issues Found), not a code fix.
+- Three open, green, unmerged "Daily quality run" PRs (#85, #86, #87) are stacking up unreviewed since 2026-09-19 — recommend the owner review/merge oldest-first to keep `main` current and avoid future runs' diffs drifting further from what's actually merged.
+- Same longstanding items as every prior entry: no Playwright/E2E harness, `npm audit`'s postcss/vitest findings blocked on major-version bumps, Supabase advisories judged safe/owner-action-only.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-2agm4y`
+- PR: opened against `main` (see PR description for link)

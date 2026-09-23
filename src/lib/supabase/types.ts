@@ -116,11 +116,13 @@ export type Database = {
           document_id: string;
           suggestions: Json;
           generated_at: string;
+          generating_at: string | null;
         };
         Insert: {
           document_id: string;
           suggestions?: Json;
           generated_at?: string;
+          generating_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["document_suggestions"]["Insert"]>;
         Relationships: [
@@ -139,12 +141,14 @@ export type Database = {
           suggestions: Json;
           document_count: number;
           generated_at: string;
+          generating_at: string | null;
         };
         Insert: {
           user_id: string;
           suggestions?: Json;
           document_count?: number;
           generated_at?: string;
+          generating_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["portfolio_suggestions"]["Insert"]>;
         Relationships: [

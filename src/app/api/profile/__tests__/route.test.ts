@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
   db,
   jsonRequest,
   resetSupabaseMock,
+  seedBillingCustomer,
   seedClause,
   seedDate,
   seedDocument,
@@ -15,6 +16,7 @@ import {
   userA,
   userB,
 } from "@/../tests/helpers/supabase";
+import { __setStripeForTests } from "@/lib/billing/stripe";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 
@@ -198,4 +200,71 @@ describe("/api/profile", () => {
     expect(db().reminders).toEqual([expect.objectContaining({ user_id: userB.id })]);
     expect(storageCalls().removed).toEqual([documentA.storage_path]);
   });
+
+  describe("Stripe subscription cancellation on deletion", () => {
+    afterEach(() => __setStripeForTests(null));
+
+    it("cancels an active Stripe subscription before deleting the account", async () => {
+      seedUser(userA, { full_name: "Ada", subscription_tier: "pro" });
+      seedBillingCustomer(userA, { stripe_customer_id: "cus_delete_me" });
+      const stripe = stripeSubscriptionsMock([{ id: "sub_active", status: "active" }]);
+      __setStripeForTests(stripe as never);
+
+      const response = await DELETE(new Request("http://localhost.test/api/profile", { method: "DELETE" }));
+
+      expect(response.status).toBe(200);
+      expect(stripe.subscriptions.list).toHaveBeenCalledWith({ customer: "cus_delete_me" });
+      expect(stripe.subscriptions.cancel).toHaveBeenCalledWith("sub_active");
+      expect(db().users).toHaveLength(0);
+    });
+
+    it("does not re-cancel a subscription that is already canceled", async () => {
+      seedUser(userA, { full_name: "Ada" });
+      seedBillingCustomer(userA, { stripe_customer_id: "cus_delete_me" });
+      const stripe = stripeSubscriptionsMock([{ id: "sub_old", status: "canceled" }]);
+      __setStripeForTests(stripe as never);
+
+      const response = await DELETE(new Request("http://localhost.test/api/profile", { method: "DELETE" }));
+
+      expect(response.status).toBe(200);
+      expect(stripe.subscriptions.cancel).not.toHaveBeenCalled();
+    });
+
+    it("still deletes the account when Stripe cancellation fails", async () => {
+      seedUser(userA, { full_name: "Ada", subscription_tier: "pro" });
+      seedBillingCustomer(userA, { stripe_customer_id: "cus_delete_me" });
+      const stripe = {
+        subscriptions: {
+          list: vi.fn(async () => {
+            throw new Error("Stripe is unreachable.");
+          }),
+          cancel: vi.fn(),
+        },
+      };
+      __setStripeForTests(stripe as never);
+
+      const response = await DELETE(new Request("http://localhost.test/api/profile", { method: "DELETE" }));
+
+      expect(response.status).toBe(200);
+      expect(db().users).toHaveLength(0);
+    });
+
+    it("skips Stripe entirely for a user with no billing customer mapping", async () => {
+      seedUser(userA, { full_name: "Ada" });
+
+      const response = await DELETE(new Request("http://localhost.test/api/profile", { method: "DELETE" }));
+
+      expect(response.status).toBe(200);
+      expect(db().users).toHaveLength(0);
+    });
+  });
 });
+
+function stripeSubscriptionsMock(subscriptions: Array<{ id: string; status: string }>) {
+  return {
+    subscriptions: {
+      list: vi.fn(async () => ({ data: subscriptions })),
+      cancel: vi.fn(async (id: string) => ({ id, status: "canceled" })),
+    },
+  };
+}

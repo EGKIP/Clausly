@@ -250,6 +250,145 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - Branch: `claude/upbeat-newton-3c65cz`
 - PR: opened against `main` (see PR description for link)
 
+## 2026-09-19
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (611/611, 110 files, vitest — 3 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `/dashboard/reminders` could show its inline fetch-error banner ("Unable to load reminders.") and the "No suggestions right now. Clausly's caught up." empty state at the same time for the same tab. `useReminders()` clears the list to `[]` on a failed fetch and sets `error`, but the page only guarded the loading state, not the error state, before falling through to the empty-state render — so a real backend error was visually indistinguishable from "you're all caught up," undercutting the one thing this page exists to communicate accurately.
+- **P2 (quota/billing correctness):** Neither `/api/documents/[id]/suggested-questions` nor `/api/ask/portfolio/suggested-questions` guarded against concurrent generation. Both endpoints are polled by the client every 2.5s (`document-view.tsx`, `portfolio-ask.tsx`) while a suggestion generation job runs in the background via `after()`. Since generation (an embedding call plus up to two OpenAI calls, each with a 60s timeout) routinely takes longer than one poll interval, every poll landing before the first job persisted its result independently passed the cache-miss check and kicked off its own full generation — each one inserting its own `usage_metrics` row against the user's daily Q&A quota. A single document view could silently burn several quota slots for what the UI presents as one suggestion fetch. This was called out as a remaining concern in the 2026-09-18 entry without a fix; today's run finally addressed it.
+
+### Fixes Completed
+- `src/app/dashboard/reminders/page.tsx`: the empty-state render now requires the absence of a fetch error, so a genuine error is no longer masked by (or shown alongside) the "caught up" copy.
+- `supabase/migrations/20260919120000_suggestion_generation_lock.sql`: added a nullable `generating_at` column to `document_suggestions` and `portfolio_suggestions` (applied live to `clausly-prod`; advisors re-checked, no new findings).
+- `src/app/api/documents/[id]/suggested-questions/route.ts` and `src/app/api/ask/portfolio/suggested-questions/route.ts`: before kicking off generation, the route now claims the lock (`generating_at = now()`) after passing the Q&A rate-limit gate. A poll that lands while a lock less than 4 minutes old is present returns `{ pending: true }` immediately instead of re-checking the gate and starting another generation/usage charge. The lock is cleared on both successful persistence and on a caught generation failure, so a crashed or errored job doesn't permanently block retries. `src/lib/supabase/types.ts` updated to match the new column.
+
+### Tests Added/Changed
+- `src/app/dashboard/reminders/__tests__/page.test.tsx` (new): asserts a fetch error renders the error message and not the "caught up" empty state; confirmed it fails against the pre-fix page.
+- `src/app/api/documents/[id]/suggested-questions/__tests__/route.test.ts` and `src/app/api/ask/portfolio/suggested-questions/__tests__/route.test.ts`: new case holds generation open on a deferred embedding-provider promise, issues a second request while the first is still in flight, and asserts only one `usage_metrics` row and one persisted suggestions row exist once generation completes. Confirmed both fail (2 usage rows) against the pre-fix routes.
+
+### Remaining Concerns
+- No P0/P1 issues found; the two P2s above are fixed and tested.
+- A failed Ask/QA answer still records a usage row that counts toward the daily limit while the client hides the failure from the user (from the 2026-09-18 entry) — not addressed today; still worth a dedicated pass.
+- The generation lock is a best-effort DB row, not a fully atomic distributed lock — a request racing between the lock-read and lock-write on two different warm instances could in principle still double-fire once. This is a large reduction (the common single-tab polling case, which was the actual reported failure mode, is now fully deduped) rather than a perfect guarantee; a `select ... for update`-style conditional write would close the remaining gap if it's ever observed in practice.
+- Same recurring items as every prior entry: `vector` extension in `public` schema, `delete_account` SECURITY DEFINER (verified safe/intentional), leaked-password protection disabled (owner action, Supabase dashboard), `npm audit` PostCSS finding blocked on a Next.js 16 major bump, no Playwright/E2E harness.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-suphbo`
+- PR: opened against `main` (see PR description for link)
+
+## 2026-09-20
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (609/609, 109 files, vitest — 1 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `getQaUsage` (`src/lib/billing/qa-rate-limit.ts`) counted every `usage_metrics` row in the rolling 24h window regardless of `status`, so a Q&A answer that failed mid-stream (`status: "failed"`, recorded in `src/app/api/documents/[id]/ask/route.ts` and `src/app/api/ask/portfolio/route.ts` on a provider error) still consumed one of the user's daily Q&A questions even though they received no answer. This was flagged as a known remaining concern in the 2026-09-19 log entry (open PR #85) and confirmed still present on `main`.
+- Reviewed PR #85 (`claude/upbeat-newton-suphbo`, open, green, mergeable): it already fixes the reminders-page error/empty-state overlap and the suggested-question polling double-charge noted in earlier entries. Not duplicated here — left for the owner to merge.
+- Explore-agent audit of reminders, upload, analysis, document detail, auth, and every user-data-scoped API route found no other P0-P2 issues: ownership scoping, past-date guards, optimistic-update rollback, and auth checks all held up under review.
+- Supabase advisors (security + performance) on `clausly-prod` show only the same three long-standing, already-judged-acceptable security warnings, plus 9 unindexed foreign keys and 7 unused indexes (new observation, informational-only — no evidence of an actual performance problem at current traffic, not acted on today).
+
+### Fixes Completed
+- `src/lib/billing/qa-rate-limit.ts`: `getQaUsage` now excludes rows with `status: "failed"` from both the quota count and the `resetsAt` calculation, so a failed answer no longer costs the user a question.
+
+### Tests Added/Changed
+- `src/lib/billing/__tests__/qa-rate-limit.test.ts`: new case seeding one failed and one completed `qa_question` row, asserting only the completed one counts toward usage. Confirmed it fails against the pre-fix query (reported `used: 2` instead of `1`).
+
+### Remaining Concerns
+- No P0/P1 issues found or introduced.
+- PR #85 remains open, green, and mergeable — still awaiting owner review.
+- New, informational-only: 9 foreign keys without a covering index and 7 unused indexes on `clausly-prod` (Supabase performance advisor). Low priority at current scale; worth revisiting if query latency becomes a concern.
+- Longstanding, unchanged: leaked-password protection disabled (Supabase dashboard setting), `vector` extension in `public` schema, `delete_account` SECURITY DEFINER callable by `authenticated` (verified intentional), no Playwright/E2E harness, Next.js 16/vitest 5 major bumps needed to clear remaining `npm audit` findings, and the unconfirmed production reachability of the 25 MB upload limit versus Vercel's platform body-size cap.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-egi4e9`
+- PR: opened against `main` (see PR description for link)
+## 2026-09-21
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (612/612, 109 files, vitest — 4 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `/dashboard/settings`'s profile-load `useEffect` (`page.tsx`) had no error handling at all: a thrown `fetch` (network failure) was an unhandled rejection, and a non-2xx response was silently swallowed. Either way the page was left showing the hardcoded `fallbackProfile` (`"Demo User"` / `demo@clausly.app`, `mockMode: true`) with no indication anything had failed — a real, logged-in user hitting a transient 500 would see their own settings replaced by demo data and a "Mock mode: connect Supabase to edit your profile" message that's actively wrong for their situation, with editing silently disabled.
+- **P2:** Settings → Activity's "View resource" link for a `document.deleted` audit event (`activity-timeline.tsx`) pointed at `/dashboard/documents/{id}`, which 404s once the document (and its row) are actually gone — `hrefForEvent` only branched on `resourceType`, not `action`.
+- **P2:** `ClauseLibrary`'s infinite-scroll `loadMore()` (`clause-library.tsx`) had no staleness guard, unlike the main filter-search effect (which uses `AbortController`). Concrete failure: user scrolls to trigger "load more" under filter set A, then changes a filter/search term before that request resolves; the stale filter-A page then gets merged (`mergeClauses`) onto the freshly-fetched filter-B list, showing clauses that don't match the currently displayed filters.
+- **P3:** `ExportButton`'s dropdown (`export-button.tsx`) was `absolute right-0` with a fixed `w-[260px]`, anchored to a small button that sits near the left edge of the document detail action bar. At ~375px width the panel's left edge lands well off the left of the viewport, making the export menu partly unusable on mobile.
+- **P1/P2 (found, not fixed today — documented instead):** Explore-agent audit of the clause library, contract compare, export, shareable links, audit log, and onboarding tour surfaced that the onboarding tour's steps 3 ("Skim the clauses") and 4 ("Approve a reminder") never spotlight anything in production. `TourOverlay` (mounted once in `dashboard/layout.tsx`) looks up `[data-tour="clauses"]`/`[data-tour="reminders"]` by `querySelector`, but those attributes only exist on `/dashboard/documents/[id]` (Clauses tab) and `/dashboard/reminders` respectively — pages the tour never navigates the user to. A fresh user clicking through the tour from `/dashboard` gets steps 1–2 highlighted correctly, then two floating tooltips with no spotlight and no way to know where to go, before the tour marks itself complete. The existing test (`tour-overlay.test.tsx`) masks this by rendering all four `data-tour` targets in one DOM tree, which doesn't reflect the real, multi-page layout. Not fixed today: a correct fix means either driving real cross-page navigation from the tour (needs a real document id + tab state, and a design decision about forcibly navigating a user away from wherever they are) or re-scoping the tour to the current page only — both are product/UX decisions, not a small targeted fix, so this is being documented for a dedicated future pass rather than patched today. Re-verified the clause deep-link ("View in document" from `/dashboard/clauses`) that an earlier read of this code looked broken at first glance: `DocumentView` does correctly read `?clause=` from `window.location.search` on mount and switches to the Clauses tab — that path already works.
+- Also re-checked and confirmed correct, no changes needed: `safeNextPath`-guarded redirects (login/signup/OAuth callback) are consistently applied and reject `//`-style open-redirect attempts; `createServiceSupabaseClient` is `server-only` and every caller (admin cron routes, webhooks, share resolution) gates on a bearer secret or the user's own session before using it; `/api/admin/*` routes are secret-gated, not just authenticated.
+- Supabase advisors re-checked against `clausly-prod`: no new security findings (`vector` extension in `public`, `delete_account` SECURITY DEFINER, leaked-password protection disabled — all previously reviewed/judged intentional or owner-action). Performance advisor lists 9 unindexed FKs and 7 unused indexes, all INFO-level and pre-existing; not addressed today as low-value churn for a targeted pass.
+- Confirmed via the GitHub API that PRs #85 (reminders error/empty-state clash, suggestion-quota double-charge) and #86 (failed Q&A answers no longer consuming quota) are still open, green, and unmerged from the last two days — they already cover three items that would otherwise have been re-reported today (suggested-questions in-flight guard, failed-Ask quota charging, reminders page error/empty-state clash), so those were intentionally not re-implemented here.
+- Migration bookkeeping drift, still present: `clausly-prod`'s applied-migration history includes `20260919142405_suggestion_generation_lock`, applied ahead of PR #85 merging, but PR #85's own migration file uses a different timestamp (`20260919120000_suggestion_generation_lock.sql`) for the same change — will need a trivial rename/reconciliation whenever #85 is merged so the filename matches what's already live on prod.
+
+### Fixes Completed
+- `src/app/dashboard/settings/page.tsx`: profile load now catches fetch/response failures, shows a dedicated "Couldn't load your profile" banner with a Retry button, and no longer disables the form under a misleading "Mock mode" label when the real cause is a failed request.
+- `src/components/dashboard/audit/activity-timeline.tsx`: `hrefForEvent` returns `null` for `document.deleted` events instead of linking to the now-deleted document's detail page.
+- `src/components/dashboard/clauses/clause-library.tsx`: added a `filtersVersion` ref that increments whenever the search/category/risk filters change; `loadMore()` snapshots the version at request start and discards (does not merge) its result if the filters changed while the request was in flight.
+- `src/components/dashboard/document-actions/export-button.tsx`: dropdown now anchors `left-0` (flipping to `right-0` at `sm:`) with `max-w-[calc(100vw-2rem)]`, so it stays on-screen at narrow widths instead of extending off the left edge.
+
+### Tests Added/Changed
+- `settings/__tests__/page.test.tsx`: two new cases — a failed profile fetch shows the retry banner (not the mock-mode message) and disables Save; clicking Retry re-fetches and clears the banner on success. Confirmed both fail against the pre-fix code.
+- `audit/activity-timeline.test.tsx`: new case for a `document.deleted` event asserting no "View resource" link renders (shows the truncated ID instead). Confirmed it fails against the pre-fix code.
+- `clauses/__tests__/clause-library.test.tsx`: new case simulates a slow "load more" request that resolves only after the risk filter changes underneath it, and asserts the stale page's clause is never shown. Confirmed it fails against the pre-fix code. (Also added a missing `cleanup()` to this file's `afterEach` — without it, prior tests' unmounted-but-still-rendered filter buttons collided with the new test's `getAllByRole(...)[0]` lookup.)
+
+### Remaining Concerns
+- No P0 issues found. One P1 found and intentionally left unfixed: the onboarding tour's clause/reminder steps don't highlight anything (see Issues Found) — needs a scoped design decision, not a same-day patch; recommend either constraining the tour to what's visible on the current page or giving `TourOverlay` real document/tab data plus explicit navigation between steps.
+- PRs #85 and #86 remain open, green, and unreviewed for 1-2 days — recommend the owner merge both (they're independent, no conflicting changes).
+- CSS-only mobile fix to `ExportButton` was not covered by an automated test (jsdom has no real layout engine to assert on); recommend a manual check at ~375px if this component changes again.
+- Same longstanding items as every prior entry: `vector` extension in `public`, `delete_account` SECURITY DEFINER (judged safe/intentional), leaked-password protection disabled (owner action, Supabase dashboard), no Playwright/E2E harness, `npm audit` findings blocked on Next.js 16/Vitest 5 major bumps, migration bookkeeping drift (see Issues Found), and `CompareWithButton`'s missing Escape dismissal (P3).
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-e5jvjw`
+- PR: opened against `main` (see PR description for link)
+
+## 2026-09-22
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (612/612, 109 files, vitest — 4 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P1 (billing correctness):** `DELETE /api/profile` (account deletion) never canceled the user's Stripe subscription. `delete_account`'s `auth.users` delete cascades to `public.users` and then `billing_customers` (`on delete cascade`), destroying the only mapping from the user to their `stripe_customer_id` before any cancellation could happen. A Pro user deleting their account kept their subscription active and kept being billed monthly, with no remaining way for the app (or, without manual Stripe-dashboard digging, the owner) to find and stop it.
+- **P2 (billing correctness, not fixed today):** The Stripe webhook (`src/app/api/billing/webhook/route.ts`) only handles `checkout.session.completed` and `customer.subscription.deleted`. It has no handler for `invoice.payment_failed` or `customer.subscription.updated` (`past_due`/`unpaid`), so a lapsed/failed-payment Pro subscription leaves `subscription_tier` at `pro` indefinitely until Stripe's retry schedule fully exhausts and deletes the subscription (if ever) — the user keeps Pro-tier access despite non-payment in the meantime. Needs a deliberate pass (new webhook branch + a decision on what tier/UX a `past_due` user gets) rather than a same-day fix bundled with the P1 above.
+- **P3 (not fixed today):** `getOrCreateStripeCustomer` (`src/lib/billing/stripe.ts`) has a race: two concurrent checkout requests with no existing `billing_customers` row both create a Stripe customer and both try to `insert`; the second insert throws (unique `user_id`), surfacing as a generic "Checkout could not be started" error even though a real (now orphaned) Stripe customer was created. Rare (needs a double-click/double-tab), and a proper fix (upsert + re-read) touches a small hand-written Supabase type shim used for test mocking — deferred rather than rushed.
+- Investigated the onboarding-tour issue flagged (but not fixed) in PR #87: confirmed steps 3–4 (`TOUR_STEPS` in `src/components/onboarding/tour-overlay.tsx`) target `[data-tour="clauses"]`/`[data-tour="reminders"]`, which only exist on `/dashboard/documents/[id]` and `/dashboard/reminders` respectively — routes the tour never navigates the user to. Not a selector bug; the tour's "Next" never moves the page. Confirmed this needs a product/UX decision (auto-navigate the user vs. redesign as single-page coachmarks vs. skip off-route steps), so left undone again, as before.
+- Verified `notification-preferences-card.tsx`, flagged as dead code in the 2026-09-16 log entry, was already deleted in commit `d4ee1c5` (#73) — no action needed; that log line is stale/resolved.
+- Supabase security/performance advisors re-checked against `clausly-prod`: no new findings. Same three previously-reviewed/judged-safe items (`vector` extension in `public`, `delete_account` SECURITY DEFINER — verified intentional, leaked-password protection disabled — owner's dashboard setting) plus routine INFO-level unindexed-FK/unused-index notices, not worth acting on for a low-traffic app.
+- `npm audit`: same 6 findings as every prior run (vitest/@vitest/mocker, esbuild dev-server-on-Windows, postcss via Next.js), all only resolvable via a Next.js 16 or Vitest 5 major bump. Tried `npm audit fix` (non-force): it re-resolved `package-lock.json` without touching the vulnerable `esbuild`/`postcss` versions at all — reverted the no-op lockfile churn rather than commit it.
+- Process note: three "Daily quality run" PRs (#85, #86, #87) from 2026-09-19 through 2026-09-21 are open, green (CI + Vercel preview passing), and mergeable against `main`, but still unreviewed — the routine skipped 2026-09-19 through 2026-09-21 in this log because those runs' entries weren't appended (same gap pattern noted on 2026-09-18). Confirmed via their PR bodies that none of the three overlap each other or today's fix.
+
+### Fixes Completed
+- `src/app/api/profile/route.ts`: `DELETE` now looks up the caller's `billing_customers` row and cancels every non-canceled Stripe subscription for that customer *before* calling the `delete_account` RPC (which cascades away the only Stripe customer mapping). Best-effort: a Stripe API failure is logged and does not block the account deletion itself, matching this route's existing best-effort audit-logging pattern.
+
+### Tests Added/Changed
+- `src/app/api/profile/__tests__/route.test.ts`: four new cases — cancels an active subscription before deleting, does not re-cancel an already-canceled subscription, still deletes the account when the Stripe call throws, and skips Stripe entirely for a user with no billing-customer mapping. First three confirmed to fail against the pre-fix code (no cancellation call at all).
+
+### Remaining Concerns
+- No P0 issues found. The P1 above is fixed and tested.
+- The P2 (webhook missing `invoice.payment_failed`/`subscription.updated` handling) and P3 (checkout customer-creation race) above are real but deliberately left for a future targeted pass.
+- Onboarding tour steps 3–4 still don't spotlight anything without the user manually navigating there first — needs a product decision (see Issues Found), not a code fix.
+- Three open, green, unmerged "Daily quality run" PRs (#85, #86, #87) are stacking up unreviewed since 2026-09-19 — recommend the owner review/merge oldest-first to keep `main` current and avoid future runs' diffs drifting further from what's actually merged.
+- Same longstanding items as every prior entry: no Playwright/E2E harness, `npm audit`'s postcss/vitest findings blocked on major-version bumps, Supabase advisories judged safe/owner-action-only.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-2agm4y`
+- PR: opened against `main` (see PR description for link)
+
 ## 2026-09-23
 
 ### Quality Gates

@@ -23,6 +23,7 @@ type QueryResult<T = unknown> = {
 
 type QueryBuilder<T = unknown> = PromiseLike<QueryResult<T>> & {
   eq(column: string, value: unknown): QueryBuilder<T>;
+  neq(column: string, value: unknown): QueryBuilder<T>;
   in(column: string, value: unknown[]): QueryBuilder<T>;
   gte(column: string, value: unknown): QueryBuilder<T>;
   order(column: string, options?: { ascending?: boolean }): QueryBuilder<T>;
@@ -56,6 +57,7 @@ export async function getQaUsage(supabase: unknown, userId: string): Promise<QaU
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .in("job_type", [...QA_JOB_TYPES])
+    .neq("status", "failed")
     .gte("created_at", windowStart);
 
   if (countError) {
@@ -73,6 +75,7 @@ export async function getQaUsage(supabase: unknown, userId: string): Promise<QaU
     .select("created_at")
     .eq("user_id", userId)
     .in("job_type", [...QA_JOB_TYPES])
+    .neq("status", "failed")
     .gte("created_at", windowStart)
     .order("created_at", { ascending: true })
     .limit(1);

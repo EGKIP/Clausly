@@ -91,7 +91,7 @@ export function ExportButton({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-[260px] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)]">
+        <div className="absolute left-0 top-[calc(100%+8px)] z-40 w-[260px] max-w-[calc(100vw-2rem)] rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-float)] sm:left-auto sm:right-0">
           <ExportOption
             icon={FileText}
             title="PDF digest"

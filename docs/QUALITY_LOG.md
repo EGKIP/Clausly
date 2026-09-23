@@ -249,3 +249,37 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-3c65cz`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-23
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (609/609, 109 files, vitest — 1 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P3:** `getOrCreateStripeCustomer` (`src/lib/billing/stripe.ts`) had the race flagged-but-deferred in the 2026-09-22 entry: two concurrent `/api/billing/checkout` requests (a double-click, or two tabs) with no existing `billing_customers` row both create a Stripe customer and both try to `insert` the mapping; `user_id` is the table's primary key, so the second insert throws and that request's checkout fails with the generic "Checkout could not be started" — even though a real (now orphaned, harmless, unbilled) Stripe customer was created and the *other* request succeeded normally.
+- Re-checked Supabase security/performance advisors against `clausly-prod`: no new findings (same three long-standing, previously-judged-safe items; same nine unindexed-FK/seven unused-index INFO notices, still not worth acting on).
+- `npm audit`: same six findings as every prior run, all still only resolvable via a Next.js 16 or Vitest 5 major bump.
+- Confirmed the four open "Daily quality run" PRs from the last four runs (#85, #86, #87, #88) are still unreviewed — see Remaining Concerns; read each one's diff to confirm today's fix doesn't overlap.
+- No new P0/P1/P2 found. A targeted read of the reminders, upload, analysis, and auth routes not already covered by the four open PRs above turned up nothing else concrete.
+
+### Fixes Completed
+- `src/lib/billing/stripe.ts`: `getOrCreateStripeCustomer` now catches a `23505` (unique-violation) insert error and re-reads the row instead of throwing, returning the concurrent winner's `stripe_customer_id` so the losing request's checkout still succeeds instead of erroring out.
+- `tests/helpers/supabase.ts`: `failNext()` now accepts an optional Postgres error `code` (previously always `"TEST_ERROR"`), needed to simulate a `23505` unique-violation in the regression test below without a broader mock rewrite.
+
+### Tests Added/Changed
+- `src/lib/billing/__tests__/stripe.test.ts`: new case simulates a concurrent request winning the insert (seeding the row as a side effect of the mocked `customers.create` call, then forcing the next `billing_customers` insert to fail with code `23505`) and asserts `getOrCreateStripeCustomer` resolves to the winner's customer ID instead of rejecting. Confirmed it fails against the pre-fix code (rejects with the raw Postgres error).
+
+### Remaining Concerns
+- No P0/P1 issues found.
+- **Four "Daily quality run" PRs are open, green, and mergeable against current `main`, unreviewed for 1–4 days: #85 (2026-09-19), #86 (2026-09-20), #87 (2026-09-21), #88 (2026-09-22, includes a P1 billing fix — canceling Stripe subscriptions on account deletion).** This is now a five-run streak of unreviewed backlog (see the same note in the 2026-09-22 entry for #85-#87) — recommend the owner review and merge oldest-first before the queue grows further; none of the four (confirmed by reading each PR body) overlap each other or today's fix.
+- The Stripe webhook (`src/app/api/billing/webhook/route.ts`) still only handles `checkout.session.completed`/`customer.subscription.deleted`, with no `invoice.payment_failed`/`customer.subscription.updated` handling — flagged again in the 2026-09-22 entry as needing a product decision (what tier/UX a `past_due` user gets, plus a `subscription_tier` check-constraint change) before it can be fixed, not something to guess at in a targeted pass.
+- Onboarding tour steps 3-4 still don't spotlight anything without a product decision (see 2026-09-21/22 entries).
+- Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-vg7oky`
+- PR: opened against `main` (see PR description for link)

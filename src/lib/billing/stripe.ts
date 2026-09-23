@@ -87,6 +87,18 @@ export async function getOrCreateStripeCustomer(
   });
 
   if (insertError) {
+    // A concurrent request can win the insert first (user_id is the primary
+    // key) — re-read its row instead of failing the whole checkout with a
+    // generic error, leaving this call's Stripe customer simply unused.
+    if (insertError.code === "23505") {
+      const { data: existing, error: refetchError } = await (supabase as BillingSupabase)
+        .from("billing_customers")
+        .select("stripe_customer_id")
+        .eq("user_id", user.id)
+        .single();
+      if (existing?.stripe_customer_id) return existing.stripe_customer_id;
+      throw new Error(refetchError?.message ?? insertError.message);
+    }
     throw new Error(insertError.message);
   }
 

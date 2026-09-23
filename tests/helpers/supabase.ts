@@ -25,6 +25,7 @@ type Failure = {
   table: TableName;
   operation: "insert" | "update" | "delete" | "select";
   message: string;
+  code?: string;
   once?: boolean;
 };
 
@@ -96,8 +97,13 @@ export function setSupabaseEnv(enabled: boolean) {
   }
 }
 
-export function failNext(operation: Failure["operation"], table: TableName, message = "Forced Supabase error.") {
-  failure = { operation, table, message, once: true };
+export function failNext(
+  operation: Failure["operation"],
+  table: TableName,
+  message = "Forced Supabase error.",
+  code?: string
+) {
+  failure = { operation, table, message, code, once: true };
 }
 
 export function failNextStorageRemove(message = "Forced storage error.") {
@@ -728,7 +734,7 @@ function cascadeDocuments(ids: Set<string>) {
 
 function consumeFailure(operation: Failure["operation"], table: TableName) {
   if (!failure || failure.operation !== operation || failure.table !== table) return null;
-  const error = { message: failure.message, code: "TEST_ERROR" };
+  const error = { message: failure.message, code: failure.code ?? "TEST_ERROR" };
   if (failure.once) failure = null;
   return error;
 }

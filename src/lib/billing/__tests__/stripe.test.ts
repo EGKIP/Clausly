@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
   db,
+  failNext,
   resetSupabaseMock,
   seedBillingCustomer,
   userA,
@@ -45,6 +46,31 @@ describe("Stripe billing helpers", () => {
         user_id: userA.id,
         stripe_customer_id: "cus_created",
       }),
+    ]);
+  });
+
+  it("returns the winning row instead of throwing when a concurrent request creates it first", async () => {
+    const stripeMock = {
+      customers: {
+        create: vi.fn(async () => {
+          // Simulate a second, concurrent checkout request winning the
+          // insert race between this request's select and its own insert.
+          seedBillingCustomer(userA, { stripe_customer_id: "cus_winner" });
+          return { id: "cus_orphaned" };
+        }),
+      },
+    };
+    __setStripeForTests(stripeMock as never);
+    failNext(
+      "insert",
+      "billing_customers",
+      "duplicate key value violates unique constraint",
+      "23505"
+    );
+
+    await expect(getOrCreateStripeCustomer(createSupabaseClient(), userA)).resolves.toBe("cus_winner");
+    expect(db().billing_customers).toEqual([
+      expect.objectContaining({ user_id: userA.id, stripe_customer_id: "cus_winner" }),
     ]);
   });
 });

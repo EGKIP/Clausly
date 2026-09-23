@@ -49,4 +49,21 @@ describe("ActivityTimeline", () => {
 
     expect(screen.getByText("No activity yet.")).toBeInTheDocument();
   });
+
+  it("does not link a deleted document to its now-gone detail page", () => {
+    const deletedEvent: AuditTimelineEvent = {
+      id: "event-document-deleted",
+      action: "document.deleted",
+      resourceType: "document",
+      resourceId: "22222222-2222-4222-8222-222222222222",
+      metadata: {},
+      createdAt: new Date().toISOString(),
+    };
+
+    render(<ActivityTimeline initialEvents={[deletedEvent]} initialNextCursor={null} />);
+
+    expect(screen.getByText("Deleted a document")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View resource" })).not.toBeInTheDocument();
+    expect(screen.getByText(/^ID 22222222/)).toBeInTheDocument();
+  });
 });

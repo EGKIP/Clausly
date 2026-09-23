@@ -15,6 +15,7 @@ import {
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import type { Json } from "@/lib/supabase/types";
 
 export type AuditTimelineEvent = {
@@ -224,6 +225,7 @@ function iconForEvent(event: AuditTimelineEvent) {
 }
 
 function hrefForEvent(event: AuditTimelineEvent) {
+  if (event.action === AUDIT_ACTIONS.DOCUMENT_DELETED) return null;
   if (event.resourceType === "document" && event.resourceId) return `/dashboard/documents/${event.resourceId}`;
   if (event.resourceType === "document_export" && event.resourceId) return `/dashboard/documents/${event.resourceId}`;
   if (event.resourceType === "document_share") {

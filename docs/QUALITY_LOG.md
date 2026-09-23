@@ -281,3 +281,34 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-suphbo`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-20
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (609/609, 109 files, vitest — 1 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `getQaUsage` (`src/lib/billing/qa-rate-limit.ts`) counted every `usage_metrics` row in the rolling 24h window regardless of `status`, so a Q&A answer that failed mid-stream (`status: "failed"`, recorded in `src/app/api/documents/[id]/ask/route.ts` and `src/app/api/ask/portfolio/route.ts` on a provider error) still consumed one of the user's daily Q&A questions even though they received no answer. This was flagged as a known remaining concern in the 2026-09-19 log entry (open PR #85) and confirmed still present on `main`.
+- Reviewed PR #85 (`claude/upbeat-newton-suphbo`, open, green, mergeable): it already fixes the reminders-page error/empty-state overlap and the suggested-question polling double-charge noted in earlier entries. Not duplicated here — left for the owner to merge.
+- Explore-agent audit of reminders, upload, analysis, document detail, auth, and every user-data-scoped API route found no other P0-P2 issues: ownership scoping, past-date guards, optimistic-update rollback, and auth checks all held up under review.
+- Supabase advisors (security + performance) on `clausly-prod` show only the same three long-standing, already-judged-acceptable security warnings, plus 9 unindexed foreign keys and 7 unused indexes (new observation, informational-only — no evidence of an actual performance problem at current traffic, not acted on today).
+
+### Fixes Completed
+- `src/lib/billing/qa-rate-limit.ts`: `getQaUsage` now excludes rows with `status: "failed"` from both the quota count and the `resetsAt` calculation, so a failed answer no longer costs the user a question.
+
+### Tests Added/Changed
+- `src/lib/billing/__tests__/qa-rate-limit.test.ts`: new case seeding one failed and one completed `qa_question` row, asserting only the completed one counts toward usage. Confirmed it fails against the pre-fix query (reported `used: 2` instead of `1`).
+
+### Remaining Concerns
+- No P0/P1 issues found or introduced.
+- PR #85 remains open, green, and mergeable — still awaiting owner review.
+- New, informational-only: 9 foreign keys without a covering index and 7 unused indexes on `clausly-prod` (Supabase performance advisor). Low priority at current scale; worth revisiting if query latency becomes a concern.
+- Longstanding, unchanged: leaked-password protection disabled (Supabase dashboard setting), `vector` extension in `public` schema, `delete_account` SECURITY DEFINER callable by `authenticated` (verified intentional), no Playwright/E2E harness, Next.js 16/vitest 5 major bumps needed to clear remaining `npm audit` findings, and the unconfirmed production reachability of the 25 MB upload limit versus Vercel's platform body-size cap.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-egi4e9`
+- PR: opened against `main` (see PR description for link)

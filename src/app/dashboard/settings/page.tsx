@@ -51,21 +51,33 @@ export default function SettingsPage() {
   const [deleteMessage, setDeleteMessage] = React.useState<string | null>(null);
   const [billingStatus, setBillingStatus] = React.useState<"idle" | "loading" | "error">("idle");
   const [billingMessage, setBillingMessage] = React.useState<string | null>(null);
+  const [profileLoadError, setProfileLoadError] = React.useState(false);
+  const [profileLoadAttempt, setProfileLoadAttempt] = React.useState(0);
 
   React.useEffect(() => {
     let cancelled = false;
     async function loadProfile() {
-      const response = await fetch("/api/profile");
-      if (cancelled || !response.ok) return;
-      const payload = (await response.json()) as Profile;
-      setProfile(payload);
-      setDisplayName(payload.displayName);
+      try {
+        const response = await fetch("/api/profile");
+        if (cancelled) return;
+        if (!response.ok) {
+          setProfileLoadError(true);
+          return;
+        }
+        const payload = (await response.json()) as Profile;
+        if (cancelled) return;
+        setProfile(payload);
+        setDisplayName(payload.displayName);
+        setProfileLoadError(false);
+      } catch {
+        if (!cancelled) setProfileLoadError(true);
+      }
     }
     void loadProfile();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [profileLoadAttempt]);
 
   React.useEffect(() => {
     const url = new URL(window.location.href);
@@ -177,6 +189,19 @@ export default function SettingsPage() {
             description="Your display name appears in workspace greetings. Email is managed by your sign-in provider."
           />
           <Card className="p-4 sm:p-6">
+            {profileLoadError && (
+              <div className="mb-5 flex flex-col items-start gap-2 rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] px-3 py-2.5 text-[12.5px] text-[var(--color-coral-ink)] sm:flex-row sm:items-center sm:justify-between">
+                <span>Couldn&apos;t load your profile. Showing placeholder data below.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setProfileLoadAttempt((attempt) => attempt + 1)}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
             <form onSubmit={saveProfile} className="grid gap-5">
               <label className="grid gap-2">
                 <span className="inline-flex items-center gap-2 text-[12.5px] font-medium">
@@ -186,7 +211,7 @@ export default function SettingsPage() {
                 <input
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
-                  disabled={profile.mockMode}
+                  disabled={profile.mockMode || profileLoadError}
                   className="h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--background)] px-3 text-[14px] outline-none transition-colors focus:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </label>
@@ -220,12 +245,14 @@ export default function SettingsPage() {
                   variant="primary"
                   size="md"
                   className="min-h-11 w-full sm:w-auto"
-                  disabled={profile.mockMode || status === "saving" || displayName.trim().length === 0}
+                  disabled={
+                    profile.mockMode || profileLoadError || status === "saving" || displayName.trim().length === 0
+                  }
                 >
                   <Save className="size-3.5" />
                   {status === "saving" ? "Saving..." : "Save profile"}
                 </Button>
-                {profile.mockMode && (
+                {profile.mockMode && !profileLoadError && (
                   <span className="text-[12px] text-[var(--faint)]">
                     Mock mode: connect Supabase to edit your profile.
                   </span>

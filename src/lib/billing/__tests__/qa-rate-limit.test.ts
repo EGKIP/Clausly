@@ -73,6 +73,28 @@ describe("Q&A rate limit", () => {
     });
   });
 
+  it("does not count failed Q&A attempts against the daily quota", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    seedUsageMetric(userA, {
+      id: "failed-question",
+      job_type: "qa_question",
+      status: "failed",
+      created_at: "2026-06-15T11:00:00.000Z",
+    });
+    seedUsageMetric(userA, {
+      id: "successful-question",
+      job_type: "qa_question",
+      status: "completed",
+      created_at: "2026-06-15T11:00:00.000Z",
+    });
+
+    await expect(canAskQuestion(createSupabaseClient(), userA.id)).resolves.toMatchObject({
+      allowed: true,
+      used: 1,
+      remaining: 24,
+    });
+  });
+
   it("sets resetsAt to now plus 24 hours when no rows are in the window", async () => {
     seedUser(userA, { subscription_tier: "free" });
 

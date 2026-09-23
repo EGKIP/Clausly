@@ -16,6 +16,10 @@ type MatchChunk = {
 export const maxDuration = 300;
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Generation (embedding + up to two OpenAI calls, each with a 60s timeout)
+// can run longer than the client's poll interval. A lock older than this is
+// assumed abandoned (crashed function, etc.) and safe to retry.
+const GENERATION_LOCK_MS = 4 * 60 * 1000;
 const anchor = "portfolio key terms, renewal dates, notice windows, obligations, costs, risks";
 const canned = [
   "Which contracts renew soon?",
@@ -44,8 +48,9 @@ export async function GET() {
   }
 
   const documentCount = await countDocuments(supabase, user.id);
-  const cached = await getCachedSuggestions(supabase, user.id, documentCount);
-  if (cached) return NextResponse.json({ suggestions: cached, pending: false });
+  const existing = await getSuggestionRow(supabase, user.id, documentCount);
+  if (existing.cached) return NextResponse.json({ suggestions: existing.cached, pending: false });
+  if (existing.locked) return NextResponse.json({ suggestions: [], pending: true });
 
   const gate = await canAskQuestion(supabase, user.id);
   if (!gate.allowed) {
@@ -62,6 +67,12 @@ export async function GET() {
     );
   }
 
+  // Claim the generation lock before kicking off work so the client's own
+  // polling (every 2.5s, see portfolio-ask.tsx) doesn't re-trigger another
+  // full generation — and another usage_metrics charge — before this one
+  // finishes and persists.
+  await acquireGenerationLock(supabase, user.id, existing.exists);
+
   // after() keeps the serverless function alive until generation finishes —
   // a bare detached promise dies with the response on Vercel, which left
   // suggestions permanently ungenerated and the UI stuck on "pending".
@@ -73,6 +84,7 @@ export async function GET() {
         userId: user.id,
         message: error instanceof Error ? error.message : "Unknown suggestion generation error.",
       });
+      await clearGenerationLock(supabase, user.id);
     }
   });
 
@@ -89,25 +101,56 @@ async function countDocuments(supabase: Awaited<ReturnType<typeof createClient>>
   return count ?? 0;
 }
 
-async function getCachedSuggestions(
+async function getSuggestionRow(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   documentCount: number
 ) {
   const { data, error } = await supabase
     .from("portfolio_suggestions")
-    .select("suggestions, generated_at, document_count")
+    .select("suggestions, generated_at, generating_at, document_count")
     .eq("user_id", userId)
     .single();
 
   if (error) {
-    if (error.code === "PGRST116") return null;
+    if (error.code === "PGRST116") return { exists: false, cached: null, locked: false };
     throw new Error(error.message);
   }
-  if (!data) return null;
-  if (data.document_count !== documentCount) return null;
-  if (Date.now() - new Date(data.generated_at).getTime() > CACHE_TTL_MS) return null;
-  return sanitizeSuggestions(data.suggestions);
+  if (!data) return { exists: false, cached: null, locked: false };
+
+  const suggestions = sanitizeSuggestions(data.suggestions);
+  const fresh =
+    data.document_count === documentCount && Date.now() - new Date(data.generated_at).getTime() <= CACHE_TTL_MS;
+  const locked = Boolean(data.generating_at) && Date.now() - new Date(data.generating_at as string).getTime() < GENERATION_LOCK_MS;
+
+  return {
+    exists: true,
+    cached: fresh && suggestions.length > 0 ? suggestions : null,
+    locked,
+  };
+}
+
+async function acquireGenerationLock(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  rowExists: boolean
+) {
+  const generatingAt = new Date().toISOString();
+  if (rowExists) {
+    await supabase.from("portfolio_suggestions").update({ generating_at: generatingAt }).eq("user_id", userId);
+  } else {
+    await supabase.from("portfolio_suggestions").insert({
+      user_id: userId,
+      suggestions: [],
+      document_count: 0,
+      generated_at: generatingAt,
+      generating_at: generatingAt,
+    });
+  }
+}
+
+async function clearGenerationLock(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  await supabase.from("portfolio_suggestions").update({ generating_at: null }).eq("user_id", userId);
 }
 
 async function generateAndPersistSuggestions(
@@ -149,6 +192,7 @@ async function persistSuggestions(
     suggestions,
     document_count: documentCount,
     generated_at: new Date().toISOString(),
+    generating_at: null,
   };
 
   const result = existing.data

@@ -422,3 +422,41 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-vg7oky`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-24
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (624/624, 110 files, vitest — 3 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `dispatchDueReminderEmails` (`src/lib/notifications/dispatch.ts`) only checked the master `email` preference before sending a due-reminder email; it never read the independent "Reminder emails" toggle (`notification_preferences.reminders`) exposed in Settings. A user who left "All emails" on but switched off "Reminder emails" specifically still got emailed for every due reminder by the daily dispatch cron.
+- **P2:** The weekly digest's "Unsubscribe from weekly digests" link (`buildWeeklyDigestUnsubscribeUrl`) tags its URL with `type=weekly_digest`, but `GET /api/notifications/unsubscribe` and `unsubscribeUserEmail` ignored that parameter entirely and always flipped the master `email` flag off — so clicking it silently killed reminder emails too, with no indication that happened.
+- **P2:** `sendWeeklyDigests` (`src/lib/notifications/weekly-digest.ts`) had no idempotency guard analogous to the reminder dispatcher's `sent_at IS NULL` check: a Vercel cron retry or a manual re-trigger of the (bearer-secret-gated) weekly-digest endpoint on the same day would re-send every eligible user's digest.
+- **P2:** `/dashboard/insights`'s "Email me this" button (`page.tsx`) had no `onClick`/`href` and wasn't in a form — clicking it did nothing, with no backend endpoint for an on-demand digest send to wire it to.
+- **P4:** The insights "Where your money is going" bar chart divided by `max(...monthly values)` with no zero guard; an all-zero-`monthly` document set produced an invalid `width: NaN%` inline style.
+- Re-confirmed still-open items from prior runs, no change: onboarding tour steps 3–4 don't spotlight anything cross-page (needs a product decision); Stripe webhook still has no `invoice.payment_failed`/`subscription.updated` handling (needs a product decision on past-due tier/UX); Supabase security/performance advisors show the same three long-standing, judged-safe findings plus routine INFO-level index notices; `npm audit`'s six findings are unchanged, still blocked on a Next.js 16 / Vitest 5 major bump.
+- Explore pass over notifications (dispatch/weekly-digest/webhook/unsubscribe), admin cron routes, contract compare, document shares, and mobile dialog widths otherwise checked out clean: admin routes correctly require the bearer secret, share creation/revocation/token validation is correctly ownership-scoped and rejects revoked/expired tokens, compare handles empty/identical documents and zero-vector embeddings without crashing, and no new mobile-overflow dialogs were found (the export-button fix from a prior run is still in place).
+- No open PRs from prior daily runs were found — #85 through #89 have all since been merged into `main`, so there is no review backlog to flag this time.
+
+### Fixes Completed
+- `src/lib/notifications/dispatch.ts`: reminder dispatch now skips a user if either the master `email` preference or the specific `reminders` preference is off (renamed `emailDisabled` → `reminderEmailDisabled` to reflect the added check); `unsubscribeUserEmail` now branches on an optional `type` parameter, only clearing `weekly_digest` when the link was typed `weekly_digest` instead of always clearing the master `email` flag.
+- `src/app/api/notifications/unsubscribe/route.ts`: reads and forwards the `type` query parameter.
+- `src/lib/notifications/weekly-digest.ts`: `sendWeeklyDigests` now fetches `weekly_digest_sent_at` and skips a user (as a no-op, not counted as processed/skipped/sent/failed) whose digest was already sent within the last 3 days, preventing a cron retry or manual re-trigger from double-sending.
+- `src/app/dashboard/insights/page.tsx`: removed the dead "Email me this" button (no backend on-demand-send endpoint exists to wire it to, and adding one is a new feature, not a same-day fix) and guarded the spend-breakdown bar's percentage against a zero max.
+
+### Tests Added/Changed
+- `src/lib/notifications/__tests__/notifications.test.ts`: new case asserts a due reminder is *not* sent when `reminders: false` even with `email: true`; new case asserts a `type=weekly_digest` unsubscribe only flips `weekly_digest`, leaving `email`/`reminders` untouched. Both confirmed to fail against the pre-fix code.
+- `src/lib/notifications/__tests__/weekly-digest.test.ts`: new case seeds `weekly_digest_sent_at` one day before `now` and asserts `sendWeeklyDigests` sends nothing and writes no audit row. Confirmed it fails against the pre-fix code (would have re-sent).
+
+### Remaining Concerns
+- No P0/P1 issues found.
+- Onboarding tour steps 3–4 and the Stripe webhook's missing `past_due` handling remain open, both needing a product decision rather than a same-day code fix (see prior entries for details).
+- Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-jlxb3q`
+- PR: opened against `main` (see PR description for link)

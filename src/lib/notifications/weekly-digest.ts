@@ -224,7 +224,7 @@ export async function sendWeeklyDigests(
 
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,full_name,notification_preferences")
+    .select("id,email,full_name,notification_preferences,weekly_digest_sent_at")
     .order("created_at", { ascending: true })
     .limit(100);
 
@@ -235,6 +235,10 @@ export async function sendWeeklyDigests(
   for (const user of ((data ?? []) as UserRow[])) {
     const plan = await getUserPlan(supabase, user.id);
     if (plan !== "pro" || !user.email || weeklyDigestDisabled(user.notification_preferences)) {
+      continue;
+    }
+
+    if (sentWithinRedispatchWindow(user.weekly_digest_sent_at, now)) {
       continue;
     }
 
@@ -366,6 +370,14 @@ function weeklyDigestDisabled(preferences: unknown) {
   if (!preferences || typeof preferences !== "object" || Array.isArray(preferences)) return false;
   const typed = preferences as { email?: unknown; weekly_digest?: unknown };
   return typed.email === false || typed.weekly_digest === false;
+}
+
+const REDISPATCH_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
+
+function sentWithinRedispatchWindow(sentAt: string | null | undefined, now: Date) {
+  if (!sentAt) return false;
+  const elapsed = now.getTime() - new Date(sentAt).getTime();
+  return elapsed >= 0 && elapsed < REDISPATCH_WINDOW_MS;
 }
 
 function addDays(date: Date, days: number) {

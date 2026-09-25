@@ -66,4 +66,50 @@ describe("ActivityTimeline", () => {
     expect(screen.queryByRole("link", { name: "View resource" })).not.toBeInTheDocument();
     expect(screen.getByText(/^ID 22222222/)).toBeInTheDocument();
   });
+
+  it("does not link an export or share event to a document that was later deleted", () => {
+    const exportEvent: AuditTimelineEvent = {
+      id: "event-export",
+      action: "export.created",
+      resourceType: "document_export",
+      resourceId: "33333333-3333-4333-8333-333333333333",
+      metadata: {},
+      createdAt: new Date().toISOString(),
+      documentExists: false,
+    };
+    const shareEvent: AuditTimelineEvent = {
+      id: "event-share",
+      action: "share.created",
+      resourceType: "document_share",
+      resourceId: "share-1",
+      metadata: { documentId: "33333333-3333-4333-8333-333333333333" },
+      createdAt: new Date().toISOString(),
+      documentExists: false,
+    };
+
+    render(<ActivityTimeline initialEvents={[exportEvent, shareEvent]} initialNextCursor={null} />);
+
+    expect(screen.getByText("Exported a document")).toBeInTheDocument();
+    expect(screen.getByText("Created a share link")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View resource" })).not.toBeInTheDocument();
+  });
+
+  it("still links an export event whose document still exists", () => {
+    const exportEvent: AuditTimelineEvent = {
+      id: "event-export",
+      action: "export.created",
+      resourceType: "document_export",
+      resourceId: "44444444-4444-4444-8444-444444444444",
+      metadata: {},
+      createdAt: new Date().toISOString(),
+      documentExists: true,
+    };
+
+    render(<ActivityTimeline initialEvents={[exportEvent]} initialNextCursor={null} />);
+
+    expect(screen.getByRole("link", { name: "View resource" })).toHaveAttribute(
+      "href",
+      "/dashboard/documents/44444444-4444-4444-8444-444444444444"
+    );
+  });
 });

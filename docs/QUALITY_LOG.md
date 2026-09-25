@@ -422,3 +422,38 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-vg7oky`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-25
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (627/627, 110 files, vitest — 4 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2 (reliability/hardening):** `useReminders` (`src/lib/hooks/use-reminders.ts`) had no unmount guard. `refetch`/`approve`/`update`/`dismiss` all call React state setters after an `await fetch(...)` with no check that the component is still mounted. PR #90 (open, from the 2026-09-24 run) root-caused an intermittent CI failure to this pattern (a pending `useReminders` fetch in a torn-down test resolving into a `ReferenceError: window is not defined`) and proposed a mount-guard patch without applying it. Could not deterministically reproduce the specific jsdom-teardown crash locally (consistent with the prior run's own finding that it only reproduced once on the GitHub Actions runner, not in 6 local attempts) — the value of the fix here is the general hardening (no unnecessary state updates after unmount), not a proven fix for that exact flake.
+- **P3 (dead links):** `hrefForEvent` in `activity-timeline.tsx` only excluded the `document.deleted` action from linking to `/dashboard/documents/{id}`. `document_export` and `document_share` events for a document that was later deleted still rendered a "View resource" link to that now-gone document's detail page, which 404s. Same class of bug the 2026-09-21 run fixed for `document.deleted` specifically, just not generalized to sibling events on the same document.
+- Explore-agent audit of contract compare, shareable links, export, other settings controls, and mobile dialogs (compare picker, delete confirmation) found nothing else — see Remaining Concerns for the one finding that duplicates already-open work.
+- Re-confirmed via GitHub: PR #90 (2026-09-24, reminder/digest email preferences + dead insights button) is open, mergeable, with one flaky CI run already investigated and explained in its own PR comments.
+
+### Fixes Completed
+- `src/lib/hooks/use-reminders.ts`: added a `mountedRef` guard checked before every `setReminders`/`setError`/`setIsLoading`/`setPendingIds` call that follows an `await`, in `refetch`, `approve`, `update`, `dismiss`, and the shared `withPending` wrapper.
+- `src/lib/audit/document-links.ts` (new): resolves which documents referenced by a page of audit events (via `resource_id` for `document`/`document_export`, or `metadata.documentId` for `document_share`) still exist, scoped to the caller's own `user_id`. Wired into both the initial SSR load (`settings/activity/page.tsx`) and the paginated `GET /api/audit` route; `activity-timeline.tsx`'s `hrefForEvent` now drops the link when the referenced document is gone.
+
+### Tests Added/Changed
+- `src/lib/hooks/__tests__/use-reminders.test.ts`: two new cases assert `refetch()`/`approve()` resolve without throwing when their fetch resolves after the hook has unmounted.
+- `src/components/dashboard/audit/activity-timeline.test.tsx`: new cases for `document_export`/`document_share` events with `documentExists: false` (no link rendered) and `documentExists: true` (link still rendered).
+- `src/app/dashboard/settings/activity/__tests__/page.test.tsx`: new end-to-end cases seeding an export event against a deleted vs. still-existing document, confirmed to fail against the pre-fix page (rendered a 404-bound link).
+
+### Remaining Concerns
+- No P0/P1 issues found.
+- **The "Reminder emails" notification toggle has no effect on delivery** (`dispatch.ts`'s `emailDisabled` only checks the master `email` preference, never `reminders`) — re-confirmed present on `main` by today's explore-agent audit, but already fixed on open PR #90 (renamed to `reminderEmailDisabled`, checks both flags). Not re-implemented here to avoid a duplicate/conflicting diff; recommend merging #90.
+- The exact CI flake PR #90 documented (intermittent `window is not defined` in `insights/page.test.tsx`) could not be reproduced locally even before today's fix — if it recurs after this hardening lands, the root cause is likely elsewhere (test-environment teardown timing), not `use-reminders.ts` itself.
+- Onboarding tour steps 3–4 and the Stripe webhook's missing `past_due` handling remain open from prior runs, both needing a product decision.
+- Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-gnhtdd`
+- PR: opened against `main` (see PR description for link)

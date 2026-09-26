@@ -33,9 +33,13 @@ export async function getUserPlan(supabase: SupabaseLike, userId: string): Promi
 export async function canUploadDocument(supabase: SupabaseLike, userId: string) {
   const plan = await getUserPlan(supabase, userId);
   const limit = PLAN_LIMITS[plan].maxDocuments;
-  const current = await countUserDocuments(supabase, userId);
+  const { count, error } = await countUserDocuments(supabase, userId);
+  // A failed count must never read as "0 documents" — that would silently
+  // lift the plan limit for anyone hitting a transient DB error. Fail
+  // closed (deny the upload) and report the count as if already at limit.
+  const current = error ? limit : count;
   return {
-    allowed: current < limit,
+    allowed: !error && current < limit,
     current,
     limit,
     plan,
@@ -50,16 +54,16 @@ export async function canAccessInsights(supabase: SupabaseLike, userId: string) 
   };
 }
 
-async function countUserDocuments(supabase: SupabaseLike, userId: string) {
+async function countUserDocuments(supabase: SupabaseLike, userId: string): Promise<{ count: number; error: boolean }> {
   try {
     const query = supabase
       .from("documents")
       .select("id", { count: "exact", head: true }) as CountQuery;
     const { count, error } = await query.eq("user_id", userId);
-    if (error) return 0;
-    return count ?? 0;
+    if (error) return { count: 0, error: true };
+    return { count: count ?? 0, error: false };
   } catch {
-    return 0;
+    return { count: 0, error: true };
   }
 }
 

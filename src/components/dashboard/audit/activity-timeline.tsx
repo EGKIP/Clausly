@@ -70,6 +70,13 @@ export function ActivityTimeline({
   const [status, setStatus] = React.useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = React.useState<string | null>(null);
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const visibleEvents = React.useMemo(() => {
     const filter = filters.find((item) => item.id === activeFilter) ?? filters[0];
@@ -84,6 +91,7 @@ export function ActivityTimeline({
 
     const response = await fetch(`/api/audit?cursor=${encodeURIComponent(nextCursor)}`);
     const payload = (await response.json().catch(() => ({ error: "Activity could not be loaded." }))) as Partial<AuditResponse> & { error?: string };
+    if (!mountedRef.current) return;
     const nextEvents = payload.events;
     if (!response.ok || !Array.isArray(nextEvents)) {
       setStatus("error");

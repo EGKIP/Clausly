@@ -422,3 +422,45 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-vg7oky`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-26
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (624/624, 110 files, vitest — 3 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `canUploadDocument`/`countUserDocuments` (`src/lib/billing/plan.ts`) swallowed any error from the document-count query and returned `0`, so a transient DB error made the free-plan 5-document cap (`src/app/api/upload/route.ts`) fail *open* — a user could upload past their limit for as long as the count query kept erroring, with no log or signal that the gate was bypassed.
+- **P3:** `ActivityTimeline`'s infinite-scroll `loadMore()` (`src/components/dashboard/audit/activity-timeline.tsx`), triggered by an `IntersectionObserver` as well as a button, had no mounted-guard around the `setEvents`/`setStatus`/`setMessage` calls after its `await fetch(...)`. Same bug class as the `use-reminders.ts` unmount crash already found and fixed on open PR #91 (not re-fixed here) — confirmed via an Explore-agent sweep of every other `useEffect`+fetch+setState site in `src/` that this was the only other genuinely unmounted-while-in-flight instance; `clause-library.tsx`'s equivalent loader already has a staleness guard (just not an unmount one, lower priority) and `rename-title.tsx`'s is a direct user action with a narrow window, not a mount-triggered effect.
+- **P4:** `PATCH /api/reminders/[id]` parsed the request body with `request.json()` and no `.catch`, unlike every sibling reminder/document/share route, which all use `.catch(() => ({}))`/`.catch(() => null)`. A malformed body threw an uncaught `SyntaxError`, surfacing as a raw framework 500 instead of the app's normal `{error, issues}` 400. Not reachable from the current UI (always sends valid JSON).
+- **P4:** `getDocumentDetail`'s PDF signed URL (`src/lib/db/documents.ts`) expired after 10 minutes, while `PDFViewer` streams pages from that same URL on demand as the user scrolls/reads, with no periodic refresh. A contract read past the 10-minute mark could fail to render later pages ("Couldn't render this page") and silently break the Download link, recoverable only by a full page reload.
+- Two Explore-agent audits (hooks/unmount-safety across `src/`; reminders + document-analysis workflow correctness) turned up nothing else new. Confirmed several near-misses are already known and already fixed on the two open, unmerged "Daily quality run" PRs (#90: reminder/digest email-preference gating, dead insights button; #91: `use-reminders.ts` unmount guard, stale activity-log links for deleted documents) and were intentionally not re-implemented here.
+- **Documented, not fixed today (needs a product/infra decision, not a same-day patch):** the reminder edit modal's "Time" field (`reminder_time`) is persisted but never read by `dispatchDueReminderEmails` (`src/lib/notifications/dispatch.ts`), which only filters by `fire_on` date; the dispatch cron itself only runs once daily (`vercel.json`, 14:00 UTC). A reminder set for a specific time can go out up to ~24h later than the UI implies, with no indication the time picker has no effect on delivery timing. Fixing this properly needs either a more frequent cron (Vercel plan/cost tradeoff) or a documented product decision to make the time field cosmetic.
+- **Documented, not fixed today:** `canUploadDocument`'s document-count check (see P2 above) is also a check-then-act TOCTOU race — two concurrent uploads at 4/5 documents can both read `current=4` and both succeed, bypassing the free-plan cap by one document. The fail-open bug is fixed; fully closing the race would need a DB-level constraint/trigger (similar in spirit to the `getOrCreateStripeCustomer` unique-violation fix from 2026-09-23), which is a larger, migration-touching change deferred to a dedicated pass.
+- Confirmed via the two open PRs' own comment threads that PR #90's CI failure (an intermittent `use-reminders.ts` "window is not defined" crash under the GitHub Actions runner) is a real, already-root-caused bug, already fixed on PR #91 — not a new finding, no action needed here.
+- Supabase security/performance advisors re-checked against `clausly-prod`: no new findings (same three longstanding, previously-judged-safe items; same nine unindexed-FK/seven unused-index INFO notices). `npm audit`: same six findings as every prior run; tried `npm audit fix` again, it only re-resolved the lockfile without touching the vulnerable packages, so the no-op churn was reverted rather than committed (all still blocked on a Next.js 16 / Vitest 5 major bump).
+
+### Fixes Completed
+- `src/lib/billing/plan.ts`: `countUserDocuments` now reports its error state instead of coercing it to `0`; `canUploadDocument` fails closed (`allowed: false`, `current` reported as the plan limit) when the count query errors, instead of silently lifting the document cap.
+- `src/components/dashboard/audit/activity-timeline.tsx`: added a `mountedRef` guard, checked before `loadMore()` touches state after its `await fetch(...)`.
+- `src/app/api/reminders/[id]/route.ts`: `PATCH` now parses the body with `.catch(() => ({}))`, matching every sibling route, so a malformed body returns the normal 400 instead of an unhandled 500.
+- `src/lib/db/documents.ts`: bumped the document-preview signed URL's TTL from 10 to 60 minutes to cover a normal contract-reading session.
+
+### Tests Added/Changed
+- `src/lib/billing/__tests__/plan.test.ts`: new case forces the document-count query to error and asserts `canUploadDocument` returns `allowed: false` (current code returns `true` without the fix). Confirmed failing pre-fix.
+- `src/app/api/reminders/[id]/__tests__/route.test.ts`: new case sends a non-JSON body to `PATCH` and asserts a clean 400. Confirmed it throws an uncaught `SyntaxError` pre-fix.
+- `src/components/dashboard/audit/activity-timeline.test.tsx`: new case unmounts `ActivityTimeline` while a `loadMore()` fetch is in flight, then resolves it. This exercises the exact guarded code path but, like the `use-reminders.ts` guard on PR #91, does not reproduce the underlying jsdom-teardown crash in a single-test run (React 18 no-ops a state update on an unmounted tree without throwing) — it's defensive hardening consistent with every other fetch site in this codebase, not a proven regression catch for that specific crash class.
+
+### Remaining Concerns
+- No P0/P1 issues found; the P2 above is fixed and tested. The related TOCTOU race (see Issues Found) is real but deferred pending a DB-level fix.
+- **Two "Daily quality run" PRs are open, green, and unreviewed for 1–2 days: #90 (2026-09-24) and #91 (2026-09-25).** Confirmed neither overlaps today's changes. This is now a recurring pattern across the last several entries — recommend the owner review/merge oldest-first before the backlog grows further.
+- Reminder "Time" field has no effect on delivery timing (see Issues Found) — needs a product/infra decision on cron cadence, not a code-only fix.
+- Onboarding tour steps 3–4 and the Stripe webhook's missing `past_due`/`invoice.payment_failed` handling remain open from prior runs, both still needing a product decision.
+- Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-xt1gf6`
+- PR: opened against `main` (see PR description for link)

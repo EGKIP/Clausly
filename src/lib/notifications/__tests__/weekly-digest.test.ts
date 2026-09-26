@@ -323,6 +323,29 @@ describe("weekly digest send loop", () => {
     expect(db().weekly_digests).toHaveLength(0);
   });
 
+  it("does not re-send a digest already sent within the last few days (retry/double-trigger protection)", async () => {
+    seedUser(userA, {
+      subscription_tier: "pro",
+      notification_preferences: { email: true, weekly_digest: true },
+      weekly_digest_sent_at: "2026-06-21T14:00:00.000Z",
+    });
+    const document = seedDocument(userA, { created_at: "2026-06-20T12:00:00.000Z" });
+    seedReminder(document.id, userA, { status: "approved", fire_on: "2026-06-25" });
+    const provider = new MockEmailProvider();
+
+    const result = await sendWeeklyDigests(testClient(), {
+      provider,
+      now,
+      baseUrl: "https://clausly.test",
+      from: "Clausly <digest@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+    });
+
+    expect(result).toEqual({ processed: 0, sent: 0, skipped: 0, failed: 0 });
+    expect(provider.sent).toHaveLength(0);
+    expect(db().weekly_digests).toHaveLength(0);
+  });
+
   it("respects weekly digest notification preference", async () => {
     seedUser(userA, {
       subscription_tier: "pro",

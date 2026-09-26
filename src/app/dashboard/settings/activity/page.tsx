@@ -4,6 +4,7 @@ import { PageBody, PageHeader } from "@/components/dashboard/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge, Card } from "@/components/ui/primitives";
 import { getUserPlan } from "@/lib/billing/plan";
+import { documentIdForEvent, loadExistingDocumentIds } from "@/lib/audit/document-links";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 
@@ -78,9 +79,15 @@ async function getInitialAuditEvents(): Promise<
   const hasNextPage = (data ?? []).length > FIRST_PAGE_LIMIT;
   const cursorRow = rows[rows.length - 1];
 
+  const existingDocumentIds = await loadExistingDocumentIds(
+    supabase,
+    user.id,
+    rows.map((row) => ({ resourceType: row.resource_type, resourceId: row.resource_id, metadata: row.metadata }))
+  );
+
   return {
     kind: "events",
-    events: rows.map(toTimelineEvent),
+    events: rows.map((row) => toTimelineEvent(row, existingDocumentIds)),
     nextCursor: hasNextPage && cursorRow ? encodeCursor({ createdAt: cursorRow.created_at }) : null,
   };
 }
@@ -110,7 +117,13 @@ function ActivityUpgradeCard() {
   );
 }
 
-function toTimelineEvent(row: AuditEventRow): AuditTimelineEvent {
+function toTimelineEvent(row: AuditEventRow, existingDocumentIds: Set<string>): AuditTimelineEvent {
+  const documentId = documentIdForEvent({
+    resourceType: row.resource_type,
+    resourceId: row.resource_id,
+    metadata: row.metadata,
+  });
+
   return {
     id: row.id,
     action: row.action,
@@ -118,6 +131,7 @@ function toTimelineEvent(row: AuditEventRow): AuditTimelineEvent {
     resourceId: row.resource_id,
     metadata: row.metadata,
     createdAt: row.created_at,
+    documentExists: documentId ? existingDocumentIds.has(documentId) : undefined,
   };
 }
 

@@ -3,14 +3,12 @@ import {
   TrendingUp,
   CalendarClock,
   ShieldAlert,
-  ArrowUpRight,
   PiggyBank,
   Hourglass,
 } from "lucide-react";
 import Link from "next/link";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/primitives";
-import { Button } from "@/components/ui/button";
 import { RiskPill } from "@/components/ui/risk-pill";
 import { listDocuments } from "@/lib/db/documents";
 import { listReminders } from "@/lib/db/reminders";
@@ -79,11 +77,6 @@ export default async function InsightsPage() {
           </>
         }
         description="A calm, weekly read on what you're spending, what's coming due, and where Clausly thinks you should look. Generated Mondays at 9am."
-        actions={
-          <Button variant="secondary" size="md" className="min-h-11 w-full sm:w-auto">
-            <ArrowUpRight className="size-3.5" /> Email me this
-          </Button>
-        }
       />
 
       <PortfolioAsk />
@@ -146,7 +139,7 @@ export default async function InsightsPage() {
             .map((d, _i, arr) => {
               const amount = Number(d.monthly?.replace(/[^0-9.]/g, "")) || 0;
               const max = Math.max(...arr.map((x) => Number(x.monthly?.replace(/[^0-9.]/g, "")) || 0));
-              const pct = (amount / max) * 100;
+              const pct = max > 0 ? (amount / max) * 100 : 0;
               return (
                 <div key={d.id} className="px-5 py-4 border-b border-[var(--border)] last:border-0">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getUserPlan } from "@/lib/billing/plan";
+import { documentIdForEvent, loadExistingDocumentIds } from "@/lib/audit/document-links";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 
@@ -10,6 +11,7 @@ type AuditEventItem = {
   resourceId: string | null;
   metadata: Json;
   createdAt: string;
+  documentExists?: boolean;
 };
 
 type AuditEventRow = {
@@ -67,8 +69,14 @@ export async function GET(request: Request) {
   const hasNextPage = (data ?? []).length > parsed.limit;
   const cursorRow = rows[rows.length - 1];
 
+  const existingDocumentIds = await loadExistingDocumentIds(
+    supabase,
+    user.id,
+    rows.map((row) => ({ resourceType: row.resource_type, resourceId: row.resource_id, metadata: row.metadata }))
+  );
+
   return NextResponse.json({
-    events: rows.map(toAuditEventItem),
+    events: rows.map((row) => toAuditEventItem(row, existingDocumentIds)),
     nextCursor: hasNextPage && cursorRow ? encodeCursor({ createdAt: cursorRow.created_at }) : null,
   });
 }
@@ -87,7 +95,13 @@ function parseAuditQuery(searchParams: URLSearchParams): { limit: number; cursor
   };
 }
 
-function toAuditEventItem(row: AuditEventRow): AuditEventItem {
+function toAuditEventItem(row: AuditEventRow, existingDocumentIds: Set<string>): AuditEventItem {
+  const documentId = documentIdForEvent({
+    resourceType: row.resource_type,
+    resourceId: row.resource_id,
+    metadata: row.metadata,
+  });
+
   return {
     id: row.id,
     action: row.action,
@@ -95,6 +109,7 @@ function toAuditEventItem(row: AuditEventRow): AuditEventItem {
     resourceId: row.resource_id,
     metadata: row.metadata,
     createdAt: row.created_at,
+    documentExists: documentId ? existingDocumentIds.has(documentId) : undefined,
   };
 }
 

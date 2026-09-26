@@ -85,7 +85,7 @@ export async function dispatchDueReminderEmails(options: DispatchOptions = {}): 
     const user = usersById.get(reminder.user_id);
     const document = firstObject(reminder.documents);
 
-    if (!user?.email || emailDisabled(user.notification_preferences)) {
+    if (!user?.email || reminderEmailDisabled(user.notification_preferences)) {
       result.skipped += 1;
       continue;
     }
@@ -164,6 +164,7 @@ export async function unsubscribeUserEmail(options: {
   userId: string;
   token: string;
   secret?: string;
+  type?: string | null;
 }) {
   const supabase = options.supabase ?? createServiceSupabaseClient();
   const secret = options.secret ?? process.env.CLAUSLY_UNSUBSCRIBE_SECRET;
@@ -185,9 +186,10 @@ export async function unsubscribeUserEmail(options: {
   }
 
   const preferences = objectPreferences(user.notification_preferences);
+  const patch = options.type === "weekly_digest" ? { weekly_digest: false } : { email: false };
   const { error: updateError } = await supabase
     .from("users")
-    .update({ notification_preferences: { ...preferences, email: false } })
+    .update({ notification_preferences: { ...preferences, ...patch } })
     .eq("id", options.userId);
 
   if (updateError) {
@@ -229,8 +231,10 @@ async function logEmailFailure(supabase: ServiceSupabaseClient, reminder: Dispat
   }
 }
 
-function emailDisabled(preferences: unknown) {
-  return Boolean(preferences && typeof preferences === "object" && (preferences as { email?: unknown }).email === false);
+function reminderEmailDisabled(preferences: unknown) {
+  if (!preferences || typeof preferences !== "object") return false;
+  const typed = preferences as { email?: unknown; reminders?: unknown };
+  return typed.email === false || typed.reminders === false;
 }
 
 function objectPreferences(preferences: unknown): Record<string, Json> {

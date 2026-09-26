@@ -423,6 +423,79 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - Branch: `claude/upbeat-newton-vg7oky`
 - PR: opened against `main` (see PR description for link)
 
+## 2026-09-24
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (624/624, 110 files, vitest — 3 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2:** `dispatchDueReminderEmails` (`src/lib/notifications/dispatch.ts`) only checked the master `email` preference before sending a due-reminder email; it never read the independent "Reminder emails" toggle (`notification_preferences.reminders`) exposed in Settings. A user who left "All emails" on but switched off "Reminder emails" specifically still got emailed for every due reminder by the daily dispatch cron.
+- **P2:** The weekly digest's "Unsubscribe from weekly digests" link (`buildWeeklyDigestUnsubscribeUrl`) tags its URL with `type=weekly_digest`, but `GET /api/notifications/unsubscribe` and `unsubscribeUserEmail` ignored that parameter entirely and always flipped the master `email` flag off — so clicking it silently killed reminder emails too, with no indication that happened.
+- **P2:** `sendWeeklyDigests` (`src/lib/notifications/weekly-digest.ts`) had no idempotency guard analogous to the reminder dispatcher's `sent_at IS NULL` check: a Vercel cron retry or a manual re-trigger of the (bearer-secret-gated) weekly-digest endpoint on the same day would re-send every eligible user's digest.
+- **P2:** `/dashboard/insights`'s "Email me this" button (`page.tsx`) had no `onClick`/`href` and wasn't in a form — clicking it did nothing, with no backend endpoint for an on-demand digest send to wire it to.
+- **P4:** The insights "Where your money is going" bar chart divided by `max(...monthly values)` with no zero guard; an all-zero-`monthly` document set produced an invalid `width: NaN%` inline style.
+- Re-confirmed still-open items from prior runs, no change: onboarding tour steps 3–4 don't spotlight anything cross-page (needs a product decision); Stripe webhook still has no `invoice.payment_failed`/`subscription.updated` handling (needs a product decision on past-due tier/UX); Supabase security/performance advisors show the same three long-standing, judged-safe findings plus routine INFO-level index notices; `npm audit`'s six findings are unchanged, still blocked on a Next.js 16 / Vitest 5 major bump.
+- Explore pass over notifications (dispatch/weekly-digest/webhook/unsubscribe), admin cron routes, contract compare, document shares, and mobile dialog widths otherwise checked out clean: admin routes correctly require the bearer secret, share creation/revocation/token validation is correctly ownership-scoped and rejects revoked/expired tokens, compare handles empty/identical documents and zero-vector embeddings without crashing, and no new mobile-overflow dialogs were found (the export-button fix from a prior run is still in place).
+- No open PRs from prior daily runs were found — #85 through #89 have all since been merged into `main`, so there is no review backlog to flag this time.
+
+### Fixes Completed
+- `src/lib/notifications/dispatch.ts`: reminder dispatch now skips a user if either the master `email` preference or the specific `reminders` preference is off (renamed `emailDisabled` → `reminderEmailDisabled` to reflect the added check); `unsubscribeUserEmail` now branches on an optional `type` parameter, only clearing `weekly_digest` when the link was typed `weekly_digest` instead of always clearing the master `email` flag.
+- `src/app/api/notifications/unsubscribe/route.ts`: reads and forwards the `type` query parameter.
+- `src/lib/notifications/weekly-digest.ts`: `sendWeeklyDigests` now fetches `weekly_digest_sent_at` and skips a user (as a no-op, not counted as processed/skipped/sent/failed) whose digest was already sent within the last 3 days, preventing a cron retry or manual re-trigger from double-sending.
+- `src/app/dashboard/insights/page.tsx`: removed the dead "Email me this" button (no backend on-demand-send endpoint exists to wire it to, and adding one is a new feature, not a same-day fix) and guarded the spend-breakdown bar's percentage against a zero max.
+
+### Tests Added/Changed
+- `src/lib/notifications/__tests__/notifications.test.ts`: new case asserts a due reminder is *not* sent when `reminders: false` even with `email: true`; new case asserts a `type=weekly_digest` unsubscribe only flips `weekly_digest`, leaving `email`/`reminders` untouched. Both confirmed to fail against the pre-fix code.
+- `src/lib/notifications/__tests__/weekly-digest.test.ts`: new case seeds `weekly_digest_sent_at` one day before `now` and asserts `sendWeeklyDigests` sends nothing and writes no audit row. Confirmed it fails against the pre-fix code (would have re-sent).
+
+### Remaining Concerns
+- No P0/P1 issues found.
+- Onboarding tour steps 3–4 and the Stripe webhook's missing `past_due` handling remain open, both needing a product decision rather than a same-day code fix (see prior entries for details).
+- Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-jlxb3q`
+- PR: opened against `main` (see PR description for link)
+
+## 2026-09-25
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (627/627, 110 files, vitest — 4 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P2 (reliability/hardening):** `useReminders` (`src/lib/hooks/use-reminders.ts`) had no unmount guard. `refetch`/`approve`/`update`/`dismiss` all call React state setters after an `await fetch(...)` with no check that the component is still mounted. PR #90 (open, from the 2026-09-24 run) root-caused an intermittent CI failure to this pattern (a pending `useReminders` fetch in a torn-down test resolving into a `ReferenceError: window is not defined`) and proposed a mount-guard patch without applying it. Could not deterministically reproduce the specific jsdom-teardown crash locally (consistent with the prior run's own finding that it only reproduced once on the GitHub Actions runner, not in 6 local attempts) — the value of the fix here is the general hardening (no unnecessary state updates after unmount), not a proven fix for that exact flake.
+- **P3 (dead links):** `hrefForEvent` in `activity-timeline.tsx` only excluded the `document.deleted` action from linking to `/dashboard/documents/{id}`. `document_export` and `document_share` events for a document that was later deleted still rendered a "View resource" link to that now-gone document's detail page, which 404s. Same class of bug the 2026-09-21 run fixed for `document.deleted` specifically, just not generalized to sibling events on the same document.
+- Explore-agent audit of contract compare, shareable links, export, other settings controls, and mobile dialogs (compare picker, delete confirmation) found nothing else — see Remaining Concerns for the one finding that duplicates already-open work.
+- Re-confirmed via GitHub: PR #90 (2026-09-24, reminder/digest email preferences + dead insights button) is open, mergeable, with one flaky CI run already investigated and explained in its own PR comments.
+
+### Fixes Completed
+- `src/lib/hooks/use-reminders.ts`: added a `mountedRef` guard checked before every `setReminders`/`setError`/`setIsLoading`/`setPendingIds` call that follows an `await`, in `refetch`, `approve`, `update`, `dismiss`, and the shared `withPending` wrapper.
+- `src/lib/audit/document-links.ts` (new): resolves which documents referenced by a page of audit events (via `resource_id` for `document`/`document_export`, or `metadata.documentId` for `document_share`) still exist, scoped to the caller's own `user_id`. Wired into both the initial SSR load (`settings/activity/page.tsx`) and the paginated `GET /api/audit` route; `activity-timeline.tsx`'s `hrefForEvent` now drops the link when the referenced document is gone.
+
+### Tests Added/Changed
+- `src/lib/hooks/__tests__/use-reminders.test.ts`: two new cases assert `refetch()`/`approve()` resolve without throwing when their fetch resolves after the hook has unmounted.
+- `src/components/dashboard/audit/activity-timeline.test.tsx`: new cases for `document_export`/`document_share` events with `documentExists: false` (no link rendered) and `documentExists: true` (link still rendered).
+- `src/app/dashboard/settings/activity/__tests__/page.test.tsx`: new end-to-end cases seeding an export event against a deleted vs. still-existing document, confirmed to fail against the pre-fix page (rendered a 404-bound link).
+
+### Remaining Concerns
+- No P0/P1 issues found.
+- **The "Reminder emails" notification toggle has no effect on delivery** (`dispatch.ts`'s `emailDisabled` only checks the master `email` preference, never `reminders`) — re-confirmed present on `main` by today's explore-agent audit, but already fixed on open PR #90 (renamed to `reminderEmailDisabled`, checks both flags). Not re-implemented here to avoid a duplicate/conflicting diff; recommend merging #90.
+- The exact CI flake PR #90 documented (intermittent `window is not defined` in `insights/page.test.tsx`) could not be reproduced locally even before today's fix — if it recurs after this hardening lands, the root cause is likely elsewhere (test-environment teardown timing), not `use-reminders.ts` itself.
+- Onboarding tour steps 3–4 and the Stripe webhook's missing `past_due` handling remain open from prior runs, both needing a product decision.
+- Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-gnhtdd`
+- PR: opened against `main` (see PR description for link)
+
 ## 2026-09-26
 
 ### Quality Gates
@@ -448,15 +521,16 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - `src/components/dashboard/audit/activity-timeline.tsx`: added a `mountedRef` guard, checked before `loadMore()` touches state after its `await fetch(...)`.
 - `src/app/api/reminders/[id]/route.ts`: `PATCH` now parses the body with `.catch(() => ({}))`, matching every sibling route, so a malformed body returns the normal 400 instead of an unhandled 500.
 - `src/lib/db/documents.ts`: bumped the document-preview signed URL's TTL from 10 to 60 minutes to cover a normal contract-reading session.
+- `src/lib/hooks/use-reminders.ts`: ported the same `mountedRef` guard as PR #91 into this branch to clear a pre-existing (unrelated) flaky CI failure, so this PR's own CI run went green without waiting on #91 to merge first.
 
 ### Tests Added/Changed
 - `src/lib/billing/__tests__/plan.test.ts`: new case forces the document-count query to error and asserts `canUploadDocument` returns `allowed: false` (current code returns `true` without the fix). Confirmed failing pre-fix.
 - `src/app/api/reminders/[id]/__tests__/route.test.ts`: new case sends a non-JSON body to `PATCH` and asserts a clean 400. Confirmed it throws an uncaught `SyntaxError` pre-fix.
 - `src/components/dashboard/audit/activity-timeline.test.tsx`: new case unmounts `ActivityTimeline` while a `loadMore()` fetch is in flight, then resolves it. This exercises the exact guarded code path but, like the `use-reminders.ts` guard on PR #91, does not reproduce the underlying jsdom-teardown crash in a single-test run (React 18 no-ops a state update on an unmounted tree without throwing) — it's defensive hardening consistent with every other fetch site in this codebase, not a proven regression catch for that specific crash class.
+- `src/lib/hooks/__tests__/use-reminders.test.ts`: ported the same two unmount-guard regression tests as PR #91.
 
 ### Remaining Concerns
 - No P0/P1 issues found; the P2 above is fixed and tested. The related TOCTOU race (see Issues Found) is real but deferred pending a DB-level fix.
-- **Two "Daily quality run" PRs are open, green, and unreviewed for 1–2 days: #90 (2026-09-24) and #91 (2026-09-25).** Confirmed neither overlaps today's changes. This is now a recurring pattern across the last several entries — recommend the owner review/merge oldest-first before the backlog grows further.
 - Reminder "Time" field has no effect on delivery timing (see Issues Found) — needs a product/infra decision on cron cadence, not a code-only fix.
 - Onboarding tour steps 3–4 and the Stripe webhook's missing `past_due`/`invoice.payment_failed` handling remain open from prior runs, both still needing a product decision.
 - Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.

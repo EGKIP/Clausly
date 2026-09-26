@@ -102,6 +102,23 @@ describe("notification dispatch", () => {
     expect(sentMessages).toHaveLength(0);
     expect(store.reminders[0].sent_at).toBeNull();
   });
+
+  it("skips users who disabled reminder emails specifically, even with the master switch on", async () => {
+    seedDueReminder({ user: { notification_preferences: { email: true, reminders: false } } });
+
+    const result = await dispatchDueReminderEmails({
+      supabase: createSupabaseMock(),
+      provider: new MockProvider(),
+      baseUrl: "https://clausly.test",
+      from: "Clausly <reminders@clausly.test>",
+      unsubscribeSecret: "unsubscribe-secret",
+      now: new Date("2026-06-08T15:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ processed: 1, sent: 0, skipped: 1, failed: 0 });
+    expect(sentMessages).toHaveLength(0);
+    expect(store.reminders[0].sent_at).toBeNull();
+  });
 });
 
 describe("unsubscribe tokens", () => {
@@ -124,6 +141,31 @@ describe("unsubscribe tokens", () => {
 
     expect(result).toMatchObject({ ok: true, status: 200 });
     expect(store.users[0].notification_preferences).toEqual({ email: false, version: 7, sms: true });
+  });
+
+  it("only disables the weekly digest, not all email, when the link is typed as weekly_digest", async () => {
+    store.users.push({
+      id: "user-1",
+      email: "ada@clausly.test",
+      notification_preferences: { email: true, reminders: true, weekly_digest: true, version: 7 },
+    });
+    const token = createUnsubscribeToken("user-1", 7, "unsubscribe-secret");
+
+    const result = await unsubscribeUserEmail({
+      supabase: createSupabaseMock(),
+      userId: "user-1",
+      token,
+      secret: "unsubscribe-secret",
+      type: "weekly_digest",
+    });
+
+    expect(result).toMatchObject({ ok: true, status: 200 });
+    expect(store.users[0].notification_preferences).toEqual({
+      email: true,
+      reminders: true,
+      weekly_digest: false,
+      version: 7,
+    });
   });
 
   it("builds an unsubscribe URL with a verifiable token", () => {

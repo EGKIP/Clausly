@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
+  failNext,
   resetSupabaseMock,
   seedDocument,
   seedUser,
@@ -43,6 +44,17 @@ describe("billing plan resolution", () => {
     expect(result.current).toBe(100);
     expect(result.limit).toBe(Infinity);
     expect(result.plan).toBe("pro");
+  });
+
+  it("fails closed (denies upload) instead of silently allowing it when the document count query errors", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    seedDocument(userA, { id: "document-0" });
+    failNext("select", "documents", "Connection timed out.");
+
+    const result = await canUploadDocument(createSupabaseClient(), userA.id);
+
+    expect(result.allowed).toBe(false);
+    expect(result.current).toBe(result.limit);
   });
 
   it("gates insights by plan", async () => {

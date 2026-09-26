@@ -84,11 +84,14 @@ export async function getDocumentDetail(id: string, userId?: string): Promise<Do
   /* Demo / seeded documents land with an empty storage_path because they
    * have no PDF on disk. Skip the signed-URL roundtrip and let the preview
    * fall back to the FauxPaper rendering. */
+  // 60 minutes: long enough to cover a normal read-through-the-contract
+  // session (react-pdf streams pages on demand against this URL well after
+  // the initial load), while still bounding how long a leaked URL works.
   const signedUrl = document.storage_path
     ? (
         await supabase.storage
           .from("documents")
-          .createSignedUrl(document.storage_path, 60 * 10)
+          .createSignedUrl(document.storage_path, 60 * 60)
       ).data?.signedUrl ?? null
     : null;
 

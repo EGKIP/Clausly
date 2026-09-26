@@ -318,6 +318,32 @@ describe("useReminders", () => {
     // failed delete should be reinstated.
     expect(result.current.reminders.map((item) => item.id)).toEqual([reminderTwo.id]);
   });
+
+  it("does not throw when the initial fetch resolves after the component has unmounted", async () => {
+    const fetchResponse = deferred<Response>();
+    mockFetch(fetchResponse.promise);
+
+    const { result, unmount } = renderHook(() => useReminders());
+    const refetchPromise = result.current.refetch();
+    unmount();
+
+    fetchResponse.resolve(jsonResponse({ reminders: [reminder] }));
+    await expect(refetchPromise).resolves.toBeUndefined();
+  });
+
+  it("does not throw when an in-flight approve resolves after the component has unmounted", async () => {
+    const approval = deferred<Response>();
+    mockFetch(jsonResponse({ reminders: [reminder] }), approval.promise);
+
+    const { result, unmount } = renderHook(() => useReminders());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const approvePromise = result.current.approve(reminder.id);
+    unmount();
+
+    approval.resolve(jsonResponse({ reminder: { ...reminder, status: "approved" } }));
+    await expect(approvePromise).resolves.toBeNull();
+  });
 });
 
 function mockFetch(...responses: Array<Response | Promise<Response>>) {

@@ -46,6 +46,14 @@ export function useReminders(filters: ReminderFilters = {}): State {
   const status = filters.status;
   const documentId = filters.documentId;
 
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const refetch = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -55,6 +63,7 @@ export function useReminders(filters: ReminderFilters = {}): State {
 
     try {
       const response = await fetch(url);
+      if (!mountedRef.current) return;
       if (response.status === 503) {
         setReminders([]);
         setIsLoading(false);
@@ -62,16 +71,20 @@ export function useReminders(filters: ReminderFilters = {}): State {
       }
 
       if (!response.ok) {
+        const message = await responseError(response, "Unable to load reminders.");
+        if (!mountedRef.current) return;
         setReminders([]);
-        setError(await responseError(response, "Unable to load reminders."));
+        setError(message);
         setIsLoading(false);
         return;
       }
 
       const payload = (await response.json()) as ReminderPayload;
+      if (!mountedRef.current) return;
       setReminders((payload.reminders ?? []).map(normalizeReminder));
       setIsLoading(false);
     } catch {
+      if (!mountedRef.current) return;
       setReminders([]);
       setError("Unable to load reminders.");
       setIsLoading(false);
@@ -87,11 +100,13 @@ export function useReminders(filters: ReminderFilters = {}): State {
     try {
       return await action();
     } finally {
-      setPendingIds((current) => {
-        const next = new Set(current);
-        next.delete(id);
-        return next;
-      });
+      if (mountedRef.current) {
+        setPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
+      }
     }
   }, []);
 
@@ -113,12 +128,15 @@ export function useReminders(filters: ReminderFilters = {}): State {
       });
 
       if (!response.ok) {
+        const message = await responseError(response, "Unable to approve reminder.");
+        if (!mountedRef.current) return null;
         setReminders((current) => restoreReminder(current, original));
-        setError(await responseError(response, "Unable to approve reminder."));
+        setError(message);
         return null;
       }
 
       const payload = (await response.json()) as ReminderPayload;
+      if (!mountedRef.current) return null;
       if (payload.reminder) {
         const nextReminder = normalizeReminder(payload.reminder);
         setReminders((current) => dropIfStatusChanged(replaceReminder(current, nextReminder), status));
@@ -139,11 +157,14 @@ export function useReminders(filters: ReminderFilters = {}): State {
       });
 
       if (!response.ok) {
-        setError(await responseError(response, "Unable to update reminder."));
+        const message = await responseError(response, "Unable to update reminder.");
+        if (!mountedRef.current) return null;
+        setError(message);
         return null;
       }
 
       const payload = (await response.json()) as ReminderPayload;
+      if (!mountedRef.current) return null;
       if (payload.reminder) {
         const nextReminder = normalizeReminder(payload.reminder);
         setReminders((current) => replaceReminder(current, nextReminder));
@@ -161,8 +182,10 @@ export function useReminders(filters: ReminderFilters = {}): State {
     return withPending(id, async () => {
       const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!response.ok) {
+        const message = await responseError(response, "Unable to ignore reminder.");
+        if (!mountedRef.current) return false;
         setReminders((current) => restoreReminder(current, original));
-        setError(await responseError(response, "Unable to ignore reminder."));
+        setError(message);
         return false;
       }
       return true;

@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActivityTimeline, type AuditTimelineEvent } from "./activity-timeline";
 
 const events: AuditTimelineEvent[] = [
@@ -65,5 +65,34 @@ describe("ActivityTimeline", () => {
     expect(screen.getByText("Deleted a document")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "View resource" })).not.toBeInTheDocument();
     expect(screen.getByText(/^ID 22222222/)).toBeInTheDocument();
+  });
+
+  it("does not touch state after unmounting while a 'load more' request is still in flight", async () => {
+    let resolveFetch: (value: unknown) => void = () => {};
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise((resolve) => { resolveFetch = resolve; }))
+    );
+    // jsdom has no IntersectionObserver; the component's own scroll-trigger
+    // effect only needs one to exist here, not to actually observe anything.
+    vi.stubGlobal(
+      "IntersectionObserver",
+      vi.fn().mockImplementation(() => ({ observe: vi.fn(), disconnect: vi.fn() }))
+    );
+
+    const { unmount } = render(<ActivityTimeline initialEvents={events} initialNextCursor="cursor-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Load older activity" }));
+
+    unmount();
+    resolveFetch({ ok: true, json: async () => ({ events: [], nextCursor: null }) });
+
+    // Let the loadMore promise chain (await response, await response.json())
+    // fully settle after unmount. Without the mounted guard this used to
+    // reach React's scheduler for an unmounted tree via a stale closure.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    vi.unstubAllGlobals();
   });
 });

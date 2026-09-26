@@ -63,6 +63,22 @@ describe("/api/reminders/[id]", () => {
     });
   });
 
+  it("returns a clean 400, not an unhandled crash, when the PATCH body isn't valid JSON", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "suggested" });
+
+    const response = await PATCH(
+      new Request("http://localhost.test/api/reminders/" + reminder.id, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: "not json",
+      }),
+      routeContext(reminder.id)
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it("returns 409 when patching a sent reminder", async () => {
     const document = seedDocument(userA);
     const reminder = seedReminder(document.id, userA, { status: "sent", title: "Already sent" });

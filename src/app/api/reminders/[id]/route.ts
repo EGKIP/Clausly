@@ -42,7 +42,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Dismissed reminders cannot be updated." }, { status: 409 });
   }
 
-  const parsed = reminderPatchLifecycleSchema.safeParse(await request.json());
+  const parsed = reminderPatchLifecycleSchema.safeParse(await request.json().catch(() => ({})));
 
   if (!parsed.success) {
     return NextResponse.json(

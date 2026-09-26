@@ -25,6 +25,8 @@ export type AuditTimelineEvent = {
   resourceId: string | null;
   metadata: Json;
   createdAt: string;
+  /** Whether the document this event links to (if any) still exists. Undefined for events that don't link to a document. */
+  documentExists?: boolean;
 };
 
 type AuditResponse = {
@@ -226,6 +228,7 @@ function iconForEvent(event: AuditTimelineEvent) {
 
 function hrefForEvent(event: AuditTimelineEvent) {
   if (event.action === AUDIT_ACTIONS.DOCUMENT_DELETED) return null;
+  if (event.documentExists === false) return null;
   if (event.resourceType === "document" && event.resourceId) return `/dashboard/documents/${event.resourceId}`;
   if (event.resourceType === "document_export" && event.resourceId) return `/dashboard/documents/${event.resourceId}`;
   if (event.resourceType === "document_share") {

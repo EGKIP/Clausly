@@ -61,10 +61,13 @@ export async function getQaUsage(supabase: unknown, userId: string): Promise<QaU
     .gte("created_at", windowStart);
 
   if (countError) {
+    // A failed count must never read as "0 used" — that would silently lift
+    // the daily Ask/Compare quota for anyone hitting a transient DB error.
+    // Fail closed: report the quota as already exhausted.
     return {
-      used: 0,
+      used: limit,
       limit,
-      remaining: limit,
+      remaining: 0,
       plan,
       resetsAt: new Date(now.getTime() + DAY_IN_MS).toISOString(),
     };

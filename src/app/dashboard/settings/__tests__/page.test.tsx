@@ -61,6 +61,38 @@ describe("SettingsPage", () => {
     expect(screen.queryByRole("heading", { name: "Delete account" })).not.toBeInTheDocument();
   });
 
+  it("exposes the delete-account confirmation as an accessible dialog with focus inside it", async () => {
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByDisplayValue("Ada Lovelace")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /delete account/i }));
+
+    const dialog = screen.getByRole("dialog", { name: "Delete account" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it("traps Tab focus inside the delete-account confirmation", async () => {
+    render(<SettingsPage />);
+    await waitFor(() => expect(screen.getByDisplayValue("Ada Lovelace")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: /delete account/i }));
+    const dialog = screen.getByRole("dialog", { name: "Delete account" });
+    const focusable = dialog.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+
+    last.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+
+    first.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+  });
+
   it("shows a retry banner instead of falsely claiming mock mode when the profile fetch fails", async () => {
     let profileCalls = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {

@@ -538,3 +538,45 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-xt1gf6`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-09-28
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (640/640, 111 files, vitest — 7 new)
+- E2E: none configured (still no Playwright in this repo)
+
+### Issues Found
+- **P1:** The document detail page's Dates tab (`DatesPanel` in `src/components/dashboard/document-view.tsx`) rendered literal hardcoded day counts — `-90` for Effective, `27` for Notice deadline, `86` for Ends — instead of computing them from the document's actual dates. Every single document, regardless of its real effective/notice/end dates, showed the same fake "90d ago" / "27d" / "86d" badges. This directly undermines the product's core "track your contract deadlines" value proposition. Root cause: `ContractDoc` (`src/lib/mock-data.ts`) only carried pre-formatted display strings ("Sep 1, 2025") for these fields, never the raw date, so the component had nothing to compute from and someone had stubbed literal placeholder numbers instead.
+- **P2:** `getQaUsage`/`getExportUsage` (`src/lib/billing/qa-rate-limit.ts`, `src/lib/exports/limits.ts`) failed open on a DB count-query error, reporting the full remaining quota (`allowed: true`) instead of denying — the exact fail-open bug class the 2026-09-26 run fixed in `canUploadDocument`, just never ported to these two sibling gates. A transient `usage_metrics`/`document_exports` query error silently bypassed the daily Ask Clausly question limit, the Compare rate limit (gated by the same `canAskQuestion`), and the free-plan 30-day export limit, with no log line marking the bypass.
+- **P2:** Settings' "Delete account" confirmation (`src/app/dashboard/settings/page.tsx`) — arguably the single highest-stakes confirmation in the app — was the one modal in the codebase missing standard dialog semantics: no `role="dialog"`/`aria-modal`/`aria-labelledby`, no initial focus, no Tab focus trap, unlike every other modal (`delete-document-button.tsx`, `upload-modal.tsx`, `share-dialog.tsx`, `reminder-edit-modal.tsx`, `command-palette.tsx`). A screen-reader user got no dialog announcement; a keyboard user could Tab out into the (visually obscured) page behind it.
+- **P2:** `AskPanel`'s conversation switcher (`document-view.tsx`) — the "+ New chat" button and conversation pills — stayed clickable while a question was still streaming. Switching mid-stream reset `messages`/`result` for the newly selected (empty) conversation, but the old stream's reader loop kept running and its `setResult` calls kept overwriting state unconditionally, so the previous conversation's still-arriving answer rendered under the new, unrelated, supposedly-empty conversation.
+- Two Explore-agent audits (document analysis/export/Ask/Compare; dashboard/settings/reminders/mobile/a11y) covering areas not touched by open PR #93 turned up nothing else concrete. One additional finding — Ask's on-demand chunk-reindex recovery (`src/lib/ai/embeddings/index.ts`) unconditionally uses the PDF text extractor regardless of the document's actual file type, so DOCX/TXT/image documents that land in that recovery path fail it (a manual re-analyze works fine as a workaround since that path does branch on mime type) — is real but deferred; fixing it needs the `ask` route to select and thread `mime_type` through, which is a slightly larger change than today's pass scope.
+- Confirmed via GitHub: PR #93 (2026-09-27, dashboard "Fresh summaries" leak, unsurfaced OAuth callback error, hardcoded Pro-insight numbers) is open, green, and unreviewed — none of today's fixes overlap it (confirmed by reading its diff first).
+- Re-checked Supabase security/performance advisors against `clausly-prod` and `npm audit`: identical to every prior run (same three long-standing, previously-judged-safe security findings; same 9 unindexed-FK/7 unused-index INFO notices; same 6 `npm audit` findings, all blocked on a Next.js 16/Vitest 5 major bump).
+
+### Fixes Completed
+- `src/lib/mock-data.ts` + `src/lib/db/adapters.ts`: added raw ISO date fields (`effectiveDate`, `endsDate`, `noticeByDate`) to `ContractDoc` alongside the existing formatted display strings, populated from `documents.effective_date`/`end_date` (and the computed notice date) for real documents, and from matching literal ISO dates for the seven static demo documents.
+- `src/components/dashboard/document-view.tsx`: `DatesPanel` now computes each row's day count via `daysUntil()` (`src/lib/utils.ts`) from the document's real date instead of a hardcoded constant, and shows a dash instead of a fabricated number when a date is genuinely unknown (`DatesPanel` is now exported for direct testing, matching the existing `AskPanel` export).
+- `src/lib/billing/qa-rate-limit.ts`, `src/lib/exports/limits.ts`: both now fail closed (quota reported as exhausted) instead of open when their usage-count query errors, mirroring the `canUploadDocument` fix from 2026-09-26.
+- `src/app/dashboard/settings/page.tsx`: the delete-account confirmation now has `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, moves focus into itself on open, and traps Tab focus inside itself while open — porting the same pattern already used by `upload-modal.tsx`/`share-dialog.tsx`.
+- `src/components/dashboard/document-view.tsx`: `AskPanel`'s "+ New chat" button and conversation-select pills are now disabled (and their handlers no-op) while a question is still streaming, preventing the stale-answer race described above.
+
+### Tests Added/Changed
+- `src/components/dashboard/__tests__/document-view-dates.test.tsx` (new): asserts `DatesPanel` renders day counts computed from a fixture document's real dates (not the old hardcoded -90/27/86) and shows a dash rather than a number when a date is missing. Confirmed both fail against the pre-fix hardcoded component.
+- `src/lib/billing/__tests__/qa-rate-limit.test.ts`, `src/lib/exports/__tests__/limits.test.ts`: new cases force the usage-count query to error and assert `canAskQuestion`/`canExport` return `allowed: false` with the quota reported as fully used. Confirmed failing pre-fix.
+- `src/app/dashboard/settings/__tests__/page.test.tsx`: new cases assert the delete-account dialog exposes `role="dialog"`/`aria-modal`, receives initial focus, and traps Tab focus between its first and last focusable elements.
+- `src/components/dashboard/__tests__/ask-panel-suggestions.test.tsx`: new case holds the `/ask` fetch pending and asserts the "+ New chat" button and a conversation pill are disabled while it's in flight, then re-enabled once it resolves.
+
+### Remaining Concerns
+- No P0 issues found; the P1 above is fixed and tested. All three P2s are fixed and tested.
+- Ask Clausly's on-demand chunk-reindex recovery is PDF-only (see Issues Found) — has a working manual-re-analyze workaround, deferred to a pass that threads `mime_type` through `src/app/api/documents/[id]/ask/route.ts` and `reindexDocumentChunksFromStorage`.
+- **PR #93 (2026-09-27) is still open and unreviewed, joined today by this run's own PR** — recommend the owner review and merge oldest-first.
+- Onboarding tour steps 3–4, the Stripe webhook's missing `past_due`/`invoice.payment_failed` handling, the reminder "Time" field having no effect on delivery timing, and the `canUploadDocument` TOCTOU race remain open from prior runs, each needing a product/infra decision or a larger migration-touching change.
+- Same longstanding items as every prior entry: no Playwright/E2E harness, leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-npu8tp`
+- PR: opened against `main` (see PR description for link)

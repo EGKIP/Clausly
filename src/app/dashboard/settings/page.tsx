@@ -53,6 +53,7 @@ export default function SettingsPage() {
   const [billingMessage, setBillingMessage] = React.useState<string | null>(null);
   const [profileLoadError, setProfileLoadError] = React.useState(false);
   const [profileLoadAttempt, setProfileLoadAttempt] = React.useState(0);
+  const deletePanelRef = React.useRef<HTMLFormElement>(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -148,6 +149,39 @@ export default function SettingsPage() {
   }
 
   useDismissOnEscape(confirmOpen && deleteStatus !== "deleting", closeDeleteConfirm);
+
+  React.useEffect(() => {
+    if (!confirmOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const panel = deletePanelRef.current;
+      if (!panel) return;
+      const focusable = getFocusableElements(panel);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [confirmOpen]);
+
+  React.useEffect(() => {
+    if (!confirmOpen) return;
+    const panel = deletePanelRef.current;
+    if (!panel) return;
+    const focusable = getFocusableElements(panel);
+    (focusable[0] ?? panel).focus();
+  }, [confirmOpen]);
 
   async function startCheckout() {
     await startBillingRedirect("/api/billing/checkout", "Checkout could not be started.");
@@ -404,13 +438,17 @@ export default function SettingsPage() {
           }}
         >
           <form
+            ref={deletePanelRef}
             onSubmit={deleteAccount}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
             className="max-h-[calc(100vh-2rem)] w-full max-w-[460px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-float)] sm:p-6"
           >
             <div className="inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)]">
               <AlertTriangle className="size-4" />
             </div>
-            <h2 className="mt-4 font-serif text-[24px] leading-tight tracking-[-0.01em]">
+            <h2 id="delete-account-title" className="mt-4 font-serif text-[24px] leading-tight tracking-[-0.01em]">
               Delete account
             </h2>
             <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--muted)]">
@@ -489,4 +527,12 @@ function DocumentUsageBar({ current, limit }: { current: number; limit: number |
       />
     </div>
   );
+}
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
 }

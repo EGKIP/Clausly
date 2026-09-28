@@ -67,10 +67,13 @@ export async function getExportUsage(supabase: unknown, userId: string): Promise
     .gte("created_at", windowStart);
 
   if (countError) {
+    // A failed count must never read as "0 used" — that would silently lift
+    // the free-plan export limit for anyone hitting a transient DB error.
+    // Fail closed: report the quota as already exhausted.
     return {
-      used: 0,
+      used: limit,
       limit,
-      remaining: limit,
+      remaining: 0,
       plan,
       resetsAt: new Date(now.getTime() + EXPORT_WINDOW_MS).toISOString(),
     };

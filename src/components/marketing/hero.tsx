@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Container, Eyebrow } from "@/components/ui/primitives";
+import { Container } from "@/components/ui/primitives";
 import { DocumentStrip } from "./document-strip";
 import { HeroVisual } from "./hero-visual";
 
@@ -35,22 +35,11 @@ export function Hero() {
         <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           {/* Copy block */}
           <div className="lg:col-span-7 max-w-[680px]">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: [0.165, 0.84, 0.44, 1] }}
-            >
-              <Eyebrow>
-                <FileTextIcon />
-                Contract summaries, dates, and reminders
-              </Eyebrow>
-            </motion.div>
-
             <motion.h1
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.05, ease: [0.165, 0.84, 0.44, 1] }}
-              className="mt-6 font-serif font-normal text-balance text-[var(--foreground)] text-[clamp(2.55rem,5.4vw,4.7rem)] leading-[1]"
+              className="font-serif font-normal text-balance text-[var(--foreground)] text-[clamp(2.55rem,5.4vw,4.7rem)] leading-[1]"
             >
               Know what you signed.{" "}
               <span className="italic text-[var(--accent-ink)]">
@@ -118,13 +107,5 @@ export function Hero() {
         }}
       />
     </section>
-  );
-}
-
-function FileTextIcon() {
-  return (
-    <span className="inline-flex size-3 items-center justify-center rounded-[3px] border border-current/40">
-      <span className="h-1.5 w-1 rounded-[1px] bg-current" />
-    </span>
   );
 }

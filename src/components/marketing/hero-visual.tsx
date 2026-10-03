@@ -161,18 +161,18 @@ export function HeroVisual() {
         transition={{ duration: 0.9, delay: 0.3, ease: [0.165, 0.84, 0.44, 1] }}
         viewport={{ once: true }}
       >
-        <div className="flex items-center gap-2.5">
-          <span className="inline-flex size-9 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)]">
+        <div className="flex items-start gap-2.5">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-ember-soft)] text-[var(--color-ember-ink)]">
             <CalendarClock className="size-4" />
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-medium">Lease renewal notice deadline</p>
             <p className="text-[11.5px] text-[var(--muted)]">Wed, Jul 1 · 30 days before lease ends</p>
+            <button className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-[var(--foreground)] text-[var(--background)] px-2.5 py-1 text-[11px] font-medium">
+              <CheckCircle2 className="size-3" />
+              Approve
+            </button>
           </div>
-          <button className="inline-flex items-center gap-1 rounded-full bg-[var(--foreground)] text-[var(--background)] px-2.5 py-1 text-[11px] font-medium">
-            <CheckCircle2 className="size-3" />
-            Approve
-          </button>
         </div>
       </motion.div>
 

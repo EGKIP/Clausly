@@ -10,9 +10,17 @@ import { cn } from "@/lib/utils";
 
 type Mode = "login" | "signup" | "forgot";
 
-export function AuthCard({ mode, next = "/dashboard" }: { mode: Mode; next?: string }) {
+export function AuthCard({
+  mode,
+  next = "/dashboard",
+  initialError,
+}: {
+  mode: Mode;
+  next?: string;
+  initialError?: string;
+}) {
   const [status, setStatus] = React.useState<"idle" | "loading" | "sent">("idle");
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(initialError ?? null);
   const [magicLink, setMagicLink] = React.useState(false);
 
   const isLogin = mode === "login";

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
+  failNext,
   resetSupabaseMock,
   seedUsageMetric,
   seedUser,
@@ -101,6 +102,17 @@ describe("Q&A rate limit", () => {
     const usage = await getQaUsage(createSupabaseClient(), userA.id);
 
     expect(usage.resetsAt).toBe("2026-06-16T12:00:00.000Z");
+  });
+
+  it("fails closed (quota exhausted) when the usage count query errors", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    failNext("select", "usage_metrics", "Connection timed out.");
+
+    const result = await canAskQuestion(createSupabaseClient(), userA.id);
+
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.used).toBe(result.limit);
   });
 
   it("sets resetsAt to the oldest counted row plus 24 hours", async () => {

@@ -18,8 +18,11 @@ export interface ContractDoc {
   jurisdiction: string;
   pages: number;
   effective: string;
+  effectiveDate: string | null;
   ends: string;
+  endsDate: string | null;
   noticeBy?: string;
+  noticeByDate?: string | null;
   risk: RiskLevel;
   uploadedDaysAgo: number;
   monthly?: string;
@@ -37,8 +40,11 @@ export const documents: ContractDoc[] = [
     jurisdiction: "Minnesota",
     pages: 14,
     effective: "Sep 1, 2025",
+    effectiveDate: "2025-09-01",
     ends: "Aug 31, 2026",
+    endsDate: "2026-08-31",
     noticeBy: "Jul 1, 2026",
+    noticeByDate: "2026-07-01",
     risk: "Medium",
     uploadedDaysAgo: 3,
     monthly: "$1,850 / mo",
@@ -55,7 +61,9 @@ export const documents: ContractDoc[] = [
     jurisdiction: "Minnesota",
     pages: 22,
     effective: "Dec 14, 2025",
+    effectiveDate: "2025-12-14",
     ends: "Jun 14, 2026",
+    endsDate: "2026-06-14",
     risk: "Low",
     uploadedDaysAgo: 12,
     monthly: "$142 / mo",
@@ -72,7 +80,9 @@ export const documents: ContractDoc[] = [
     jurisdiction: "California",
     pages: 9,
     effective: "Jan 1, 2026",
+    effectiveDate: "2026-01-01",
     ends: "Dec 31, 2026",
+    endsDate: "2026-12-31",
     risk: "Needs Review",
     uploadedDaysAgo: 1,
     monthly: "$6,500 / project",
@@ -89,7 +99,9 @@ export const documents: ContractDoc[] = [
     jurisdiction: "—",
     pages: 18,
     effective: "Mar 12, 2025",
+    effectiveDate: "2025-03-12",
     ends: "Mar 12, 2027",
+    endsDate: "2027-03-12",
     risk: "Low",
     uploadedDaysAgo: 47,
     monthly: "$85 / mo",
@@ -106,7 +118,9 @@ export const documents: ContractDoc[] = [
     jurisdiction: "Minnesota",
     pages: 6,
     effective: "Oct 1, 2025",
+    effectiveDate: "2025-10-01",
     ends: "Oct 1, 2026",
+    endsDate: "2026-10-01",
     risk: "Low",
     uploadedDaysAgo: 28,
     monthly: "$78 / mo",
@@ -123,7 +137,9 @@ export const documents: ContractDoc[] = [
     jurisdiction: "—",
     pages: 4,
     effective: "Jun 1, 2025",
+    effectiveDate: "2025-06-01",
     ends: "May 30, 2026",
+    endsDate: "2026-05-30",
     risk: "High",
     uploadedDaysAgo: 60,
     monthly: "$59 / mo",
@@ -140,7 +156,9 @@ export const documents: ContractDoc[] = [
     jurisdiction: "California",
     pages: 7,
     effective: "Feb 3, 2025",
+    effectiveDate: "2025-02-03",
     ends: "—",
+    endsDate: null,
     risk: "Medium",
     uploadedDaysAgo: 120,
     summary:

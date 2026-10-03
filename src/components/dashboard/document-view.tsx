@@ -25,7 +25,7 @@ import { Button } from "@/components/ui/button";
 import { AskAnswerContent } from "./ask/answer-content";
 import { PDFPreview } from "./pdf-preview";
 import { DocumentRemindersSection } from "./reminders/document-reminders-section";
-import { cn } from "@/lib/utils";
+import { cn, daysUntil } from "@/lib/utils";
 
 type Tab = "summary" | "clauses" | "dates" | "reminders" | "ask";
 type QaUsage = {
@@ -327,12 +327,20 @@ function ClausesPanel({
 }
 
 /* ── Dates ──────────────────────────────────────────────────────────── */
-function DatesPanel({ doc }: { doc: ContractDoc }) {
+export function DatesPanel({ doc }: { doc: ContractDoc }) {
   const items = [
-    { label: "Effective", value: doc.effective, days: -90 },
-    doc.noticeBy && { label: "Notice deadline", value: doc.noticeBy, days: 27 },
-    doc.ends !== "—" && { label: "Ends", value: doc.ends, days: 86 },
-  ].filter(Boolean) as { label: string; value: string; days: number }[];
+    { label: "Effective", value: doc.effective, days: doc.effectiveDate ? daysUntil(doc.effectiveDate) : null },
+    doc.noticeBy && {
+      label: "Notice deadline",
+      value: doc.noticeBy,
+      days: doc.noticeByDate ? daysUntil(doc.noticeByDate) : null,
+    },
+    doc.ends !== "—" && {
+      label: "Ends",
+      value: doc.ends,
+      days: doc.endsDate ? daysUntil(doc.endsDate) : null,
+    },
+  ].filter(Boolean) as { label: string; value: string; days: number | null }[];
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6">
       <div className="space-y-3">
@@ -343,7 +351,7 @@ function DatesPanel({ doc }: { doc: ContractDoc }) {
               <p className="text-[11.5px] text-[var(--muted)]">{d.value}</p>
             </div>
             <span className="font-serif text-[20px] tabular-nums tracking-[-0.01em]">
-              {d.days < 0 ? `${Math.abs(d.days)}d ago` : `${d.days}d`}
+              {d.days === null ? "—" : d.days < 0 ? `${Math.abs(d.days)}d ago` : `${d.days}d`}
             </span>
             <Button
               variant="ghost"
@@ -503,6 +511,10 @@ export function AskPanel({ docId, docTitle }: { docId: string; docTitle: string 
   }, [docId, question, showSuggestions, suggestionsLoaded, suggestionsPending, suggestionAttempts]);
 
   async function selectConversation(id: string) {
+    // Switching conversations while a previous question is still streaming
+    // would leave that stream's setResult/setMessages calls targeting the
+    // newly selected (and visually empty) conversation once it resolves.
+    if (loading) return;
     setConversationId(id);
     setError(null);
     const response = await fetch(`/api/conversations/${id}/messages`).catch(() => null);
@@ -524,6 +536,7 @@ export function AskPanel({ docId, docTitle }: { docId: string; docTitle: string 
   }
 
   function startNewChat() {
+    if (loading) return;
     setConversationId(null);
     setMessages([]);
     setResult(null);
@@ -671,7 +684,8 @@ export function AskPanel({ docId, docTitle }: { docId: string; docTitle: string 
           <button
             type="button"
             onClick={startNewChat}
-            className="text-[12px] font-medium text-[var(--accent-ink)] underline underline-offset-4"
+            disabled={loading}
+            className="text-[12px] font-medium text-[var(--accent-ink)] underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-60"
           >
             + New chat
           </button>
@@ -683,8 +697,9 @@ export function AskPanel({ docId, docTitle }: { docId: string; docTitle: string 
                 key={conversation.id}
                 type="button"
                 onClick={() => void selectConversation(conversation.id)}
+                disabled={loading}
                 className={cn(
-                  "shrink-0 rounded-full border px-3 py-1.5 text-[12px] transition-colors",
+                  "shrink-0 rounded-full border px-3 py-1.5 text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                   conversation.id === conversationId
                     ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-ink)]"
                     : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--border-strong)]"

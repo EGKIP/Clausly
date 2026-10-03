@@ -538,3 +538,29 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-xt1gf6`
 - PR: opened against `main` (see PR description for link)
+
+## 2026-10-03
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass
+- Lint: pass
+- Unit tests: pass (633/633, 110 files) — 1 failure on fresh checkout, fixed (see below)
+- E2E: none configured (no Playwright in this repo)
+
+### Issues Found
+- **P3 (test-only):** `seedReminder` defaulted `fire_on` to the hard-coded `2026-10-01`, which became a past date today. The reminder-approve route correctly rejects past dates (409 `REMINDER_PAST`), so the "approves suggested reminders" test started failing. Product code was correct. The PATCH test also hard-coded `2026-11-15` and would have failed after that date.
+
+### Fixes Completed
+- None in product code.
+
+### Tests Added/Changed
+- `tests/helpers/supabase.ts`: default reminder `fire_on` is now relative (+90 days).
+- `src/app/api/reminders/[id]/__tests__/route.test.ts`: PATCH test uses a relative future date.
+
+### Remaining Concerns
+- Same as the previous entry: reminder Time field not used for delivery timing, upload cap TOCTOU race, no E2E harness, `npm audit` items blocked on major bumps.
+- Other tests still hard-code 2026 dates; they pass today, but watch for date rot.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-r38fpp`

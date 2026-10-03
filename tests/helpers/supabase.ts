@@ -301,7 +301,8 @@ export function seedReminder(documentId: string, user = userA, overrides: Row = 
     date_id: null,
     title: "Review notice window",
     description: "Review the contract before notice is due.",
-    fire_on: "2026-10-01",
+    // Relative so the default stays a valid (future) date as the calendar moves.
+    fire_on: new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10),
     reminder_time: null,
     reminder_type: "Notice",
     status: "suggested",

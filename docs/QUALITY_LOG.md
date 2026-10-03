@@ -312,6 +312,7 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 ### PR/Branch
 - Branch: `claude/upbeat-newton-egi4e9`
 - PR: opened against `main` (see PR description for link)
+
 ## 2026-09-21
 
 ### Quality Gates
@@ -539,33 +540,42 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 - Branch: `claude/upbeat-newton-xt1gf6`
 - PR: opened against `main` (see PR description for link)
 
-## 2026-09-28
-## 2026-10-02
+## 2026-09-27
 
 ### Quality Gates
 - Build: pass
-- Typecheck: pass
-- Lint: pass
-- Unit tests: pass (633/633, 110 files) — 1 failure before fix
-- E2E: none configured (no Playwright in this repo)
+- Typecheck: pass (`tsc --noEmit`)
+- Lint: pass (`next lint`, no warnings)
+- Unit tests: pass (637/637, 110 files, vitest — 4 new)
+- E2E: none configured (still no Playwright in this repo)
 
 ### Issues Found
-- **P3 (test-only):** `seedReminder` in `tests/helpers/supabase.ts` defaulted `fire_on` to the hardcoded `2026-10-01`. Once that date passed, the route's `REMINDER_PAST` guard returned 409 and "approves suggested reminders and is idempotent…" failed on main. Production code was correct; the fixture had aged out.
-- PRs #93 and #94 (earlier daily runs) are still open and unreviewed; main is unchanged since #92.
+- **P2:** Dashboard home's "Fresh summaries" rail (`src/app/dashboard/page.tsx`) filtered on `d.risk === "Needs Review"` alone, which is also the fallback UI value for a document whose `risk_level` is still `null` (pending/analyzing/failed). A document still processing — or one whose analysis failed — appeared in a list captioned "Clausly just finished reading these," reintroducing exactly the null-risk-fallback footgun `DocumentCard`'s `DocumentStatusMarker` already has an explicit guard/comment against; that guard just wasn't reused here.
+- **P2:** A failed Google OAuth callback (`src/app/auth/callback/route.ts`) redirects to `/login?error=oauth_callback_failed`, but nothing on the login page ever read the `error` query param — the user landed on a plain, unexplained login page with no indication sign-in was attempted or why it failed.
+- **P2:** The dashboard home's "Pro insight teaser" card showed hardcoded, non-user-specific numbers ("You're paying $2,054/month... Two auto-renew... Three have notice windows") on every account, regardless of the viewer's actual portfolio. The sibling `/dashboard/insights` page computes the same kind of sentence from real data, so a user with e.g. one $20/month document saw a directly contradicting number on the very next click through "See full breakdown."
+- Explore-agent audit of document deletion (ownership checks, cascade cleanup via FKs), middleware/session/redirect safety (`safeNextPath` applied consistently), reset-password flow, settings (profile/notifications/billing — no secrets in client code), and mobile dialogs/dropdowns at 375px found nothing else; all checked out clean.
+- Re-confirmed via Supabase advisors and `npm audit`: same three longstanding security findings (all previously judged safe — `delete_account` SECURITY DEFINER correctly scopes to `auth.uid() = target_user_id`, re-verified today by reading its definition), same INFO-level index notices, same six `npm audit` findings blocked on Next.js 16/Vitest 5 major bumps.
+- No open "Daily quality run" PRs found — #92 (2026-09-26) has been merged, no review backlog to flag.
 
 ### Fixes Completed
-- Test seed `fire_on` is now relative (today + 30 days), so it cannot expire again.
+- `src/app/dashboard/page.tsx`: `needsReview` now additionally requires `d.status === "ready"`, so only documents with a genuine `needs_review` risk verdict appear in "Fresh summaries" — not ones still processing or that failed analysis.
+- `src/app/(auth)/login/page.tsx` + `src/components/auth/auth-card.tsx`: the login page now reads the `error` search param and passes a friendly message into `AuthCard` as an `initialError`, shown in the card's existing error banner instead of silently discarding it.
+- `src/app/dashboard/page.tsx`: `ProInsightTeaser` now takes `documents`/`reminders` and computes real monthly spend, auto-renewal, and notice-window counts (same logic as `/dashboard/insights`) instead of showing hardcoded placeholder figures.
 
 ### Tests Added/Changed
-- `tests/helpers/supabase.ts` only.
+- `src/app/dashboard/__tests__/page.test.tsx`: new cases assert a still-analyzing document is excluded from "Fresh summaries" (while a genuinely `needs_review`-verdict ready document is included), and that the Pro insight teaser renders a document's real monthly spend instead of the old hardcoded `$2,054` figure. All confirmed to fail against the pre-fix code.
+- `src/components/auth/__tests__/auth-card.test.tsx`: new case asserts `AuthCard` renders an `initialError` passed in from a failed OAuth callback redirect.
 
 ### Remaining Concerns
-- Same longstanding items as prior entries (no E2E harness, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, npm audit blocked on major bumps).
-- Supabase advisors and browser flows not re-exercised this run.
+- No P0/P1 issues found; all three P2s above are fixed and tested.
+- Onboarding tour steps 3–4, the Stripe webhook's missing `past_due`/`invoice.payment_failed` handling, the reminder "Time" field having no effect on delivery timing, and the `canUploadDocument` TOCTOU race remain open from prior runs, each needing a product/infra decision or a larger migration-touching change rather than a same-day fix.
+- Same longstanding items as every prior entry: no Playwright/E2E harness (CI also doesn't run `next build`, only lint/typecheck/test), leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
 
 ### PR/Branch
-- Branch: `claude/upbeat-newton-w9ei4h`
-## 2026-09-27
+- Branch: `claude/upbeat-newton-9bt78t`
+- PR: opened against `main` (see PR description for link)
+
+## 2026-09-28
 
 ### Quality Gates
 - Build: pass
@@ -605,31 +615,30 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-npu8tp`
-- Unit tests: pass (637/637, 110 files, vitest — 4 new)
-- E2E: none configured (still no Playwright in this repo)
+- PR: opened against `main` (see PR description for link)
+
+## 2026-10-02
+
+### Quality Gates
+- Build: pass
+- Typecheck: pass
+- Lint: pass
+- Unit tests: pass (633/633, 110 files) — 1 failure before fix
+- E2E: none configured (no Playwright in this repo)
 
 ### Issues Found
-- **P2:** Dashboard home's "Fresh summaries" rail (`src/app/dashboard/page.tsx`) filtered on `d.risk === "Needs Review"` alone, which is also the fallback UI value for a document whose `risk_level` is still `null` (pending/analyzing/failed). A document still processing — or one whose analysis failed — appeared in a list captioned "Clausly just finished reading these," reintroducing exactly the null-risk-fallback footgun `DocumentCard`'s `DocumentStatusMarker` already has an explicit guard/comment against; that guard just wasn't reused here.
-- **P2:** A failed Google OAuth callback (`src/app/auth/callback/route.ts`) redirects to `/login?error=oauth_callback_failed`, but nothing on the login page ever read the `error` query param — the user landed on a plain, unexplained login page with no indication sign-in was attempted or why it failed.
-- **P2:** The dashboard home's "Pro insight teaser" card showed hardcoded, non-user-specific numbers ("You're paying $2,054/month... Two auto-renew... Three have notice windows") on every account, regardless of the viewer's actual portfolio. The sibling `/dashboard/insights` page computes the same kind of sentence from real data, so a user with e.g. one $20/month document saw a directly contradicting number on the very next click through "See full breakdown."
-- Explore-agent audit of document deletion (ownership checks, cascade cleanup via FKs), middleware/session/redirect safety (`safeNextPath` applied consistently), reset-password flow, settings (profile/notifications/billing — no secrets in client code), and mobile dialogs/dropdowns at 375px found nothing else; all checked out clean.
-- Re-confirmed via Supabase advisors and `npm audit`: same three longstanding security findings (all previously judged safe — `delete_account` SECURITY DEFINER correctly scopes to `auth.uid() = target_user_id`, re-verified today by reading its definition), same INFO-level index notices, same six `npm audit` findings blocked on Next.js 16/Vitest 5 major bumps.
-- No open "Daily quality run" PRs found — #92 (2026-09-26) has been merged, no review backlog to flag.
+- **P3 (test-only):** `seedReminder` in `tests/helpers/supabase.ts` defaulted `fire_on` to the hardcoded `2026-10-01`. Once that date passed, the route's `REMINDER_PAST` guard returned 409 and "approves suggested reminders and is idempotent…" failed on main. Production code was correct; the fixture had aged out.
+- PRs #93 and #94 (earlier daily runs) are still open and unreviewed; main is unchanged since #92.
 
 ### Fixes Completed
-- `src/app/dashboard/page.tsx`: `needsReview` now additionally requires `d.status === "ready"`, so only documents with a genuine `needs_review` risk verdict appear in "Fresh summaries" — not ones still processing or that failed analysis.
-- `src/app/(auth)/login/page.tsx` + `src/components/auth/auth-card.tsx`: the login page now reads the `error` search param and passes a friendly message into `AuthCard` as an `initialError`, shown in the card's existing error banner instead of silently discarding it.
-- `src/app/dashboard/page.tsx`: `ProInsightTeaser` now takes `documents`/`reminders` and computes real monthly spend, auto-renewal, and notice-window counts (same logic as `/dashboard/insights`) instead of showing hardcoded placeholder figures.
+- Test seed `fire_on` is now relative (today + 30 days), so it cannot expire again.
 
 ### Tests Added/Changed
-- `src/app/dashboard/__tests__/page.test.tsx`: new cases assert a still-analyzing document is excluded from "Fresh summaries" (while a genuinely `needs_review`-verdict ready document is included), and that the Pro insight teaser renders a document's real monthly spend instead of the old hardcoded `$2,054` figure. All confirmed to fail against the pre-fix code.
-- `src/components/auth/__tests__/auth-card.test.tsx`: new case asserts `AuthCard` renders an `initialError` passed in from a failed OAuth callback redirect.
+- `tests/helpers/supabase.ts` only.
 
 ### Remaining Concerns
-- No P0/P1 issues found; all three P2s above are fixed and tested.
-- Onboarding tour steps 3–4, the Stripe webhook's missing `past_due`/`invoice.payment_failed` handling, the reminder "Time" field having no effect on delivery timing, and the `canUploadDocument` TOCTOU race remain open from prior runs, each needing a product/infra decision or a larger migration-touching change rather than a same-day fix.
-- Same longstanding items as every prior entry: no Playwright/E2E harness (CI also doesn't run `next build`, only lint/typecheck/test), leaked-password protection disabled (owner action), `vector` extension in `public` schema, `npm audit` findings blocked on major-version bumps.
+- Same longstanding items as prior entries (no E2E harness, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, npm audit blocked on major bumps).
+- Supabase advisors and browser flows not re-exercised this run.
 
 ### PR/Branch
-- Branch: `claude/upbeat-newton-9bt78t`
-- PR: opened against `main` (see PR description for link)
+- Branch: `claude/upbeat-newton-w9ei4h`

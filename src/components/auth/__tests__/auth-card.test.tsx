@@ -86,6 +86,12 @@ describe("AuthCard", () => {
     await waitFor(() => expect(window.location.href).toBe("/dashboard/welcome"));
   });
 
+  it("shows an initial error message passed in from a failed OAuth callback redirect", () => {
+    render(<AuthCard mode="login" initialError="Sign-in could not be completed. Please try again." />);
+
+    expect(screen.getByText("Sign-in could not be completed. Please try again.")).toBeInTheDocument();
+  });
+
   it("sends the password reset link through the callback route so a reset-password page is reachable", async () => {
     mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
     render(<AuthCard mode="forgot" />);

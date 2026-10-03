@@ -33,7 +33,7 @@ export default async function DashboardHomePage() {
     .filter((r) => r.status !== "sent")
     .sort((a, b) => a.daysAway - b.daysAway)
     .slice(0, 4);
-  const needsReview = documents.filter((d) => d.risk === "Needs Review");
+  const needsReview = documents.filter((d) => d.status === "ready" && d.risk === "Needs Review");
   const highRisk = documents.filter((d) => d.risk === "High");
   const recent = [...documents]
     .sort((a, b) => a.uploadedDaysAgo - b.uploadedDaysAgo)
@@ -192,7 +192,7 @@ export default async function DashboardHomePage() {
           </div>
 
           {/* Pro insight teaser */}
-          <ProInsightTeaser />
+          <ProInsightTeaser documents={documents} reminders={reminders} />
         </div>
       </div>
 
@@ -222,7 +222,20 @@ export default async function DashboardHomePage() {
 }
 
 /* ── Pieces ─────────────────────────────────────────────────────────── */
-function ProInsightTeaser() {
+function ProInsightTeaser({
+  documents,
+  reminders,
+}: {
+  documents: Awaited<ReturnType<typeof listDocuments>>;
+  reminders: Awaited<ReturnType<typeof listReminders>>;
+}) {
+  const monthlySpend = documents.reduce(
+    (sum, d) => sum + (Number(d.monthly?.replace(/[^0-9.]/g, "")) || 0),
+    0
+  );
+  const renewalsSoon = documents.filter((d) => d.tags.includes("Auto-renew")).length;
+  const noticeWindows = reminders.filter((r) => r.type === "Notice" && r.status !== "sent").length;
+
   return (
     <div className="relative overflow-hidden rounded-[var(--radius-lg)] border border-[color-mix(in_oklch,var(--accent)_30%,var(--border))] bg-gradient-to-b from-[var(--accent-soft)] to-[var(--surface)] p-5">
       <div
@@ -236,10 +249,10 @@ function ProInsightTeaser() {
       <div className="relative">
         <Badge tone="clause"><TrendingUp className="size-2.5" /> Weekly insight</Badge>
         <h3 className="mt-3 font-serif text-[18px] leading-tight tracking-[-0.005em]">
-          You&apos;re paying $2,054 / month across recurring contracts.
+          You&apos;re paying ${monthlySpend.toLocaleString()} / month across recurring contracts.
         </h3>
         <p className="mt-2 text-[12.5px] text-[var(--accent-ink)] leading-relaxed">
-          Two of them auto-renew within 90 days. Three have notice windows you should hit.
+          {renewalsSoon} of them auto-renew within 90 days. {noticeWindows} have notice windows you should hit.
         </p>
         <Button variant="ghost" size="sm" href="/dashboard/insights" className="mt-4 w-full sm:-ml-2 sm:w-auto">
           See full breakdown <ArrowRight className="size-3" />

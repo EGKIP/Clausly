@@ -18,6 +18,7 @@ one small, reviewed step at a time, following [`PROGRESS.md`](PROGRESS.md).
 5. Append a concise entry to `docs/QUALITY_LOG.md`.
 
 ### Phase 2 — One iOS step
+0. **Reconcile first:** check each `in-review` step's PR on GitHub. Merged → mark `merged`; closed unmerged → mark `todo` and note why. Never trust the file over GitHub.
 1. Open `docs/mobile/PROGRESS.md`. Choose the first `todo` step whose `Needs` are all merged/done and that isn't blocked.
 2. If more than 2 mobile PRs are open, or nothing is eligible, skip Phase 2 and say exactly what it is waiting on.
 3. Do that **one** step on the session's designated branch. Keep it small. Follow the guardrails in `PLAN.md` §5 and `CLAUDE.md`.

@@ -17,7 +17,7 @@ Phase A — repo foundation and the shared contract (backend/web-safe, no UI ris
 |---|---|---|---|---|
 | S00 | Plan, ADRs, track briefs | — | agent | merged (#98) |
 | S01 | Bearer-token auth on server Supabase client (ADR-0003) | S00 | agent | in-review (#99) |
-| S02 | Repo organization: CLAUDE.md, README, docs index, config excludes for `mobile/`, PR template, CODEOWNERS, this tracker + routine | S00 | agent | in-review (see PR) |
+| S02 | Repo organization: CLAUDE.md, README, docs index, config excludes for `mobile/`, PR template, CODEOWNERS, this tracker + routine | S00 | agent | in-review (#99, stacked with S01) |
 | S03 | `packages/shared` scaffold + npm workspaces (web stays at repo root); CI builds/tests it; web output unchanged | S02 | agent | todo |
 | S04 | Move zod schemas + DB types into `packages/shared`; web imports them | S03 | agent | todo |
 | S05 | Typed API client in shared (auth injection, error shape); `X-Clausly-Client` header; `GET /api/client-config` (`minSupportedVersion`) with tests | S04, S01 | agent | todo |
@@ -73,4 +73,4 @@ Phase A — repo foundation and the shared contract (backend/web-safe, no UI ris
 - No Playwright/E2E harness on web — S06.
 
 ## Run log (newest last; the routine appends one line per run)
-- 2026-10-05 — Plan merged (S00); bearer auth in review (S01); repo organization in review (S02).
+- 2026-10-05 — Plan merged (S00); bearer auth (S01) and repo organization (S02) in review together in #99.

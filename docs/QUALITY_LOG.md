@@ -642,3 +642,17 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-w9ei4h`
+
+## 2026-10-05 (mobile track M1)
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (651/651) · E2E: none configured
+
+### Fixes Completed
+- `src/lib/supabase/server.ts`: `createClient()` now authenticates by `Authorization: Bearer <access_token>` when present (cookies otherwise, unchanged), so a native client can call every existing API route. Queries carry the user's JWT, so RLS applies as on web. An invalid bearer token never falls back to cookies. No service-role key on either path. See ADR-0003.
+
+### Tests Added/Changed
+- `src/lib/supabase/__tests__/server.test.ts` (new, 7 cases): cookie path unchanged, non-Bearer header ignored, bearer client built with anon key + no stored session, bare `getUser()` validates the caller's token, invalid token doesn't fall back to cookies, service-role key never used, missing env still throws.
+
+### Remaining Concerns
+- Not yet verified end-to-end against live Supabase with a real user JWT (cross-user denial per table) — scheduled for the M7 security track before any release.

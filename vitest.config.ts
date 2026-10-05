@@ -8,6 +8,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["tests/setup.ts"],
+    // mobile/ has its own test runner (jest-expo).
+    exclude: ["**/node_modules/**", "mobile/**"],
   },
   resolve: {
     alias: {

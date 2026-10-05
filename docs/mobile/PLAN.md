@@ -1,6 +1,6 @@
 # Clausly Mobile — Plan & Decision Board
 
-- **Status:** Draft for owner review (planning only — no mobile code is started)
+- **Status:** Approved 2026-10-05 — iOS first. D1 (Expo), D2 (iOS first), D3 (bearer auth) accepted; D4 (billing) defaults to free-tier-only first build until decided.
 - **Goal:** An iOS app (Android as a near-free follow-on) that is a first-class
   client of the *same* Supabase + Next.js backend as the web app, so documents,
   analysis, reminders, and settings are one shared source of truth.
@@ -67,7 +67,7 @@ marked ∥ can run in parallel. **Every PR is human-reviewed; agents never merge
 | Track | Agent role | Deliverable | Depends on | Parallel |
 |---|---|---|---|---|
 | **M0** | Architect | Accept/adjust ADR-0002..0004; scaffold `packages/shared` + workspaces; CI runs shared tests; no behavior change | D1 | — |
-| **M1** | Backend/API | `getRouteClient(request)` helper (cookie **or** bearer); migrate all 38 call sites; tests proving bearer + cookie + cross-user denial | D3 | ∥ M2 |
+| **M1** | Backend/API | **Done in PR (see below):** `createClient()` accepts cookie **or** bearer, so all routes work unchanged; unit tests. **Remaining:** live end-to-end RLS check with a real test user (M7) | D3 | ∥ M2 |
 | **M2** | Shared-contract | Move/mirror zod schemas + DB types into `packages/shared`; typed API client; `X-Clausly-Client` + `/api/client-config` | M0 | ∥ M1 |
 | **M3** | Mobile app | Expo scaffold; auth (email + Apple + Google, PKCE deep link); Documents list/detail; upload (picker + share sheet); processing status via Realtime; summary/clauses/dates/risk; reminders review/edit/approve | M1, M2, D1 | — |
 | **M4** | Notifications | `device_tokens` migration + RLS; register/unregister; push dispatcher; honor `reminder_time` (cron cadence decision) | M3 auth | ∥ M5 |

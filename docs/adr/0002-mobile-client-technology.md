@@ -1,8 +1,8 @@
 # ADR 0002 — Mobile client technology (Expo / React Native)
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-05) — iOS first; Android follows after the iOS build ships
 - **Date:** 2026-10-05
-- **Deciders:** Emmanuel Kiprotich (pending)
+- **Deciders:** Emmanuel Kiprotich
 
 ## Context
 Clausly's backend is Supabase + Next.js API routes. The web UI is React/TypeScript

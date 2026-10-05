@@ -1,8 +1,8 @@
 # ADR 0003 — Mobile API authentication (bearer tokens on existing routes)
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-05) — implemented in `src/lib/supabase/server.ts`
 - **Date:** 2026-10-05
-- **Deciders:** Emmanuel Kiprotich (pending)
+- **Deciders:** Emmanuel Kiprotich
 
 ## Context
 All 38 API route-handler call sites build their Supabase client with
@@ -11,10 +11,11 @@ browser cookies. A native app holds a Supabase access token (JWT), not cookies,
 so it cannot call these routes today. Business rules (plan caps, Ask quota,
 export limits, reminder past-date guard, analysis pipeline) live in these routes.
 
-## Decision (proposed)
-Add `getRouteClient(request)` that returns a Supabase client authenticated by
-`Authorization: Bearer <access_token>` when present, else by cookies as today.
-Migrate all call sites to it. No separate mobile API; no service-role key in
+## Decision
+Make the existing `createClient()` (`src/lib/supabase/server.ts`) authenticate by
+`Authorization: Bearer <access_token>` when that header is present, else by cookies
+as today. Every route already goes through it, so no call site changes.
+A present-but-invalid bearer token never falls back to cookies. No separate mobile API; no service-role key in
 the app; RLS remains the authorization boundary.
 
 ## Consequences

@@ -1,0 +1,7 @@
+# Auto-requests the owner on changes that can affect production or security.
+*                          @EGKIP
+/supabase/migrations/      @EGKIP
+/src/lib/supabase/         @EGKIP
+/src/app/api/billing/      @EGKIP
+/.github/                  @EGKIP
+/vercel.json               @EGKIP

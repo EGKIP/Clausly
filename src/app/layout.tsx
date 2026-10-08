@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/icon", sizes: "64x64", type: "image/png" },
-      { url: "/brand/clausly-mark.svg", type: "image/svg+xml" },
+      { url: "/brand/clausly-favicon.svg", type: "image/svg+xml" },
     ],
     apple: [{ url: "/apple-icon", sizes: "180x180", type: "image/png" }],
   },

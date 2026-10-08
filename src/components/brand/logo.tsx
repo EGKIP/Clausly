@@ -1,47 +1,18 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { AnimatedMark, type MarkMotion } from "./animated-mark";
+import { MarkSvg } from "./mark";
 
-/* The Clausly logomark: a contract page, a highlighted clause, and a reminder
- * dot compressed into a small mark that stays legible in light and dark mode. */
-export function Logomark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      className={cn("size-7", className)}
-    >
-      <defs>
-        <linearGradient id="clauslyMark" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="var(--foreground)" />
-          <stop offset="1" stopColor="color-mix(in oklch, var(--foreground) 70%, var(--accent) 30%)" />
-        </linearGradient>
-      </defs>
-      <rect x="1" y="1" width="30" height="30" rx="8" fill="url(#clauslyMark)" />
-      <path
-        d="M20.25 7.75v5.25h5.25"
-        stroke="var(--background)"
-        strokeWidth="1.45"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.72"
-      />
-      <path
-        d="M9.5 10.25h8.25M9.5 16h13M9.5 21.75h7.25"
-        stroke="var(--background)"
-        strokeWidth="1.65"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9.5 16h9.75"
-        stroke="var(--accent)"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-      <circle cx="23.5" cy="22" r="2.45" fill="var(--accent)" stroke="var(--background)" strokeWidth="1.2" />
-    </svg>
-  );
+/* The Clausly logomark: a C-ring around a contract page, a highlighted clause and a reminder dot.
+ * Geometry lives in ./mark-geometry.ts. This variant floats on the page and follows light/dark tokens;
+ * use <MarkSvg tile /> where a fixed navy tile is needed (icons, OG image).
+ *
+ * `motion` is opt-in and reserved for moments that earn it: "draw" for first-run reveals,
+ * "loop" for working states. Navigation and chrome stay static. */
+export function Logomark({ className, motion }: { className?: string; motion?: MarkMotion }) {
+  const cls = cn("size-8", className);
+  if (motion) return <AnimatedMark mode={motion} className={cls} />;
+  return <MarkSvg theme="adaptive" className={cls} />;
 }
 
 export function Logo({

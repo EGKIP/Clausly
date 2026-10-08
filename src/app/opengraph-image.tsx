@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { MarkSvg } from "@/components/brand/mark";
 
 export const alt = "Clausly contract intelligence workspace";
 
@@ -37,24 +38,7 @@ export default function OpenGraphImage() {
         }}
       >
         <div style={{ alignItems: "center", display: "flex", gap: 18 }}>
-          <div
-            style={{
-              alignItems: "center",
-              background: "#111827",
-              borderRadius: 18,
-              display: "flex",
-              height: 72,
-              justifyContent: "center",
-              width: 72,
-            }}
-          >
-            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
-              <path d="M46 17v12h12" stroke="#F8F5EE" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" opacity=".78" />
-              <path d="M21 23h18M21 36h29M21 49h16" stroke="#F8F5EE" strokeWidth="3.8" strokeLinecap="round" />
-              <path d="M21 36h22" stroke="#C8A65A" strokeWidth="5" strokeLinecap="round" />
-              <circle cx="53" cy="50" r="5.5" fill="#C8A65A" stroke="#F8F5EE" strokeWidth="2.7" />
-            </svg>
-          </div>
+          <MarkSvg tile size={72} />
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ fontFamily: "Georgia, serif", fontSize: 46, lineHeight: 1 }}>Clausly</div>
             <div style={{ color: "#6B6258", fontSize: 18, letterSpacing: 2, textTransform: "uppercase" }}>

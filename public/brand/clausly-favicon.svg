@@ -1,4 +1,4 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="64" height="64" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="ring" x1="110" y1="96" x2="404" y2="420" gradientUnits="userSpaceOnUse">
       <stop stop-color="#C8A65A"/>
@@ -10,10 +10,7 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="#181B20"/>
-  <path d="M398.5 136.4A186 186 0 1 0 398.5 375.6" stroke="url(#ring)" stroke-width="30" stroke-linecap="round"/>
+  <path d="M398.5 136.4A186 186 0 1 0 398.5 375.6" stroke="url(#ring)" stroke-width="42" stroke-linecap="round"/>
   <path d="M178 154H288L334 200V358H178Z" fill="url(#page)"/>
-  <path d="M288 154V200H334Z" fill="#D9CBB0"/>
-  <path d="M207 214H284M207 304H264" stroke="#181B20" stroke-width="22" stroke-linecap="round"/>
-  <path d="M207 259H305" stroke="#C8A65A" stroke-width="32" stroke-linecap="round"/>
-  <circle cx="322" cy="338" r="32" fill="#D46B5D" stroke="#F8F5EE" stroke-width="14"/>
+  <path d="M207 256H305" stroke="#C8A65A" stroke-width="52" stroke-linecap="round"/>
 </svg>

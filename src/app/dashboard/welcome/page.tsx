@@ -10,6 +10,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { PageBody, PageHeader } from "@/components/dashboard/page-header";
+import { Logomark } from "@/components/brand/logo";
 import { Badge } from "@/components/ui/primitives";
 import { MarkOnboardedLink } from "./mark-onboarded-link";
 
@@ -48,6 +49,7 @@ const promises = [
 export default function WelcomePage() {
   return (
     <PageBody className="max-w-[980px]">
+      <Logomark motion="draw" className="mb-6 size-16" />
       <PageHeader
         eyebrow={
           <>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Container } from "@/components/ui/primitives";
 import { DocumentStrip } from "./document-strip";
 import { HeroVisual } from "./hero-visual";
+import { WatchTourButton } from "./tour-video";
 
 export function Hero() {
   return (
@@ -70,6 +71,7 @@ export function Hero() {
               <Button variant="secondary" size="lg" href="#preview">
                 See the product
               </Button>
+              <WatchTourButton />
             </motion.div>
 
             <motion.div

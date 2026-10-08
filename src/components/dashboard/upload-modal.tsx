@@ -4,8 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, UploadCloud, FileText, Sparkles, Lock, TriangleAlert, ClipboardType } from "lucide-react";
+import { X, UploadCloud, FileText, Lock, TriangleAlert, ClipboardType } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logomark } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
@@ -407,7 +408,7 @@ export function UploadModal({
                     {phase === "error" ? (
                       <TriangleAlert className="size-3 shrink-0" />
                     ) : (
-                      <Sparkles className="size-3 shrink-0" />
+                      <Logomark motion="loop" className="size-5 shrink-0" />
                     )}
                     {phase === "uploading" && "Uploading securely…"}
                     {phase === "analyzing" && "Queued for clause, date and risk analysis…"}

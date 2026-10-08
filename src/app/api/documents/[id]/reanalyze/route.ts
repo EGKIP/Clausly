@@ -6,6 +6,13 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+// Re-analysis runs synchronously in this handler (unlike upload's after()
+// callback), so it needs the same 300s ceiling as the initial analysis or a
+// slow/scanned document can have its function killed mid-run, leaving the
+// document stuck at "analyzing" until the stuck-analysis recovery sweep
+// reclaims it (see /api/admin/recover-stuck-analyses).
+export const maxDuration = 300;
+
 export async function POST(_request: Request, context: RouteContext) {
   if (!hasSupabaseEnv()) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });

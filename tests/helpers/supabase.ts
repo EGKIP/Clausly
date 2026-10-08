@@ -25,6 +25,7 @@ type Failure = {
   table: TableName;
   operation: "insert" | "update" | "delete" | "select";
   message: string;
+  code?: string;
   once?: boolean;
 };
 
@@ -56,6 +57,7 @@ const storage = {
 
 let currentUser: TestUser | null = null;
 let failure: Failure | null = null;
+let storageRemoveFailure: string | null = null;
 let uuidCounter = 0;
 const rpcCallsList: { name: string; args: Row }[] = [];
 
@@ -74,6 +76,7 @@ export function resetSupabaseMock(user: TestUser | null = userA) {
   storage.files = new Map();
   currentUser = user;
   failure = null;
+  storageRemoveFailure = null;
   uuidCounter = 0;
   rpcCallsList.length = 0;
   vi.spyOn(crypto, "randomUUID").mockImplementation(() => nextUuid() as any);
@@ -94,8 +97,17 @@ export function setSupabaseEnv(enabled: boolean) {
   }
 }
 
-export function failNext(operation: Failure["operation"], table: TableName, message = "Forced Supabase error.") {
-  failure = { operation, table, message, once: true };
+export function failNext(
+  operation: Failure["operation"],
+  table: TableName,
+  message = "Forced Supabase error.",
+  code?: string
+) {
+  failure = { operation, table, message, code, once: true };
+}
+
+export function failNextStorageRemove(message = "Forced storage error.") {
+  storageRemoveFailure = message;
 }
 
 export function db() {
@@ -289,7 +301,7 @@ export function seedReminder(documentId: string, user = userA, overrides: Row = 
     date_id: null,
     title: "Review notice window",
     description: "Review the contract before notice is due.",
-    fire_on: "2026-10-01",
+    fire_on: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
     reminder_time: null,
     reminder_type: "Notice",
     status: "suggested",
@@ -396,6 +408,22 @@ export function routeContext(id: string) {
   return { params: Promise.resolve({ id }) };
 }
 
+// isVisible() unconditionally enforces per-user row scoping to simulate
+// Postgres RLS, which means an ordinary cross-tenant test still 404s even if
+// a route's own `.eq("user_id", user.id)` filter regressed. Wrap a call in
+// this to disable that simulation so the assertion actually exercises the
+// route's own ownership check rather than the mock's backstop.
+let rlsSimulationDisabled = false;
+
+export async function withoutRlsSimulation<T>(fn: () => Promise<T>): Promise<T> {
+  rlsSimulationDisabled = true;
+  try {
+    return await fn();
+  } finally {
+    rlsSimulationDisabled = false;
+  }
+}
+
 export function createSupabaseClient() {
   return createSupabaseClientForRole(false);
 }
@@ -478,6 +506,11 @@ function createSupabaseClientForRole(bypassRls: boolean) {
             return { data: file, error: null };
           }),
           remove: vi.fn(async (paths: string[]) => {
+            if (storageRemoveFailure) {
+              const message = storageRemoveFailure;
+              storageRemoveFailure = null;
+              return { data: null, error: { message } };
+            }
             storage.removed.push(...paths);
             paths.forEach((path) => storage.files.delete(path));
             return { data: paths.map((path) => ({ name: path })), error: null };
@@ -675,7 +708,7 @@ class Query {
 }
 
 function isVisible(table: TableName, row: Row, bypassRls = false) {
-  if (bypassRls) return true;
+  if (bypassRls || rlsSimulationDisabled) return true;
   if (!currentUser) return false;
   if (table === "users") return row.id === currentUser.id;
   if (table === "document_suggestions") {
@@ -701,7 +734,7 @@ function cascadeDocuments(ids: Set<string>) {
 
 function consumeFailure(operation: Failure["operation"], table: TableName) {
   if (!failure || failure.operation !== operation || failure.table !== table) return null;
-  const error = { message: failure.message, code: "TEST_ERROR" };
+  const error = { message: failure.message, code: failure.code ?? "TEST_ERROR" };
   if (failure.once) failure = null;
   return error;
 }

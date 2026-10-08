@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
+  failNext,
   resetSupabaseMock,
   seedDocument,
   seedDocumentExport,
@@ -79,6 +80,17 @@ describe("document export limits", () => {
       remaining: 3,
       resetsAt: "2026-06-23T12:01:00.000Z",
     });
+  });
+
+  it("fails closed (quota exhausted) when the export count query errors", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    failNext("select", "document_exports", "Connection timed out.");
+
+    const result = await canExport(createSupabaseClient(), userA.id);
+
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.used).toBe(result.limit);
   });
 
   it("allows pro users regardless of export count", async () => {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, routeContext, seedDocument, seedReminder, setSupabaseUser, userA, userB } from "@/../tests/helpers/supabase";
+import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, routeContext, seedDocument, seedReminder, setSupabaseUser, userA, userB, withoutRlsSimulation } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 
@@ -63,6 +63,22 @@ describe("/api/reminders/[id]", () => {
     });
   });
 
+  it("returns a clean 400, not an unhandled crash, when the PATCH body isn't valid JSON", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "suggested" });
+
+    const response = await PATCH(
+      new Request("http://localhost.test/api/reminders/" + reminder.id, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: "not json",
+      }),
+      routeContext(reminder.id)
+    );
+
+    expect(response.status).toBe(400);
+  });
+
   it("returns 409 when patching a sent reminder", async () => {
     const document = seedDocument(userA);
     const reminder = seedReminder(document.id, userA, { status: "sent", title: "Already sent" });
@@ -71,6 +87,42 @@ describe("/api/reminders/[id]", () => {
 
     expect(response.status).toBe(409);
     expect(db().reminders[0].title).toBe("Already sent");
+  });
+
+  it("rejects editing an approved reminder's date into the past", async () => {
+    const document = seedDocument(userA);
+    const future = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+    const reminder = seedReminder(document.id, userA, { status: "approved", fire_on: future });
+
+    const response = await PATCH(jsonRequest({ fire_on: "2026-01-05" }, { method: "PATCH" }), routeContext(reminder.id));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body).toMatchObject({ code: "REMINDER_PAST" });
+    expect(db().reminders[0].fire_on).toBe(future);
+  });
+
+  it("rejects any edit to an already-past approved reminder unless the same edit moves it forward", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "approved", fire_on: "2026-01-05" });
+
+    const withoutDateChange = await PATCH(jsonRequest({ title: "Renamed" }, { method: "PATCH" }), routeContext(reminder.id));
+    expect(withoutDateChange.status).toBe(409);
+
+    const future = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+    const withDateChange = await PATCH(jsonRequest({ fire_on: future }, { method: "PATCH" }), routeContext(reminder.id));
+    expect(withDateChange.status).toBe(200);
+    expect(db().reminders[0].fire_on).toBe(future);
+  });
+
+  it("still allows editing a suggested reminder's date into the past (approval catches it later)", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "suggested", fire_on: "2026-11-15" });
+
+    const response = await PATCH(jsonRequest({ fire_on: "2026-01-05" }, { method: "PATCH" }), routeContext(reminder.id));
+
+    expect(response.status).toBe(200);
+    expect(db().reminders[0].fire_on).toBe("2026-01-05");
   });
 
   it("approves suggested reminders and is idempotent for approved reminders with overrides", async () => {
@@ -112,6 +164,19 @@ describe("/api/reminders/[id]", () => {
     expect(db().reminders[0]).toMatchObject({ status: "approved", fire_on: future });
   });
 
+  it("denies approving another user's reminder via the route's own ownership check", async () => {
+    const document = seedDocument(userB);
+    const reminder = seedReminder(document.id, userB, { status: "suggested" });
+
+    // Runs with the mock's simulated row-level security turned off, so a 404
+    // here can only come from the route's own `.eq("user_id", user.id)`
+    // filter, not from the test harness's usual cross-tenant backstop.
+    const response = await withoutRlsSimulation(() => APPROVE(jsonRequest({}), routeContext(reminder.id)));
+
+    expect(response.status).toBe(404);
+    expect(db().reminders[0].status).toBe("suggested");
+  });
+
   it("still approves reminders with future fire dates", async () => {
     const document = seedDocument(userA);
     const future = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
@@ -132,5 +197,15 @@ describe("/api/reminders/[id]", () => {
     expect(response.status).toBe(200);
     expect(db().reminders).toHaveLength(1);
     expect(db().reminders[0].status).toBe("ignored");
+  });
+
+  it("returns 409 when dismissing a sent reminder", async () => {
+    const document = seedDocument(userA);
+    const reminder = seedReminder(document.id, userA, { status: "sent" });
+
+    const response = await DELETE(new Request("http://localhost.test/api/reminders/" + reminder.id, { method: "DELETE" }), routeContext(reminder.id));
+
+    expect(response.status).toBe(409);
+    expect(db().reminders[0].status).toBe("sent");
   });
 });

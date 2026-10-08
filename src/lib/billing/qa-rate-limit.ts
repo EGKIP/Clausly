@@ -23,6 +23,7 @@ type QueryResult<T = unknown> = {
 
 type QueryBuilder<T = unknown> = PromiseLike<QueryResult<T>> & {
   eq(column: string, value: unknown): QueryBuilder<T>;
+  neq(column: string, value: unknown): QueryBuilder<T>;
   in(column: string, value: unknown[]): QueryBuilder<T>;
   gte(column: string, value: unknown): QueryBuilder<T>;
   order(column: string, options?: { ascending?: boolean }): QueryBuilder<T>;
@@ -56,13 +57,17 @@ export async function getQaUsage(supabase: unknown, userId: string): Promise<QaU
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
     .in("job_type", [...QA_JOB_TYPES])
+    .neq("status", "failed")
     .gte("created_at", windowStart);
 
   if (countError) {
+    // A failed count must never read as "0 used" — that would silently lift
+    // the daily Ask/Compare quota for anyone hitting a transient DB error.
+    // Fail closed: report the quota as already exhausted.
     return {
-      used: 0,
+      used: limit,
       limit,
-      remaining: limit,
+      remaining: 0,
       plan,
       resetsAt: new Date(now.getTime() + DAY_IN_MS).toISOString(),
     };
@@ -73,6 +78,7 @@ export async function getQaUsage(supabase: unknown, userId: string): Promise<QaU
     .select("created_at")
     .eq("user_id", userId)
     .in("job_type", [...QA_JOB_TYPES])
+    .neq("status", "failed")
     .gte("created_at", windowStart)
     .order("created_at", { ascending: true })
     .limit(1);

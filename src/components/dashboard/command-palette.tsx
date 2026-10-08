@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useDocuments } from "@/lib/hooks/use-documents";
 import { RiskPill } from "@/components/ui/risk-pill";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 import { cn } from "@/lib/utils";
 
 export function CommandPalette({
@@ -33,6 +34,8 @@ export function CommandPalette({
     if (open) requestAnimationFrame(() => ref.current?.focus());
     else setQ("");
   }, [open]);
+
+  useDismissOnEscape(open, onClose);
 
   const filteredDocs = documents
     .filter((d) =>
@@ -64,6 +67,9 @@ export function CommandPalette({
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.18 }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
             className="w-full max-w-[640px] rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)] overflow-hidden"
           >
             <div className="flex items-center gap-3 px-5 py-3.5 border-b border-[var(--border)]">

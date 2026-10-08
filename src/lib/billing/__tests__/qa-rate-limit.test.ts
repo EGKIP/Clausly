@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
+  failNext,
   resetSupabaseMock,
   seedUsageMetric,
   seedUser,
@@ -73,12 +74,45 @@ describe("Q&A rate limit", () => {
     });
   });
 
+  it("does not count failed Q&A attempts against the daily quota", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    seedUsageMetric(userA, {
+      id: "failed-question",
+      job_type: "qa_question",
+      status: "failed",
+      created_at: "2026-06-15T11:00:00.000Z",
+    });
+    seedUsageMetric(userA, {
+      id: "successful-question",
+      job_type: "qa_question",
+      status: "completed",
+      created_at: "2026-06-15T11:00:00.000Z",
+    });
+
+    await expect(canAskQuestion(createSupabaseClient(), userA.id)).resolves.toMatchObject({
+      allowed: true,
+      used: 1,
+      remaining: 24,
+    });
+  });
+
   it("sets resetsAt to now plus 24 hours when no rows are in the window", async () => {
     seedUser(userA, { subscription_tier: "free" });
 
     const usage = await getQaUsage(createSupabaseClient(), userA.id);
 
     expect(usage.resetsAt).toBe("2026-06-16T12:00:00.000Z");
+  });
+
+  it("fails closed (quota exhausted) when the usage count query errors", async () => {
+    seedUser(userA, { subscription_tier: "free" });
+    failNext("select", "usage_metrics", "Connection timed out.");
+
+    const result = await canAskQuestion(createSupabaseClient(), userA.id);
+
+    expect(result.allowed).toBe(false);
+    expect(result.remaining).toBe(0);
+    expect(result.used).toBe(result.limit);
   });
 
   it("sets resetsAt to the oldest counted row plus 24 hours", async () => {

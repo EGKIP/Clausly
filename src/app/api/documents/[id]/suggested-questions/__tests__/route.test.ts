@@ -21,7 +21,13 @@ vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
   return { ...actual, after: (callback: () => unknown) => { void callback(); } };
 });
+// Real embedding content doesn't matter to the mock rpc below; mocking this
+// out lets the "in flight" test hold generation open with a deferred promise.
+vi.mock("@/lib/ai/embeddings/provider", () => ({
+  getEmbeddingProvider: vi.fn(() => async (texts: string[]) => texts.map(() => [0])),
+}));
 
+import { getEmbeddingProvider } from "@/lib/ai/embeddings/provider";
 import { GET } from "../route";
 
 describe("GET /api/documents/[id]/suggested-questions", () => {
@@ -79,6 +85,29 @@ describe("GET /api/documents/[id]/suggested-questions", () => {
     });
   });
 
+  it("does not re-trigger generation (or a second usage charge) for a poll that lands while one is already in flight", async () => {
+    const document = seedDocument(userA);
+    seedDocumentChunk(document.id, userA);
+
+    const embedding = deferred<number[][]>();
+    vi.mocked(getEmbeddingProvider).mockReturnValueOnce(() => embedding.promise);
+
+    const first = await GET(new Request("http://localhost.test"), routeContext(document.id));
+    expect(await first.json()).toEqual({ suggestions: [], pending: true });
+
+    // Mirrors the client's poll (document-view.tsx) landing before the
+    // first generation (still blocked on the embedding call) has persisted.
+    const second = await GET(new Request("http://localhost.test"), routeContext(document.id));
+    expect(await second.json()).toEqual({ suggestions: [], pending: true });
+    expect(db().usage_metrics).toHaveLength(0);
+
+    embedding.resolve([[0]]);
+    await vi.waitFor(() => {
+      expect(db().document_suggestions).toHaveLength(1);
+      expect(db().usage_metrics).toHaveLength(1);
+    });
+  });
+
   it("returns 429 when uncached suggestions exceed the Q&A budget", async () => {
     const document = seedDocument(userA);
     for (let index = 0; index < 25; index += 1) {
@@ -96,3 +125,11 @@ describe("GET /api/documents/[id]/suggested-questions", () => {
     expect(body).toMatchObject({ code: "QA_RATE_LIMIT", used: 25, limit: 25 });
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}

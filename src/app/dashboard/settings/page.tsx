@@ -3,8 +3,11 @@
 import * as React from "react";
 import { AlertTriangle, CheckCircle2, LogOut, Mail, Save, ShieldAlert, Sparkles, User } from "lucide-react";
 import { PageBody, PageHeader, SectionHeader } from "@/components/dashboard/page-header";
-import type { NotificationPreferences as NotificationPreferencesShape } from "@/components/dashboard/settings/notification-preferences-card";
 import { NotificationPreferences } from "@/components/dashboard/settings/notification-preferences";
+import type { notificationPreferencesSchema } from "@/lib/validation/schemas";
+import type { z } from "zod";
+
+type NotificationPreferencesShape = z.infer<typeof notificationPreferencesSchema>;
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -12,6 +15,7 @@ import { signOut } from "@/lib/auth/actions";
 import type { PlanName } from "@/lib/billing/limits";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 type Profile = {
   displayName: string;
@@ -47,21 +51,34 @@ export default function SettingsPage() {
   const [deleteMessage, setDeleteMessage] = React.useState<string | null>(null);
   const [billingStatus, setBillingStatus] = React.useState<"idle" | "loading" | "error">("idle");
   const [billingMessage, setBillingMessage] = React.useState<string | null>(null);
+  const [profileLoadError, setProfileLoadError] = React.useState(false);
+  const [profileLoadAttempt, setProfileLoadAttempt] = React.useState(0);
+  const deletePanelRef = React.useRef<HTMLFormElement>(null);
 
   React.useEffect(() => {
     let cancelled = false;
     async function loadProfile() {
-      const response = await fetch("/api/profile");
-      if (cancelled || !response.ok) return;
-      const payload = (await response.json()) as Profile;
-      setProfile(payload);
-      setDisplayName(payload.displayName);
+      try {
+        const response = await fetch("/api/profile");
+        if (cancelled) return;
+        if (!response.ok) {
+          setProfileLoadError(true);
+          return;
+        }
+        const payload = (await response.json()) as Profile;
+        if (cancelled) return;
+        setProfile(payload);
+        setDisplayName(payload.displayName);
+        setProfileLoadError(false);
+      } catch {
+        if (!cancelled) setProfileLoadError(true);
+      }
     }
     void loadProfile();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [profileLoadAttempt]);
 
   React.useEffect(() => {
     const url = new URL(window.location.href);
@@ -124,6 +141,48 @@ export default function SettingsPage() {
     window.location.assign("/?account=deleted");
   }
 
+  function closeDeleteConfirm() {
+    setConfirmOpen(false);
+    setConfirmEmail("");
+    setDeleteMessage(null);
+    setDeleteStatus("idle");
+  }
+
+  useDismissOnEscape(confirmOpen && deleteStatus !== "deleting", closeDeleteConfirm);
+
+  React.useEffect(() => {
+    if (!confirmOpen) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const panel = deletePanelRef.current;
+      if (!panel) return;
+      const focusable = getFocusableElements(panel);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [confirmOpen]);
+
+  React.useEffect(() => {
+    if (!confirmOpen) return;
+    const panel = deletePanelRef.current;
+    if (!panel) return;
+    const focusable = getFocusableElements(panel);
+    (focusable[0] ?? panel).focus();
+  }, [confirmOpen]);
+
   async function startCheckout() {
     await startBillingRedirect("/api/billing/checkout", "Checkout could not be started.");
   }
@@ -164,6 +223,19 @@ export default function SettingsPage() {
             description="Your display name appears in workspace greetings. Email is managed by your sign-in provider."
           />
           <Card className="p-4 sm:p-6">
+            {profileLoadError && (
+              <div className="mb-5 flex flex-col items-start gap-2 rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] px-3 py-2.5 text-[12.5px] text-[var(--color-coral-ink)] sm:flex-row sm:items-center sm:justify-between">
+                <span>Couldn&apos;t load your profile. Showing placeholder data below.</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setProfileLoadAttempt((attempt) => attempt + 1)}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
             <form onSubmit={saveProfile} className="grid gap-5">
               <label className="grid gap-2">
                 <span className="inline-flex items-center gap-2 text-[12.5px] font-medium">
@@ -173,7 +245,7 @@ export default function SettingsPage() {
                 <input
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
-                  disabled={profile.mockMode}
+                  disabled={profile.mockMode || profileLoadError}
                   className="h-11 rounded-[var(--radius-sm)] border border-[var(--border)] bg-[var(--background)] px-3 text-[14px] outline-none transition-colors focus:border-[var(--border-strong)] disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </label>
@@ -207,12 +279,14 @@ export default function SettingsPage() {
                   variant="primary"
                   size="md"
                   className="min-h-11 w-full sm:w-auto"
-                  disabled={profile.mockMode || status === "saving" || displayName.trim().length === 0}
+                  disabled={
+                    profile.mockMode || profileLoadError || status === "saving" || displayName.trim().length === 0
+                  }
                 >
                   <Save className="size-3.5" />
                   {status === "saving" ? "Saving..." : "Save profile"}
                 </Button>
-                {profile.mockMode && (
+                {profile.mockMode && !profileLoadError && (
                   <span className="text-[12px] text-[var(--faint)]">
                     Mock mode: connect Supabase to edit your profile.
                   </span>
@@ -356,15 +430,25 @@ export default function SettingsPage() {
       </div>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(15%_0.02_260/0.45)] p-4 backdrop-blur-sm"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && deleteStatus !== "deleting") closeDeleteConfirm();
+          }}
+        >
           <form
+            ref={deletePanelRef}
             onSubmit={deleteAccount}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
             className="max-h-[calc(100vh-2rem)] w-full max-w-[460px] overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-float)] sm:p-6"
           >
             <div className="inline-flex size-10 items-center justify-center rounded-[var(--radius-sm)] border border-[color-mix(in_oklch,var(--color-coral)_28%,var(--border))] bg-[var(--color-coral-soft)] text-[var(--color-coral-ink)]">
               <AlertTriangle className="size-4" />
             </div>
-            <h2 className="mt-4 font-serif text-[24px] leading-tight tracking-[-0.01em]">
+            <h2 id="delete-account-title" className="mt-4 font-serif text-[24px] leading-tight tracking-[-0.01em]">
               Delete account
             </h2>
             <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--muted)]">
@@ -394,12 +478,7 @@ export default function SettingsPage() {
                 variant="ghost"
                 size="sm"
                 className="min-h-11 w-full sm:min-h-0 sm:w-auto"
-                onClick={() => {
-                  setConfirmOpen(false);
-                  setConfirmEmail("");
-                  setDeleteMessage(null);
-                  setDeleteStatus("idle");
-                }}
+                onClick={closeDeleteConfirm}
                 disabled={deleteStatus === "deleting"}
               >
                 Close
@@ -448,4 +527,12 @@ function DocumentUsageBar({ current, limit }: { current: number; limit: number |
       />
     </div>
   );
+}
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
 }

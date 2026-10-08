@@ -37,6 +37,7 @@ export function ClauseLibrary({
   const [error, setError] = React.useState<string | null>(null);
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
   const skipInitialFetch = React.useRef(true);
+  const filtersVersion = React.useRef(0);
   const scopedToDocument = Boolean(initialFilters.documentId);
   const hasFilters = query.trim().length > 0 || selectedCategories.length > 0 || selectedRisks.length > 0;
 
@@ -51,6 +52,7 @@ export function ClauseLibrary({
       return;
     }
 
+    filtersVersion.current += 1;
     const controller = new AbortController();
     setLoading(true);
     setError(null);
@@ -92,6 +94,7 @@ export function ClauseLibrary({
 
   const loadMore = React.useCallback(async () => {
     if (!nextCursor || loadingMore) return;
+    const versionAtStart = filtersVersion.current;
     setLoadingMore(true);
     setError(null);
     try {
@@ -102,11 +105,14 @@ export function ClauseLibrary({
         documentId: initialFilters.documentId,
         cursor: nextCursor,
       });
+      // The filters may have changed while this request was in flight; applying
+      // it now would append results for a filter set that's no longer shown.
+      if (filtersVersion.current !== versionAtStart) return;
       setClauses((current) => mergeClauses(current, payload.clauses));
       setNextCursor(payload.nextCursor);
       setCount(payload.totalCount);
     } catch {
-      setError("More clauses could not be loaded.");
+      if (filtersVersion.current === versionAtStart) setError("More clauses could not be loaded.");
     } finally {
       setLoadingMore(false);
     }

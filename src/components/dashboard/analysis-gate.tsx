@@ -6,6 +6,7 @@ import { AlertTriangle, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DocumentStatus } from "@/lib/db/types";
 import { useDocumentStatusPoll } from "@/lib/hooks/use-document";
+import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
 import { FAILURE_CATEGORY_COPY, type AnalysisFailureCategory } from "@/lib/ai/failure-categories";
 
 /* Branches the document detail page rendering on the document.status field.
@@ -34,12 +35,19 @@ export function AnalysisGate({
   });
 
   /* When the analysis completes (or fails), refetch the server component so
-   * the detail page hydrates with the freshly-persisted clauses/dates. */
+   * the detail page hydrates with the freshly-persisted clauses/dates.
+   * Compared against the previous poll's status (not the original `initialStatus`
+   * prop) so a retry that fails again still triggers a refresh instead of being
+   * suppressed because it landed back on the same status it started with. */
+  const prevStatusRef = React.useRef(initialStatus);
   React.useEffect(() => {
-    if (status !== initialStatus && (status === "ready" || status === "failed")) {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (status !== prevStatus && (status === "ready" || status === "failed")) {
+      notifyDocumentsChanged();
       router.refresh();
     }
-  }, [router, status, initialStatus]);
+  }, [router, status]);
 
   if (status === "ready") return <>{children}</>;
   if (status === "failed") {
@@ -55,7 +63,24 @@ export function AnalysisGate({
   return <AnalyzingState />;
 }
 
+/* Thresholds (ms) after which the "still working" copy escalates. Tuned
+ * against the normal case (a few seconds) and the stuck-analysis recovery
+ * cron, which requeues anything stuck past ~10 minutes. */
+const SLOW_NOTICE_MS = 20_000;
+const VERY_SLOW_NOTICE_MS = 90_000;
+
 function AnalyzingState() {
+  const [elapsedTier, setElapsedTier] = React.useState<"normal" | "slow" | "verySlow">("normal");
+
+  React.useEffect(() => {
+    const slowTimer = setTimeout(() => setElapsedTier("slow"), SLOW_NOTICE_MS);
+    const verySlowTimer = setTimeout(() => setElapsedTier("verySlow"), VERY_SLOW_NOTICE_MS);
+    return () => {
+      clearTimeout(slowTimer);
+      clearTimeout(verySlowTimer);
+    };
+  }, []);
+
   return (
     <div className="mt-8 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-8 md:p-10">
       <div className="flex items-center gap-2">
@@ -71,6 +96,13 @@ function AnalyzingState() {
         Clausly is extracting clauses, dates, and risks. This usually takes a few seconds.
         We&apos;ll refresh the page automatically when it&apos;s done.
       </p>
+      {elapsedTier !== "normal" && (
+        <p className="mt-2 max-w-xl text-[13px] text-[var(--muted)]">
+          {elapsedTier === "slow"
+            ? "This one's taking a little longer than usual — large or scanned documents can need extra time."
+            : "Still working. It's safe to leave this page — analysis continues in the background, and this page will show your results automatically next time you open it."}
+        </p>
+      )}
 
       <div className="mt-7 flex items-center gap-2 text-[12px] text-[var(--faint)]">
         <Loader2 className="size-3.5 animate-spin text-[var(--accent)]" />

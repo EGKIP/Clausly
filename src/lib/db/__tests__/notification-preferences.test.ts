@@ -49,7 +49,12 @@ describe("notification preference helpers", () => {
 
   it("merges patches into existing JSONB without changing unspecified flags", async () => {
     seedUser(userA, {
-      notification_preferences: { email: true, reminders: true, weekly_digest: true },
+      notification_preferences: {
+        email: true,
+        reminders: true,
+        weekly_digest: true,
+        welcome_email_sent_at: "2026-07-24T12:00:00.000Z",
+      },
     });
 
     const preferences = await updatePreferences(preferencesClient(), userA.id, {
@@ -61,6 +66,7 @@ describe("notification preference helpers", () => {
       email: true,
       reminders: false,
       weekly_digest: true,
+      welcome_email_sent_at: "2026-07-24T12:00:00.000Z",
     });
   });
 
@@ -72,5 +78,25 @@ describe("notification preference helpers", () => {
     await expect(updatePreferences(preferencesClient(), userA.id, { email: false }))
       .rejects
       .toThrow("Unsupported notification preference key: sms");
+  });
+
+  it("tolerates the version/defaults keys written by PATCH /api/profile's unsubscribe-token versioning", async () => {
+    seedUser(userA, {
+      notification_preferences: {
+        email: false,
+        reminders: true,
+        weekly_digest: true,
+        version: 2,
+        defaults: { renewal_offsets: ["30d"] },
+      },
+    });
+
+    const preferences = await updatePreferences(preferencesClient(), userA.id, { reminders: false });
+
+    expect(preferences).toEqual({ email: false, reminders: false, weeklyDigest: true });
+    expect(db().users[0].notification_preferences).toMatchObject({
+      version: 2,
+      defaults: { renewal_offsets: ["30d"] },
+    });
   });
 });

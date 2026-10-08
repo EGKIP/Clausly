@@ -30,8 +30,9 @@ interface PageProps {
 
 export default async function DocumentDetailPage({ params }: PageProps) {
   const { id } = await params;
+  const userId = await getCurrentUserId();
   const [detail, documents, exportUsage, sharePlan] = await Promise.all([
-    getDocumentDetail(id),
+    getDocumentDetail(id, userId),
     listDocuments(),
     getInitialExportUsage(),
     getInitialSharePlan(),
@@ -110,6 +111,18 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       </p>
     </PageBody>
   );
+}
+
+async function getCurrentUserId(): Promise<string | undefined> {
+  if (!hasSupabaseEnv()) return undefined;
+
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return user?.id;
+  } catch {
+    return undefined;
+  }
 }
 
 async function getInitialSharePlan() {

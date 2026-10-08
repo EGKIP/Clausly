@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Reminder } from "@/lib/mock-reminders";
 import type { ReminderMutationPatch } from "@/lib/hooks/use-reminders";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 type Props = {
   reminder: Reminder | null;
@@ -29,6 +30,8 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
     setReminderTime(timeForInput(reminder.reminderTime));
     setLocalError(null);
   }, [reminder]);
+
+  useDismissOnEscape(!!reminder && !isSaving, onClose);
 
   if (!reminder) return null;
 
@@ -64,6 +67,11 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
       return;
     }
 
+    if (currentReminder.status === "approved" && (patch.fire_on ?? currentFireOn) < todayUtcDate()) {
+      setLocalError("Reminders can't be saved with a date that's already passed.");
+      return;
+    }
+
     const saved = await onSave(currentReminder.id, patch);
 
     if (saved) onClose();
@@ -72,7 +80,13 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
   const visibleError = localError ?? error;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(0%_0_0/0.45)] px-4 py-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[oklch(0%_0_0/0.45)] px-4 py-6"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isSaving) onClose();
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"
@@ -155,8 +169,26 @@ export function ReminderEditModal({ reminder, isSaving, error, onClose, onSave }
   );
 }
 
+function todayUtcDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+const DISPLAY_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function dateForInput(value: string) {
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  // The API formats dates as "Jan 5, 2026" in UTC (see adapters.ts formatDate). Parsing that
+  // string with `new Date()` reinterprets it in the browser's local timezone, which shifts the
+  // date by a day for any timezone ahead of UTC. Parse the known format directly instead.
+  const match = /^([A-Za-z]{3})\s+(\d{1,2}),\s+(\d{4})$/.exec(value.trim());
+  if (match) {
+    const monthIndex = DISPLAY_MONTHS.indexOf(match[1]);
+    if (monthIndex !== -1) {
+      const month = String(monthIndex + 1).padStart(2, "0");
+      const day = match[2].padStart(2, "0");
+      return `${match[3]}-${month}-${day}`;
+    }
+  }
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
   return parsed.toISOString().slice(0, 10);

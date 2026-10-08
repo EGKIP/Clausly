@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
 
 export function DeleteDocumentButton({
   documentId,
@@ -16,6 +18,8 @@ export function DeleteDocumentButton({
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+
+  useDismissOnEscape(open && !deleting, () => setOpen(false));
 
   async function deleteDocument() {
     setDeleting(true);
@@ -32,6 +36,7 @@ export function DeleteDocumentButton({
 
       toast.success("Document deleted.");
       setOpen(false);
+      notifyDocumentsChanged();
       router.push("/dashboard/documents");
       router.refresh();
     } catch {

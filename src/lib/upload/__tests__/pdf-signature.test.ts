@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isJpegSignature, isPdfSignature, isPngSignature, isZipSignature } from "../pdf-signature";
+import { isJpegSignature, isPdfSignature, isPngSignature, isZipSignature, looksLikeTextContent } from "../pdf-signature";
 
 function bytesOf(text: string) {
   return new TextEncoder().encode(text);
@@ -36,5 +36,30 @@ describe("contract file signatures", () => {
   it("recognizes JPEG signatures", () => {
     expect(isJpegSignature(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe(true);
     expect(isJpegSignature(bytesOf("not-jpeg"))).toBe(false);
+  });
+});
+
+describe("looksLikeTextContent", () => {
+  it("accepts plain contract text", () => {
+    expect(looksLikeTextContent(bytesOf("This Service Agreement is entered into as of...\nSection 1. Term.\n"))).toBe(true);
+  });
+
+  it("accepts empty content", () => {
+    expect(looksLikeTextContent(new Uint8Array(0))).toBe(true);
+  });
+
+  it("rejects content containing a NUL byte", () => {
+    expect(looksLikeTextContent(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x00, 0x31, 0x2e, 0x34]))).toBe(false);
+  });
+
+  it("rejects content dense with non-printable control bytes", () => {
+    const binary = new Uint8Array(64).map((_, index) => (index % 3 === 0 ? 0x01 : 0x41));
+    expect(looksLikeTextContent(binary)).toBe(false);
+  });
+
+  it("tolerates a small amount of unusual whitespace", () => {
+    const mostlyText = bytesOf("a".repeat(200));
+    const withFormFeed = new Uint8Array([...mostlyText, 0x0c]);
+    expect(looksLikeTextContent(withFormFeed)).toBe(true);
   });
 });

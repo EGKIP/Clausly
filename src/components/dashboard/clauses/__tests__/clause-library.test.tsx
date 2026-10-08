@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ClauseLibrary } from "../clause-library";
 import type { ClauseLibraryItem } from "../types";
@@ -31,6 +31,7 @@ describe("ClauseLibrary", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -70,6 +71,66 @@ describe("ClauseLibrary", () => {
     });
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain("risk=high");
+  });
+
+  it("discards a stale load-more response instead of merging it into a newly filtered list", async () => {
+    let resolveStaleLoadMore: (() => void) | undefined;
+    const staleLoadMoreGate = new Promise<void>((resolve) => {
+      resolveStaleLoadMore = resolve;
+    });
+
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("cursor=cursor-1")) {
+        await staleLoadMoreGate;
+        return {
+          ok: true,
+          json: async () => ({
+            clauses: [{ ...baseClause, id: "clause-stale", title: "Stale merged clause" }],
+            nextCursor: null,
+            totalCount: 2,
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          clauses: [{ ...baseClause, id: "clause-fresh", title: "Fresh filtered clause" }],
+          nextCursor: null,
+          totalCount: 1,
+        }),
+      };
+    }));
+
+    render(
+      <ClauseLibrary
+        initialClauses={[baseClause]}
+        initialNextCursor="cursor-1"
+        totalCount={2}
+        categoryFacets={[{ value: "Termination", label: "Termination", count: 1 }]}
+        riskFacets={[{ value: "high", label: "High", count: 1 }]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Load more clauses" }));
+    await act(async () => {
+      await flushPromises();
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "High · 1" })[0]);
+    await act(async () => {
+      await flushPromises();
+    });
+
+    expect(screen.getByText("Fresh filtered clause")).toBeInTheDocument();
+
+    resolveStaleLoadMore?.();
+    await act(async () => {
+      await flushPromises();
+    });
+
+    expect(screen.queryByText("Stale merged clause")).not.toBeInTheDocument();
+    expect(screen.getByText("Fresh filtered clause")).toBeInTheDocument();
   });
 
   it("renders an empty state when there are no extracted clauses", () => {

@@ -69,6 +69,18 @@ describe("useReminders", () => {
     expect(result.current.error).toBe("Unauthorized");
   });
 
+  it("recovers from a network failure instead of loading forever", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError("fetch failed"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { result } = renderHook(() => useReminders());
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(result.current.reminders).toEqual([]);
+    expect(result.current.error).toBe("Unable to load reminders.");
+  });
+
   it("treats mock-mode 503 as empty without a hard error", async () => {
     mockFetch(jsonResponse({ error: "Supabase is not configured." }, { status: 503 }));
 
@@ -128,6 +140,50 @@ describe("useReminders", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/reminders/reminder-1", { method: "DELETE" });
   });
 
+  it("drops an approved reminder from a list filtered to suggested status", async () => {
+    const approved = { ...reminder, status: "approved" as const };
+    mockFetch(
+      jsonResponse({ reminders: [reminder] }),
+      jsonResponse({ reminder: approved })
+    );
+
+    const { result } = renderHook(() => useReminders({ status: "suggested" }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.reminders).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.approve(reminder.id);
+    });
+
+    expect(result.current.reminders).toHaveLength(0);
+  });
+
+  it("keeps an approved reminder that failed to save in the suggested list", async () => {
+    const approval = deferred<Response>();
+    mockFetch(
+      jsonResponse({ reminders: [reminder] }),
+      approval.promise
+    );
+
+    const { result } = renderHook(() => useReminders({ status: "suggested" }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let approvePromise: Promise<Reminder | null>;
+    act(() => {
+      approvePromise = result.current.approve(reminder.id);
+    });
+
+    await waitFor(() => expect(result.current.reminders).toHaveLength(0));
+
+    approval.resolve(jsonResponse({ error: "Approval failed" }, { status: 500 }));
+    await act(async () => {
+      await approvePromise;
+    });
+
+    expect(result.current.reminders).toHaveLength(1);
+    expect(result.current.reminders[0].status).toBe("suggested");
+  });
+
   it("rolls back optimistic approval when the mutation fails", async () => {
     const approval = deferred<Response>();
     mockFetch(
@@ -152,6 +208,141 @@ describe("useReminders", () => {
 
     expect(result.current.reminders[0].status).toBe("suggested");
     expect(result.current.error).toBe("Approval failed");
+  });
+
+  it("does not let a failed approve's rollback reinstate a different reminder that was dismissed in the meantime", async () => {
+    const other: Reminder = { ...reminder, id: "reminder-2", title: "Second reminder" };
+    const approval = deferred<Response>();
+    const dismissal = deferred<Response>();
+    mockFetch(
+      jsonResponse({ reminders: [reminder, other] }),
+      approval.promise,
+      dismissal.promise
+    );
+
+    const { result } = renderHook(() => useReminders());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let approvePromise: Promise<Reminder | null>;
+    let dismissPromise: Promise<boolean>;
+    act(() => {
+      approvePromise = result.current.approve(reminder.id);
+    });
+    act(() => {
+      dismissPromise = result.current.dismiss(other.id);
+    });
+
+    dismissal.resolve(jsonResponse({ ok: true }));
+    await act(async () => {
+      await dismissPromise;
+    });
+    expect(result.current.reminders.some((r) => r.id === other.id)).toBe(false);
+
+    approval.resolve(jsonResponse({ error: "Approval failed" }, { status: 500 }));
+    await act(async () => {
+      await approvePromise;
+    });
+
+    expect(result.current.reminders.some((r) => r.id === other.id)).toBe(false);
+    expect(result.current.reminders.find((r) => r.id === reminder.id)?.status).toBe("suggested");
+  });
+
+  it("does not let a failed dismiss's rollback undo a different reminder's successful approval", async () => {
+    const other: Reminder = { ...reminder, id: "reminder-2", title: "Second reminder" };
+    const dismissal = deferred<Response>();
+    const approval = deferred<Response>();
+    mockFetch(
+      jsonResponse({ reminders: [reminder, other] }),
+      dismissal.promise,
+      approval.promise
+    );
+
+    const { result } = renderHook(() => useReminders());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let dismissPromise: Promise<boolean>;
+    let approvePromise: Promise<Reminder | null>;
+    act(() => {
+      dismissPromise = result.current.dismiss(reminder.id);
+    });
+    act(() => {
+      approvePromise = result.current.approve(other.id);
+    });
+
+    approval.resolve(jsonResponse({ reminder: { ...other, status: "approved" } }));
+    await act(async () => {
+      await approvePromise;
+    });
+    expect(result.current.reminders.find((r) => r.id === other.id)?.status).toBe("approved");
+
+    dismissal.resolve(jsonResponse({ error: "Dismiss failed" }, { status: 500 }));
+    await act(async () => {
+      await dismissPromise;
+    });
+
+    expect(result.current.reminders.find((r) => r.id === other.id)?.status).toBe("approved");
+    expect(result.current.reminders.find((r) => r.id === reminder.id)?.status).toBe("suggested");
+  });
+
+  it("doesn't reinstate an already-succeeded dismiss when a concurrent dismiss in the same batch fails", async () => {
+    // Mirrors PastRemindersArchiveCard's Promise.all(pastReminders.map(dismiss)):
+    // two dismiss() calls fired before either resolves.
+    const reminderTwo: Reminder = { ...reminder, id: "reminder-2" };
+    const firstDelete = deferred<Response>();
+    const secondDelete = deferred<Response>();
+    mockFetch(
+      jsonResponse({ reminders: [reminder, reminderTwo] }),
+      firstDelete.promise,
+      secondDelete.promise
+    );
+
+    const { result } = renderHook(() => useReminders());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let dismissOne: Promise<boolean>;
+    let dismissTwo: Promise<boolean>;
+    act(() => {
+      dismissOne = result.current.dismiss(reminder.id);
+      dismissTwo = result.current.dismiss(reminderTwo.id);
+    });
+
+    await waitFor(() => expect(result.current.reminders).toHaveLength(0));
+
+    firstDelete.resolve(jsonResponse({ ok: true }));
+    secondDelete.resolve(jsonResponse({ error: "Already sent" }, { status: 409 }));
+    await act(async () => {
+      await Promise.all([dismissOne, dismissTwo]);
+    });
+
+    // reminder-1's delete succeeded and must stay gone; only reminder-2's
+    // failed delete should be reinstated.
+    expect(result.current.reminders.map((item) => item.id)).toEqual([reminderTwo.id]);
+  });
+
+  it("does not throw when the initial fetch resolves after the component has unmounted", async () => {
+    const fetchResponse = deferred<Response>();
+    mockFetch(fetchResponse.promise);
+
+    const { result, unmount } = renderHook(() => useReminders());
+    const refetchPromise = result.current.refetch();
+    unmount();
+
+    fetchResponse.resolve(jsonResponse({ reminders: [reminder] }));
+    await expect(refetchPromise).resolves.toBeUndefined();
+  });
+
+  it("does not throw when an in-flight approve resolves after the component has unmounted", async () => {
+    const approval = deferred<Response>();
+    mockFetch(jsonResponse({ reminders: [reminder] }), approval.promise);
+
+    const { result, unmount } = renderHook(() => useReminders());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    const approvePromise = result.current.approve(reminder.id);
+    unmount();
+
+    approval.resolve(jsonResponse({ reminder: { ...reminder, status: "approved" } }));
+    await expect(approvePromise).resolves.toBeNull();
   });
 });
 

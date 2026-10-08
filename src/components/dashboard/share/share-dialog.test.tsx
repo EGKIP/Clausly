@@ -34,6 +34,60 @@ describe("ShareDialog", () => {
     expect(screen.getByRole("link", { name: /upgrade to pro/i })).toHaveAttribute("href", "/upgrade");
   });
 
+  it("closes on Escape", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /share document/i }));
+    expect(screen.getByText("Share links are a Pro feature.")).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByText("Share links are a Pro feature.")).not.toBeInTheDocument();
+  });
+
+  it("closes when the trigger button is clicked again", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
+
+    const trigger = screen.getByRole("button", { name: /share document/i });
+    fireEvent.click(trigger);
+    expect(screen.getByText("Share links are a Pro feature.")).toBeInTheDocument();
+
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.queryByText("Share links are a Pro feature.")).not.toBeInTheDocument();
+  });
+
+  it("closes when the backdrop is clicked", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /share document/i }));
+    expect(screen.getByText("Share links are a Pro feature.")).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole("presentation"));
+
+    expect(screen.queryByText("Share links are a Pro feature.")).not.toBeInTheDocument();
+  });
+
+  it("traps Tab focus inside the dialog so the page behind it isn't reachable", () => {
+    render(<ShareDialog documentId="doc-1" plan="free" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /share document/i }));
+
+    const closeButton = screen.getByRole("button", { name: /close share dialog/i });
+    const upgradeLink = screen.getByRole("link", { name: /upgrade to pro/i });
+
+    expect(document.activeElement).toBe(closeButton);
+
+    upgradeLink.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(closeButton);
+
+    closeButton.focus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(upgradeLink);
+  });
+
   it("loads existing shares for Pro users", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({
       shares: [{

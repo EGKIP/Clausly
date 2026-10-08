@@ -3,9 +3,11 @@ import { z } from "zod";
 import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { canUploadDocument } from "@/lib/billing/plan";
+import { getStripe } from "@/lib/billing/stripe";
 import { createClient } from "@/lib/supabase/server";
 import { notificationPreferencesSchema, validationIssues } from "@/lib/validation/schemas";
 import type { PlanName } from "@/lib/billing/limits";
+import type { Json } from "@/lib/supabase/types";
 
 const profileSchema = z.object({
   displayName: z.string().trim().min(1).max(80).optional(),
@@ -84,7 +86,7 @@ export async function PATCH(request: Request) {
 
   const update: {
     full_name?: string;
-    notification_preferences?: NotificationPreferences;
+    notification_preferences?: Json;
   } = {};
 
   if (parsed.data.displayName !== undefined) {
@@ -168,6 +170,11 @@ export async function DELETE(request: Request) {
     // Audit logging is best-effort; account deletion remains the source of truth.
   }
 
+  // delete_account cascades to billing_customers, so the Stripe mapping must
+  // be read and the subscription canceled before that call, not after —
+  // otherwise a still-active subscription becomes unreachable and keeps billing.
+  await cancelStripeSubscriptionForDeletion(supabase, user.id);
+
   const { error: deletionError } = await supabase.rpc("delete_account", {
     target_user_id: user.id,
   });
@@ -191,6 +198,35 @@ function hasSupabaseEnv() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 }
 
+async function cancelStripeSubscriptionForDeletion(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  const { data: billingCustomer } = await supabase
+    .from("billing_customers")
+    .select("stripe_customer_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!billingCustomer?.stripe_customer_id) return;
+
+  try {
+    const subscriptions = await getStripe().subscriptions.list({
+      customer: billingCustomer.stripe_customer_id,
+    });
+    await Promise.all(
+      subscriptions.data
+        .filter((subscription) => subscription.status !== "canceled")
+        .map((subscription) => getStripe().subscriptions.cancel(subscription.id))
+    );
+  } catch (error) {
+    console.warn("Account deletion could not cancel the Stripe subscription.", {
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function resolveProfileUsage(supabase: Parameters<typeof canUploadDocument>[0], userId: string): Promise<{
   plan: PlanName;
   current: number;
@@ -209,7 +245,7 @@ function serializeLimit(limit: number) {
 }
 
 function normalizeNotificationPreferences(value: unknown): NotificationPreferences {
-  const parsed = notificationPreferencesSchema.safeParse(value);
+  const parsed = notificationPreferencesSchema.safeParse(publicNotificationPreferences(value));
   if (parsed.success) return parsed.data;
   return notificationPreferencesSchema.parse({});
 }
@@ -217,7 +253,8 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
 function mergeNotificationPreferences(
   storedValue: unknown,
   patch: NotificationPreferencesPatch
-): NotificationPreferences {
+): Json {
+  const stored = storedNotificationPreferences(storedValue);
   const current = normalizeNotificationPreferences(storedValue);
   const sanitizedPatch = { ...(patch ?? {}) };
   delete sanitizedPatch.version;
@@ -233,5 +270,20 @@ function mergeNotificationPreferences(
     merged.version = current.version === undefined ? 1 : current.version + 1;
   }
 
-  return merged;
+  return { ...stored, ...merged } as Json;
+}
+
+function storedNotificationPreferences(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return { ...(value as Record<string, unknown>) };
+}
+
+function publicNotificationPreferences(value: unknown): Partial<NotificationPreferences> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const stored = value as Record<string, unknown>;
+  return {
+    email: stored.email,
+    version: stored.version,
+    defaults: stored.defaults,
+  } as Partial<NotificationPreferences>;
 }

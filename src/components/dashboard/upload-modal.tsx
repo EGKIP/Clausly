@@ -9,6 +9,24 @@ import { Button } from "@/components/ui/button";
 import { Logomark } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
+import { useDismissOnEscape } from "@/lib/hooks/use-dismiss-on-escape";
+
+async function parseUploadError(response: Response): Promise<{ message: string; isLimitError: boolean }> {
+  const payload = await response.json().catch(() => null) as
+    | { error?: string; code?: string; issues?: { message?: string }[] }
+    | null;
+  const isLimitError = response.status === 402 || payload?.code === "PLAN_LIMIT_DOCUMENTS";
+  const issueMessage = payload?.issues?.[0]?.message;
+  if (issueMessage) return { message: issueMessage, isLimitError };
+  if (payload?.error) return { message: payload.error, isLimitError };
+  // A non-JSON body (e.g. an infra-level 413) means the request never reached
+  // our own size check, which only rejects files over 25 MB.
+  if (response.status === 413) {
+    return { message: "That file is too large to upload. Try a smaller file.", isLimitError };
+  }
+  return { message: "Upload failed.", isLimitError };
+}
 
 type UploadUsage = {
   plan: "free" | "pro";
@@ -38,6 +56,42 @@ export function UploadModal({
   const [limitError, setLimitError] = React.useState(false);
   const [usage, setUsage] = React.useState<UploadUsage | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+
+  useDismissOnEscape(open, onClose);
+
+  React.useEffect(() => {
+    if (!open) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Tab") return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = getFocusableElements(panel);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
+    if (!panel) return;
+    const focusable = getFocusableElements(panel);
+    (focusable[0] ?? panel).focus();
+  }, [open]);
 
   const atDocumentLimit = Boolean(
     usage?.plan === "free" &&
@@ -107,22 +161,17 @@ export function UploadModal({
         });
         if (controller.signal.aborted) return;
         if (!response.ok) {
-          const payload = await response.json().catch(() => ({ error: "Upload failed." }));
-          const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
-          // Validation failures carry the specific reason (wrong file type,
-          // over the size limit, not a real PDF) in issues[] — surface that
-          // instead of the generic top-level "Invalid upload." error.
-          const issueMessage = Array.isArray(payload.issues) ? payload.issues[0]?.message : undefined;
-          const message = issueMessage ?? payload.error ?? "Upload failed.";
-          setLimitError(limit);
+          const { message, isLimitError } = await parseUploadError(response);
+          setLimitError(isLimitError);
           setError(message);
           setPhase("error");
-          if (!limit) toast.error(message);
+          if (!isLimitError) toast.error(message);
           return;
         }
         const payload = (await response.json()) as { id: string };
         setDocumentId(payload.id);
         setPhase("analyzing");
+        notifyDocumentsChanged();
         toast.success("Document uploaded. Clausly is reading it now.");
       } catch (uploadError) {
         if (controller.signal.aborted) return;
@@ -163,19 +212,17 @@ export function UploadModal({
       });
       if (controller.signal.aborted) return;
       if (!response.ok) {
-        const payload = await response.json().catch(() => ({ error: "Upload failed." }));
-        const limit = response.status === 402 || payload.code === "PLAN_LIMIT_DOCUMENTS";
-        const issueMessage = Array.isArray(payload.issues) ? payload.issues[0]?.message : undefined;
-        const message = issueMessage ?? payload.error ?? "Upload failed.";
-        setLimitError(limit);
+        const { message, isLimitError } = await parseUploadError(response);
+        setLimitError(isLimitError);
         setError(message);
         setPhase("error");
-        if (!limit) toast.error(message);
+        if (!isLimitError) toast.error(message);
         return;
       }
       const payload = (await response.json()) as { id: string };
       setDocumentId(payload.id);
       setPhase("analyzing");
+      notifyDocumentsChanged();
       toast.success("Contract text uploaded. Clausly is reading it now.");
     } catch (uploadError) {
       if (controller.signal.aborted) return;
@@ -221,11 +268,16 @@ export function UploadModal({
             exit={{ opacity: 0, y: 8, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-[560px] rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)] overflow-hidden"
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="upload-modal-title"
+            tabIndex={-1}
+            className="relative w-full max-w-[560px] rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-float)] overflow-hidden outline-none"
           >
             <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-[var(--border)]">
               <div className="min-w-0">
-                <h2 className="font-serif text-[20px] sm:text-[22px] leading-none tracking-[-0.01em]">
+                <h2 id="upload-modal-title" className="font-serif text-[20px] sm:text-[22px] leading-none tracking-[-0.01em]">
                   Upload a document
                 </h2>
                 <p className="mt-1.5 text-[12.5px] text-[var(--muted)]">
@@ -445,6 +497,14 @@ function SourceButton({
       {children}
     </button>
   );
+}
+
+function getFocusableElements(container: HTMLElement) {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => !element.hasAttribute("disabled") && element.tabIndex !== -1);
 }
 
 function describeUploadType(file: File) {

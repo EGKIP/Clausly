@@ -6,9 +6,10 @@ import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import { auditRequestMetadata, recordAuditEvent } from "@/lib/audit/log";
 import { boundedTextSchema, validationIssues } from "@/lib/validation";
 import { canUploadDocument } from "@/lib/billing/plan";
-import { isJpegSignature, isPdfSignature, isPngSignature, isZipSignature } from "@/lib/upload/pdf-signature";
+import { isJpegSignature, isPdfSignature, isPngSignature, isZipSignature, looksLikeTextContent } from "@/lib/upload/pdf-signature";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const TEXT_SNIFF_BYTES = 8192;
 const MAX_PASTED_TEXT_CHARS = 250_000;
 const titleSchema = boundedTextSchema(1, 200);
 const pastedTextSchema = boundedTextSchema(100, MAX_PASTED_TEXT_CHARS);
@@ -232,6 +233,8 @@ async function detectUploadFileType(file: File) {
   }
 
   if ((file.type === "text/plain" || lowerName.endsWith(".txt")) && file.size > 0) {
+    const sniffBytes = new Uint8Array(await file.slice(0, TEXT_SNIFF_BYTES).arrayBuffer());
+    if (!looksLikeTextContent(sniffBytes)) return null;
     return { kind: "text" as const, mimeType: "text/plain" };
   }
 
@@ -263,6 +266,9 @@ function invalidFileTypeMessage(file: File) {
   }
   if (file.type === "image/jpeg" || lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
     return "This file doesn't look like a valid JPG image.";
+  }
+  if (file.type === "text/plain" || lowerName.endsWith(".txt")) {
+    return "This file doesn't look like plain text.";
   }
   return SUPPORTED_FILE_COPY;
 }

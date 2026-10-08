@@ -40,9 +40,14 @@ export function toUiDocument(row: DocumentRow): ContractDoc {
     jurisdiction: row.jurisdiction ?? "—",
     pages: row.page_count,
     effective: formatDate(row.effective_date),
+    effectiveDate: row.effective_date,
     ends: formatDate(row.end_date),
+    endsDate: row.end_date,
     noticeBy: row.end_date && row.notice_window_days
       ? formatDate(daysBefore(row.end_date, row.notice_window_days))
+      : undefined,
+    noticeByDate: row.end_date && row.notice_window_days
+      ? daysBefore(row.end_date, row.notice_window_days)
       : undefined,
     risk: row.risk_level ? apiRiskToUi[row.risk_level] : "Needs Review",
     uploadedDaysAgo: daysSince(row.created_at),

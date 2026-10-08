@@ -46,6 +46,46 @@ describe("ExportButton", () => {
     expect(screen.getByText("3 of 5 exports used this month.")).toBeInTheDocument();
   });
 
+  it("closes the export menu on Escape", () => {
+    render(<ExportButton documentId="doc-1" usage={usage} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /export document/i }));
+    expect(screen.getByRole("button", { name: /pdf digest/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+
+    expect(screen.queryByRole("button", { name: /pdf digest/i })).not.toBeInTheDocument();
+  });
+
+  it("closes the export menu when the trigger button is clicked again", () => {
+    render(<ExportButton documentId="doc-1" usage={usage} />);
+
+    const trigger = screen.getByRole("button", { name: /export document/i });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("button", { name: /pdf digest/i })).toBeInTheDocument();
+
+    fireEvent.mouseDown(trigger);
+    fireEvent.click(trigger);
+
+    expect(screen.queryByRole("button", { name: /pdf digest/i })).not.toBeInTheDocument();
+  });
+
+  it("closes the export menu on an outside click", () => {
+    render(
+      <div>
+        <ExportButton documentId="doc-1" usage={usage} />
+        <button type="button">Elsewhere</button>
+      </div>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /export document/i }));
+    expect(screen.getByRole("button", { name: /pdf digest/i })).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole("button", { name: /elsewhere/i }));
+
+    expect(screen.queryByRole("button", { name: /pdf digest/i })).not.toBeInTheDocument();
+  });
+
   it("fetches a PDF export and triggers a download", async () => {
     const fetchMock = vi.mocked(fetch);
     fetchMock.mockResolvedValueOnce(new Response(new Blob(["pdf"]), {

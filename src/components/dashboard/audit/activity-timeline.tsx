@@ -15,6 +15,7 @@ import {
 import { Badge, Card } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AUDIT_ACTIONS } from "@/lib/audit/actions";
 import type { Json } from "@/lib/supabase/types";
 
 export type AuditTimelineEvent = {
@@ -24,6 +25,8 @@ export type AuditTimelineEvent = {
   resourceId: string | null;
   metadata: Json;
   createdAt: string;
+  /** Whether the document this event links to (if any) still exists. Undefined for events that don't link to a document. */
+  documentExists?: boolean;
 };
 
 type AuditResponse = {
@@ -69,6 +72,13 @@ export function ActivityTimeline({
   const [status, setStatus] = React.useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = React.useState<string | null>(null);
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const visibleEvents = React.useMemo(() => {
     const filter = filters.find((item) => item.id === activeFilter) ?? filters[0];
@@ -83,6 +93,7 @@ export function ActivityTimeline({
 
     const response = await fetch(`/api/audit?cursor=${encodeURIComponent(nextCursor)}`);
     const payload = (await response.json().catch(() => ({ error: "Activity could not be loaded." }))) as Partial<AuditResponse> & { error?: string };
+    if (!mountedRef.current) return;
     const nextEvents = payload.events;
     if (!response.ok || !Array.isArray(nextEvents)) {
       setStatus("error");
@@ -224,6 +235,8 @@ function iconForEvent(event: AuditTimelineEvent) {
 }
 
 function hrefForEvent(event: AuditTimelineEvent) {
+  if (event.action === AUDIT_ACTIONS.DOCUMENT_DELETED) return null;
+  if (event.documentExists === false) return null;
   if (event.resourceType === "document" && event.resourceId) return `/dashboard/documents/${event.resourceId}`;
   if (event.resourceType === "document_export" && event.resourceId) return `/dashboard/documents/${event.resourceId}`;
   if (event.resourceType === "document_share") {

@@ -196,9 +196,11 @@ function ReminderRow({
           <p className="mt-2 font-mono text-[11px] text-[var(--faint)] tabular-nums">
             {reminder.fireOn} · {reminder.daysAway < 0 ? `${Math.abs(reminder.daysAway)} days late` : `${reminder.daysAway} days away`}
           </p>
-          {isPast && onApprove && (
+          {isPast && (
             <p className="mt-1 text-[11.5px] text-[var(--color-coral-ink)]">
-              This date has already passed. Edit it to a future date to approve.
+              {onApprove
+                ? "This date has already passed. Edit it to a future date to approve."
+                : "This date has already passed and won't fire. Edit it to a future date."}
             </p>
           )}
         </div>

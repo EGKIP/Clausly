@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
+import { notifyDocumentsChanged } from "@/lib/hooks/use-documents";
 import { cn } from "@/lib/utils";
 
 const MAX_TITLE_LENGTH = 200;
@@ -56,6 +57,7 @@ export function RenameableTitle({
       }
       toast.success("Document renamed.");
       setEditing(false);
+      notifyDocumentsChanged();
       router.refresh();
     } finally {
       setSaving(false);

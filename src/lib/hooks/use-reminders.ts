@@ -46,6 +46,14 @@ export function useReminders(filters: ReminderFilters = {}): State {
   const status = filters.status;
   const documentId = filters.documentId;
 
+  const mountedRef = React.useRef(true);
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const refetch = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -53,23 +61,34 @@ export function useReminders(filters: ReminderFilters = {}): State {
     if (status) url.searchParams.set("status", status);
     if (documentId) url.searchParams.set("document_id", documentId);
 
-    const response = await fetch(url);
-    if (response.status === 503) {
-      setReminders([]);
-      setIsLoading(false);
-      return;
-    }
+    try {
+      const response = await fetch(url);
+      if (!mountedRef.current) return;
+      if (response.status === 503) {
+        setReminders([]);
+        setIsLoading(false);
+        return;
+      }
 
-    if (!response.ok) {
-      setReminders([]);
-      setError(await responseError(response, "Unable to load reminders."));
-      setIsLoading(false);
-      return;
-    }
+      if (!response.ok) {
+        const message = await responseError(response, "Unable to load reminders.");
+        if (!mountedRef.current) return;
+        setReminders([]);
+        setError(message);
+        setIsLoading(false);
+        return;
+      }
 
-    const payload = (await response.json()) as ReminderPayload;
-    setReminders((payload.reminders ?? []).map(normalizeReminder));
-    setIsLoading(false);
+      const payload = (await response.json()) as ReminderPayload;
+      if (!mountedRef.current) return;
+      setReminders((payload.reminders ?? []).map(normalizeReminder));
+      setIsLoading(false);
+    } catch {
+      if (!mountedRef.current) return;
+      setReminders([]);
+      setError("Unable to load reminders.");
+      setIsLoading(false);
+    }
   }, [documentId, status]);
 
   React.useEffect(() => {
@@ -81,20 +100,25 @@ export function useReminders(filters: ReminderFilters = {}): State {
     try {
       return await action();
     } finally {
-      setPendingIds((current) => {
-        const next = new Set(current);
-        next.delete(id);
-        return next;
-      });
+      if (mountedRef.current) {
+        setPendingIds((current) => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
+      }
     }
   }, []);
 
   const approve = React.useCallback((id: string, overrides: ReminderMutationPatch = {}) => {
-    const previous = reminders;
+    const original = reminders.find((reminder) => reminder.id === id);
     setError(null);
-    setReminders((current) => current.map((reminder) =>
-      reminder.id === id ? applyPatchToReminder({ ...reminder, status: "approved" }, overrides) : reminder
-    ));
+    setReminders((current) => {
+      const next = current.map((reminder) =>
+        reminder.id === id ? applyPatchToReminder({ ...reminder, status: "approved" }, overrides) : reminder
+      );
+      return dropIfStatusChanged(next, status);
+    });
 
     return withPending(id, async () => {
       const response = await fetch(`/api/reminders/${encodeURIComponent(id)}/approve`, {
@@ -104,20 +128,23 @@ export function useReminders(filters: ReminderFilters = {}): State {
       });
 
       if (!response.ok) {
-        setReminders(previous);
-        setError(await responseError(response, "Unable to approve reminder."));
+        const message = await responseError(response, "Unable to approve reminder.");
+        if (!mountedRef.current) return null;
+        setReminders((current) => restoreReminder(current, original));
+        setError(message);
         return null;
       }
 
       const payload = (await response.json()) as ReminderPayload;
+      if (!mountedRef.current) return null;
       if (payload.reminder) {
         const nextReminder = normalizeReminder(payload.reminder);
-        setReminders((current) => replaceReminder(current, nextReminder));
+        setReminders((current) => dropIfStatusChanged(replaceReminder(current, nextReminder), status));
         return nextReminder;
       }
       return null;
     });
-  }, [reminders, withPending]);
+  }, [reminders, withPending, status]);
 
   const update = React.useCallback((id: string, patch: ReminderMutationPatch) => {
     setError(null);
@@ -130,11 +157,14 @@ export function useReminders(filters: ReminderFilters = {}): State {
       });
 
       if (!response.ok) {
-        setError(await responseError(response, "Unable to update reminder."));
+        const message = await responseError(response, "Unable to update reminder.");
+        if (!mountedRef.current) return null;
+        setError(message);
         return null;
       }
 
       const payload = (await response.json()) as ReminderPayload;
+      if (!mountedRef.current) return null;
       if (payload.reminder) {
         const nextReminder = normalizeReminder(payload.reminder);
         setReminders((current) => replaceReminder(current, nextReminder));
@@ -145,15 +175,17 @@ export function useReminders(filters: ReminderFilters = {}): State {
   }, [withPending]);
 
   const dismiss = React.useCallback((id: string) => {
-    const previous = reminders;
+    const original = reminders.find((reminder) => reminder.id === id);
     setError(null);
     setReminders((current) => current.filter((reminder) => reminder.id !== id));
 
     return withPending(id, async () => {
       const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!response.ok) {
-        setReminders(previous);
-        setError(await responseError(response, "Unable to ignore reminder."));
+        const message = await responseError(response, "Unable to ignore reminder.");
+        if (!mountedRef.current) return false;
+        setReminders((current) => restoreReminder(current, original));
+        setError(message);
         return false;
       }
       return true;
@@ -167,6 +199,30 @@ function replaceReminder(reminders: Reminder[], next: Reminder) {
   const exists = reminders.some((reminder) => reminder.id === next.id);
   if (!exists) return reminders;
   return reminders.map((reminder) => reminder.id === next.id ? next : reminder);
+}
+
+/**
+ * Rolls back a single failed optimistic mutation by restoring `original` in
+ * place (or re-adding it if the optimistic update had removed it), without
+ * touching any other mutation that may have completed on `reminders` in the
+ * meantime.
+ */
+function restoreReminder(reminders: Reminder[], original: Reminder | undefined) {
+  if (!original) return reminders;
+  const exists = reminders.some((reminder) => reminder.id === original.id);
+  if (exists) return reminders.map((reminder) => reminder.id === original.id ? original : reminder);
+  return [...reminders, original];
+}
+
+/**
+ * This hook's list is fetched filtered by `filters.status`. A mutation like
+ * `approve` can flip a reminder's status to something outside that filter
+ * (e.g. "suggested" -> "approved"), which would otherwise leave a stale
+ * duplicate sitting in this list until the next full refetch.
+ */
+function dropIfStatusChanged(reminders: Reminder[], status: ReminderFilters["status"]) {
+  if (!status) return reminders;
+  return reminders.filter((reminder) => reminder.status === status);
 }
 
 function applyPatchToReminder(reminder: Reminder, patch: ReminderMutationPatch) {

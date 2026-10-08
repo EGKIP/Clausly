@@ -13,12 +13,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const userId = url.searchParams.get("user_id");
   const token = url.searchParams.get("token");
+  const type = url.searchParams.get("type");
 
   if (!userId || !token) {
     return NextResponse.json({ error: "Missing unsubscribe parameters." }, { status: 400 });
   }
 
-  const result = await unsubscribeUserEmail({ userId, token });
+  const result = await unsubscribeUserEmail({ userId, token, type });
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

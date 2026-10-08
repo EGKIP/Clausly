@@ -83,6 +83,44 @@ describe("AskPanel suggested questions", () => {
     expect(screen.queryByText("Suggested questions")).not.toBeInTheDocument();
   });
 
+  it("disables conversation switching while a question is still streaming", async () => {
+    let resolveAsk!: (response: unknown) => void;
+    const pendingAsk = new Promise<unknown>((resolve) => {
+      resolveAsk = resolve;
+    });
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/documents/doc-1/ask")) return pendingAsk;
+      if (url.includes("/api/conversations")) {
+        return respond({
+          ok: true,
+          body: { conversations: [{ id: "conv-1", title: "Earlier chat" }] },
+        });
+      }
+      return respond({ ok: false, status: 404 });
+    });
+
+    render(<AskPanel docId="doc-1" docTitle="Lease" />);
+
+    const newChatButton = await screen.findByText("+ New chat");
+    const conversationPill = await screen.findByText("Earlier chat");
+    expect(newChatButton).not.toBeDisabled();
+    expect(conversationPill).not.toBeDisabled();
+
+    const input = screen.getByPlaceholderText("Ask anything about this document…");
+    fireEvent.change(input, { target: { value: "When does this renew?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    // The fetch to /ask is still pending, so the panel is mid-stream: switching
+    // conversations now would leave the in-flight answer misattributed to
+    // whichever (now-empty) conversation the user switched to.
+    expect(newChatButton).toBeDisabled();
+    expect(conversationPill).toBeDisabled();
+
+    resolveAsk({ ok: false, status: 500, json: async () => ({ error: "unavailable" }) });
+    await waitFor(() => expect(newChatButton).not.toBeDisabled());
+  });
+
   it("submits the question when a suggestion chip is clicked", async () => {
     routeFetch({
       "/suggested-questions": {

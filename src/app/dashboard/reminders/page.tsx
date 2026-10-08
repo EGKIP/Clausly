@@ -134,8 +134,8 @@ export default function RemindersPage() {
 
       <div className="mt-6 space-y-2.5">
         {activeReminders.isLoading && <LoadingState />}
-        {activeReminders.error && <InlineError message={activeReminders.error} />}
-        {!activeReminders.isLoading && list.length === 0 && <EmptyState status={tab} />}
+        {!activeReminders.isLoading && activeReminders.error && <InlineError message={activeReminders.error} />}
+        {!activeReminders.isLoading && !activeReminders.error && list.length === 0 && <EmptyState status={tab} />}
         {!activeReminders.isLoading && list.map((r, i) => {
           const Icon = iconFor(r.type);
           const urgent = r.daysAway > 0 && r.daysAway < 14;

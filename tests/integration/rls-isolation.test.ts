@@ -9,6 +9,7 @@ import {
   createServiceSupabaseClientMock,
   createSupabaseClient,
   db,
+  futureDate,
   jsonRequest,
   resetSupabaseMock,
   routeContext,
@@ -66,7 +67,7 @@ describe("route-level tenant isolation", () => {
       documentId,
       title: "Review renewal",
       description: "Review before renewal.",
-      fireOn: "2026-11-01",
+      fireOn: futureDate(30),
       type: "Review",
       channel: "Email",
     }));

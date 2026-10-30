@@ -301,7 +301,7 @@ export function seedReminder(documentId: string, user = userA, overrides: Row = 
     date_id: null,
     title: "Review notice window",
     description: "Review the contract before notice is due.",
-    fire_on: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+    fire_on: futureDate(30),
     reminder_time: null,
     reminder_type: "Notice",
     status: "suggested",
@@ -750,4 +750,9 @@ function clone<T>(value: T): T {
 function nextUuid() {
   uuidCounter += 1;
   return "00000000-0000-4000-8000-" + String(uuidCounter).padStart(12, "0");
+}
+
+/** ISO date (YYYY-MM-DD) `days` from today, so fixtures never age past the reminder date guard. */
+export function futureDate(days: number): string {
+  return new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 }

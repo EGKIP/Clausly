@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, seedDocument, seedReminder, setSupabaseUser, userA } from "@/../tests/helpers/supabase";
+import { createSupabaseClient, db, futureDate, jsonRequest, resetSupabaseMock, seedDocument, seedReminder, setSupabaseUser, userA } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 
@@ -68,7 +68,7 @@ describe("/api/reminders", () => {
       documentId: document.id,
       title: "Renewal review",
       description: "Review renewal terms.",
-      fireOn: "2026-11-01",
+      fireOn: futureDate(30),
       type: "Review",
       channel: "Email",
     }));

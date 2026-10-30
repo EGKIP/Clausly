@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSupabaseClient, db, jsonRequest, resetSupabaseMock, routeContext, seedDocument, seedReminder, setSupabaseUser, userA, userB, withoutRlsSimulation } from "@/../tests/helpers/supabase";
+import { createSupabaseClient, db, futureDate, jsonRequest, resetSupabaseMock, routeContext, seedDocument, seedReminder, setSupabaseUser, userA, userB, withoutRlsSimulation } from "@/../tests/helpers/supabase";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => createSupabaseClient() }));
 
@@ -49,7 +49,7 @@ describe("/api/reminders/[id]", () => {
     const response = await PATCH(jsonRequest({
       title: "Renewal review",
       description: "Review updated renewal language.",
-      fire_on: "2026-11-15",
+      fire_on: futureDate(45),
       reminder_time: "09:30",
     }, { method: "PATCH" }), routeContext(reminder.id));
 
@@ -58,7 +58,7 @@ describe("/api/reminders/[id]", () => {
       status,
       title: "Renewal review",
       description: "Review updated renewal language.",
-      fire_on: "2026-11-15",
+      fire_on: futureDate(45),
       reminder_time: "09:30",
     });
   });
@@ -117,7 +117,7 @@ describe("/api/reminders/[id]", () => {
 
   it("still allows editing a suggested reminder's date into the past (approval catches it later)", async () => {
     const document = seedDocument(userA);
-    const reminder = seedReminder(document.id, userA, { status: "suggested", fire_on: "2026-11-15" });
+    const reminder = seedReminder(document.id, userA, { status: "suggested", fire_on: futureDate(45) });
 
     const response = await PATCH(jsonRequest({ fire_on: "2026-01-05" }, { method: "PATCH" }), routeContext(reminder.id));
 

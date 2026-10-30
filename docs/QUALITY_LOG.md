@@ -656,3 +656,24 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### Remaining Concerns
 - Not yet verified end-to-end against live Supabase with a real user JWT (cross-user denial per table) — scheduled for the M7 security track before any release.
+
+## 2026-10-30
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (657/657, 113 files) · E2E: none configured
+
+### Issues Found
+- **P3 (test-only, time bomb):** reminder tests hardcoded `fire_on`/`fireOn` of `2026-11-01` and `2026-11-15`. After those dates the `REMINDER_PAST` guard would return 409 and CI would go red on main with no code change (same class as the 2026-10-02 failure). Production code correct.
+
+### Fixes Completed
+- Added `futureDate(days)` test helper; reminder route tests and the RLS isolation suite now use relative dates.
+
+### Tests Added/Changed
+- `tests/helpers/supabase.ts`, `src/app/api/reminders/__tests__/route.test.ts`, `src/app/api/reminders/[id]/__tests__/route.test.ts`, `tests/integration/rls-isolation.test.ts`.
+
+### Remaining Concerns
+- Same longstanding items (no E2E harness, browser flows and Supabase advisors not exercised this run).
+- Hardcoded `end_date: "2026-12-31"` in `tests/helpers/supabase.ts` seed is non-guarded but will age; revisit if a test depends on it.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-h0uf1c`

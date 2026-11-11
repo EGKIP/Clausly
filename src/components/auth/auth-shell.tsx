@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { AuthTrustPanel } from "@/components/auth/auth-trust-panel";
 
@@ -52,9 +51,7 @@ export function AuthShell({
         <section className="flex min-h-svh items-center justify-center px-4 py-10 sm:px-6">
           <div className="w-full max-w-[440px]">
             <div className="mb-10 lg:hidden">
-              <Link href="/" aria-label="Clausly home">
-                <Logo />
-              </Link>
+              <Logo />
             </div>
             {children}
           </div>

@@ -656,3 +656,30 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### Remaining Concerns
 - Not yet verified end-to-end against live Supabase with a real user JWT (cross-user denial per table) — scheduled for the M7 security track before any release.
+
+## 2026-11-11
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (659/659, 114 files) · E2E: none configured (no Playwright suite; ad-hoc Playwright probe of `/`, `/login`, `/signup` at 375px and 1280px against a local production build)
+
+### Issues Found
+- **P3:** The logo refresh (merged 2026-10-07) gave every in-app mark the same gradient ids (`clm-ring`/`clm-page`). Pages render two marks (auth pages: desktop panel + mobile header; dashboard: desktop sidebar + mobile drawer), and `url(#clm-ring)` resolves to the first one. When that copy is `display:none` (any viewport below `lg`), Chrome paints the visible ring with no stroke — the C-ring disappeared from the logo on mobile sign-in/sign-up and in the mobile dashboard drawer. Reproduced at 375px on `/login`.
+- **P3 (a11y/HTML validity):** `AuthShell`'s mobile header wrapped `<Logo />` (already a link to `/`) in another `<Link>`, producing a nested `<a><a>` on every auth page.
+- Checked with no defect found: tour-video dialog opens, closes via Esc and via the close button, and unmounts the `<video>` on close; no horizontal overflow at 375px on `/`, `/login`, `/signup`; no duplicate DOM ids on those pages after the fix.
+
+### Fixes Completed
+- `src/components/brand/logo.tsx`: `Logomark` derives a per-instance gradient id prefix from `React.useId()` and passes it to `MarkSvg`/`AnimatedMark`. `MarkSvg` itself is unchanged (it stays hook-free for ImageResponse).
+- `src/components/auth/auth-shell.tsx`: removed the redundant wrapper link; `<Logo />` already links home with the same accessible name.
+
+### Tests Added/Changed
+- `src/components/brand/__tests__/logo.test.tsx`: new case renders a hidden `Logo`, a visible `Logo` and both motion variants, then asserts gradient ids are unique and each ring references a gradient inside its own `<svg>`. Failed before the fix.
+- `src/components/auth/__tests__/auth-shell.test.tsx` (new): asserts no nested links. Failed before the fix.
+
+### Remaining Concerns
+- PR #101 (npm audit lockfile fixes, opened 2026-11-07) is still open and awaiting review.
+- Main has had no commits since 2026-10-07; the last logged run was 2026-10-05, so there is a gap of about a month in daily runs.
+- Signed-in flows (upload → analysis → reminders) were not exercised in a browser: this environment has no test Supabase project or credentials. They are covered only by unit/route tests. A Playwright smoke test (PROGRESS S06) is still blocked on the owner providing a test account/env.
+- Same longstanding items as earlier entries: reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection disabled.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-tkokc5`

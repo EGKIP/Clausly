@@ -2,19 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { analyzeDocument, getAnalysisModel, getAnalysisProvider } from "./provider";
 import { persistAnalysis } from "./persistence";
-import * as pdfText from "./pdf-text";
 import { recordUsage } from "./usage-metrics";
 import { embedDocumentChunks } from "./embeddings";
 import { categorizeAnalysisError, type AnalysisFailureCategory } from "./failure-categories";
-import { extractDocxText } from "./docx-text";
+import { extractStoredDocumentText } from "./document-text";
 
 type AnyClient = SupabaseClient<Database>;
-type PdfTextExtractor = typeof pdfText.extractPdfText;
-type PdfTextModule = {
-  extractPdfText: PdfTextExtractor;
-  extractPdfTextWithOcr?: PdfTextExtractor;
-  extractImageText?: PdfTextExtractor;
-};
 
 type AnalysisDocument = {
   id: string;
@@ -239,44 +232,4 @@ async function loadOwnedDocument(supabase: AnyClient, documentId: string, userId
     throw new Error(error?.message ?? "Document not found.");
   }
   return document;
-}
-
-function getPdfTextExtractor() {
-  const pdfTextModule = pdfText as PdfTextModule;
-  if ("extractPdfTextWithOcr" in pdfTextModule) {
-    return pdfTextModule.extractPdfTextWithOcr ?? pdfTextModule.extractPdfText;
-  }
-  return pdfTextModule.extractPdfText;
-}
-
-async function extractStoredDocumentText(file: Blob, doc: AnalysisDocument) {
-  if (doc.mime_type === "text/plain" || doc.file_name.toLowerCase().endsWith(".txt")) {
-    const text = (await readBlobText(file)).trim();
-    if (!text) throw new Error("Pasted contract text was empty.");
-    return text;
-  }
-
-  if (isDocxDocument(doc)) {
-    return extractDocxText(file);
-  }
-
-  if (doc.mime_type.startsWith("image/")) {
-    const pdfTextModule = pdfText as PdfTextModule;
-    if (!pdfTextModule.extractImageText) throw new Error("Image OCR extractor is unavailable.");
-    return pdfTextModule.extractImageText(file);
-  }
-
-  return getPdfTextExtractor()(file);
-}
-
-async function readBlobText(file: Blob) {
-  if (typeof file.text === "function") return file.text();
-  if (typeof Response !== "undefined") return new Response(file).text();
-  const bytes = await file.arrayBuffer();
-  return new TextDecoder().decode(bytes);
-}
-
-function isDocxDocument(doc: AnalysisDocument) {
-  return doc.mime_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    || doc.file_name.toLowerCase().endsWith(".docx");
 }

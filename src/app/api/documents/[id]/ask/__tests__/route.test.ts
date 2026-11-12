@@ -12,6 +12,7 @@ import {
   seedStoredPdf,
   seedUsageMetric,
   setSupabaseUser,
+  storageCalls,
   userA,
   userB,
 } from "@/../tests/helpers/supabase";
@@ -104,6 +105,34 @@ describe("POST /api/documents/[id]/ask", () => {
       }),
     ]);
     expect(body.citations.length).toBeGreaterThan(0);
+  });
+
+  it("rebuilds the index from a pasted-text document without using the PDF extractor", async () => {
+    const document = seedDocument(userA, {
+      status: "ready",
+      file_name: "pasted-contract.txt",
+      mime_type: "text/plain",
+    });
+    const storedText = "The tenant may terminate by giving 60 days written notice.";
+    storageCalls().files.set(document.storage_path, {
+      text: async () => storedText,
+      type: "text/plain",
+      size: storedText.length,
+    } as Blob);
+
+    const response = await POST(
+      jsonRequest({ question: "What is the termination clause?" }),
+      routeContext(document.id),
+    );
+
+    expect(response.status).toBe(200);
+    expect(extractPdfTextWithOcrMock).not.toHaveBeenCalled();
+    expect(db().document_chunks).toEqual([
+      expect.objectContaining({
+        document_id: document.id,
+        content: "The tenant may terminate by giving 60 days written notice.",
+      }),
+    ]);
   });
 
   it("returns JSON 429 before opening a stream when the daily Q&A limit is reached", async () => {

@@ -656,3 +656,27 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### Remaining Concerns
 - Not yet verified end-to-end against live Supabase with a real user JWT (cross-user denial per table) — scheduled for the M7 security track before any release.
+
+## 2026-11-12
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (658/658, 113 files; 1 new) · E2E: none configured (no Playwright suite)
+
+### Issues Found
+- **P2:** Ask Clausly's chunk-reindex recovery (`reindexDocumentChunksFromStorage`, `src/lib/ai/embeddings/index.ts`) always ran the PDF extractor, whatever the document's type. A ready pasted-text, DOCX, or image document with an empty chunk index (failed embedding pass, or predates indexing) failed recovery, so Ask returned `DOC_NOT_INDEXED` until the user manually re-analyzed. Deferred since 2026-09-28; reproduced today with a route test.
+- Open PRs #101 (npm audit lockfile, 2026-11-07) and #102 (logo ring on mobile, 2026-11-11) are still unreviewed. Main unchanged since 2026-10-07. Today's change does not overlap either.
+
+### Fixes Completed
+- New `src/lib/ai/document-text.ts`: `extractStoredDocumentText` (moved unchanged from `run-analysis.ts`) picks the extractor by mime type / file name. Analysis and reindex recovery now share it.
+- `reindexDocumentChunksFromStorage` takes `file_name`/`mime_type` and uses the shared extractor (still dynamically imported). The Ask route selects and passes both columns.
+
+### Tests Added/Changed
+- `src/app/api/documents/[id]/ask/__tests__/route.test.ts`: a ready pasted-text document with no chunks is reindexed from its stored text, the PDF extractor is not called, and Ask answers 200. Failed before the fix. Existing analysis tests (text/DOCX/image routing) cover the moved function.
+
+### Remaining Concerns
+- No P0/P1 found. Signed-in browser flows still not exercised (no test Supabase account/env in this environment); covered by route/unit tests only.
+- Same longstanding items: no E2E harness, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection disabled, npm audit (PR #101).
+- The routine asks for a long-lived `claude/web-stabilization` branch; this environment only permits pushing to its per-session branch, so each run still produces its own PR.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-zfn34k`

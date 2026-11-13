@@ -656,3 +656,27 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### Remaining Concerns
 - Not yet verified end-to-end against live Supabase with a real user JWT (cross-user denial per table) — scheduled for the M7 security track before any release.
+
+## 2026-11-13
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (657/657, 113 files) · E2E: none configured (ad-hoc Playwright probe of 9 public/demo routes at 375px and 1280px against a local production build)
+
+### Issues Found
+- **P2 (raises PR #102's priority):** `/login`, `/signup` and `/forgot-password` throw a React hydration error (#418) in the production build. Dev mode names the cause: `<a> cannot be a descendant of <a>` — the nested link in `AuthShell` that open PR #102 removes. React recovers by client-rendering, so the forms still work, but every auth page pays a full client re-render and logs an error. No new change needed; merging #102 fixes it.
+- **P3 (not changed):** `POST /api/documents/[id]/analyze` runs analysis synchronously but lacks the `maxDuration = 300` its sibling `/reanalyze` sets. No client calls it today, so left as-is; add it if/when a client (e.g. mobile) starts using the route.
+- Checked with no defect found: no horizontal overflow at 375px on any probed route; no broken internal links from `/`; reminder PATCH/approve/DELETE ownership and past-date guards; document PATCH/DELETE ownership and storage-path check; analysis retry flow. Supabase security advisors unchanged (vector in public, `delete_account` SECURITY DEFINER — re-verified it rejects `target_user_id <> auth.uid()`, leaked-password protection off).
+
+### Fixes Completed
+- None. No defect found today that justified a code change outside open PRs.
+
+### Tests Added/Changed
+- None.
+
+### Remaining Concerns
+- PRs #101 (npm audit lockfile), #102 (logo ring + nested auth link, now known to cause auth-page hydration errors) and #103 (Ask reindex by file type) are open and unreviewed; main unchanged since 2026-10-07. Recommend reviewing #102 first.
+- Signed-in flows (upload → analysis → reminders) still not exercised in a browser: no test Supabase account in this environment.
+- Same longstanding items: no E2E harness, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection disabled.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-clrl1r` (log entry only; no PR opened, to avoid a docs-only PR on top of three unreviewed ones)

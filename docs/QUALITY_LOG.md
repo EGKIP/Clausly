@@ -656,3 +656,27 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### Remaining Concerns
 - Not yet verified end-to-end against live Supabase with a real user JWT (cross-user denial per table) — scheduled for the M7 security track before any release.
+
+## 2026-11-14
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (657/657, 113 files) · E2E: none configured (no Playwright suite)
+
+### Issues Found
+- **P3 (test-only, would turn CI red):** "/api/reminders/[id] > patches approved reminders" PATCHed an approved reminder to the literal `fire_on: "2026-11-15"`. The route's `REMINDER_PAST` guard rejects past dates for approved reminders, so from 2026-11-16 UTC the test returns 409 and fails on `main` and every open PR. Reproduced by running the suite with the clock faked to 2026-11-16 and 2027-01-15; this was the only date-dependent failure (3 other failures came from the global fake clock clashing with tests' own timers, not from fixture dates). Same bug class as 2026-10-02. Production code is correct.
+- Reviewed with no defect found: reminder PATCH/approve/DELETE ownership and lifecycle guards, share create/revoke/public-token routes (owner checks, revoked/expired handling, 256-bit tokens), auth callback `next` sanitization, document DELETE ownership + storage-path check.
+- Supabase security advisors (`clausly-prod`, read-only): unchanged — `vector` in `public`, `delete_account` SECURITY DEFINER (checks `auth.uid() = target_user_id`), leaked-password protection disabled.
+
+### Fixes Completed
+- The test now uses a date 45 days from now.
+
+### Tests Added/Changed
+- `src/app/api/reminders/[id]/__tests__/route.test.ts` only.
+
+### Remaining Concerns
+- Open PRs #101 (npm audit lockfile), #102 (logo ring on mobile), #103 (Ask reindex by file type) are still unreviewed; `main` unchanged since 2026-10-07. Today's change does not overlap them. Until this merges, CI on any PR will fail from 2026-11-16.
+- Signed-in browser flows still not exercised (no test Supabase account/env here). Same longstanding items: reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection.
+- Minor (P4, not changed): document DELETE returns 404 instead of 500 for a non-PGRST116 read error.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-2dos3e`

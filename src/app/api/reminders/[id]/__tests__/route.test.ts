@@ -45,11 +45,14 @@ describe("/api/reminders/[id]", () => {
   it.each(["suggested", "approved"] as const)("patches %s reminders", async (status) => {
     const document = seedDocument(userA);
     const reminder = seedReminder(document.id, userA, { status });
+    // Relative, not a literal date: approved reminders reject past dates, so a
+    // fixed date would start failing once it passed.
+    const future = new Date(Date.now() + 45 * 86_400_000).toISOString().slice(0, 10);
 
     const response = await PATCH(jsonRequest({
       title: "Renewal review",
       description: "Review updated renewal language.",
-      fire_on: "2026-11-15",
+      fire_on: future,
       reminder_time: "09:30",
     }, { method: "PATCH" }), routeContext(reminder.id));
 
@@ -58,7 +61,7 @@ describe("/api/reminders/[id]", () => {
       status,
       title: "Renewal review",
       description: "Review updated renewal language.",
-      fire_on: "2026-11-15",
+      fire_on: future,
       reminder_time: "09:30",
     });
   });

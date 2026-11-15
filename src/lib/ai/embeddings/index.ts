@@ -76,12 +76,13 @@ export async function embedDocumentChunks(
 /**
  * Recovery path for a document whose analysis succeeded but whose chunks are
  * missing (e.g. the original embedding pass failed silently, or the document
- * predates chunk indexing). Downloads the stored PDF, re-extracts its text,
- * and rebuilds document_chunks. Callers must have verified ownership.
+ * predates chunk indexing). Downloads the stored file, re-extracts its text
+ * with the extractor for its type (PDF, DOCX, pasted text, or image), and
+ * rebuilds document_chunks. Callers must have verified ownership.
  */
 export async function reindexDocumentChunksFromStorage(
   supabase: AnyClient,
-  document: { id: string; user_id: string; storage_path: string },
+  document: { id: string; user_id: string; storage_path: string; file_name: string; mime_type: string },
 ): Promise<EmbedResult> {
   try {
     const { data: file, error: downloadError } = await supabase.storage
@@ -92,8 +93,8 @@ export async function reindexDocumentChunksFromStorage(
 
     // Dynamic import keeps the native-canvas-backed PDF stack out of routes
     // that only need reindexing on the rare recovery path.
-    const { extractPdfTextWithOcr } = await import("../pdf-text");
-    const text = await extractPdfTextWithOcr(file);
+    const { extractStoredDocumentText } = await import("../document-text");
+    const text = await extractStoredDocumentText(file, document);
     return await embedDocumentChunks(supabase, document.id, document.user_id, text);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown reindexing error.";

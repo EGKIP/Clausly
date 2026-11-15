@@ -656,3 +656,126 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### Remaining Concerns
 - Not yet verified end-to-end against live Supabase with a real user JWT (cross-user denial per table) — scheduled for the M7 security track before any release.
+
+## 2026-11-07
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (657/657, 113 files) · E2E: none configured
+
+### Issues Found
+- **P1 (security, dependency):** `npm audit --omit=dev` reported 1 critical + 4 high. Next.js advisories (SSG/ISR cache poisoning, image-optimization SVG RCE, Server Actions DoS), `sharp`, `zod` (memory exhaustion on oversized collections), `source-map-js`. All fixable within the existing semver ranges.
+- Remaining after fix: `postcss` (bundled inside `next`) — only fixable by upgrading to Next 16 (breaking); not done.
+
+### Fixes Completed
+- `npm audit fix` (lockfile only, `package.json` unchanged): next → 15.5.29, sharp → 0.35.5, zod → 4.6.7, source-map-js bumped. Audit now 2 findings (postcss/next, build-time only).
+
+### Tests Added/Changed
+- None (lockfile change; full suite and production build re-run green).
+
+### Remaining Concerns
+- Next 16 upgrade needed to clear the bundled postcss advisory — owner decision.
+- No E2E harness; browser flows and Supabase advisors not exercised this run (no test credentials/staging in this session).
+- Branch `claude/web-stabilization` does not exist; work is on the session branch below.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-mrkp6i`
+
+## 2026-11-11
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (659/659, 114 files) · E2E: none configured (no Playwright suite; ad-hoc Playwright probe of `/`, `/login`, `/signup` at 375px and 1280px against a local production build)
+
+### Issues Found
+- **P3:** The logo refresh (merged 2026-10-07) gave every in-app mark the same gradient ids (`clm-ring`/`clm-page`). Pages render two marks (auth pages: desktop panel + mobile header; dashboard: desktop sidebar + mobile drawer), and `url(#clm-ring)` resolves to the first one. When that copy is `display:none` (any viewport below `lg`), Chrome paints the visible ring with no stroke — the C-ring disappeared from the logo on mobile sign-in/sign-up and in the mobile dashboard drawer. Reproduced at 375px on `/login`.
+- **P3 (a11y/HTML validity):** `AuthShell`'s mobile header wrapped `<Logo />` (already a link to `/`) in another `<Link>`, producing a nested `<a><a>` on every auth page.
+- Checked with no defect found: tour-video dialog opens, closes via Esc and via the close button, and unmounts the `<video>` on close; no horizontal overflow at 375px on `/`, `/login`, `/signup`; no duplicate DOM ids on those pages after the fix.
+
+### Fixes Completed
+- `src/components/brand/logo.tsx`: `Logomark` derives a per-instance gradient id prefix from `React.useId()` and passes it to `MarkSvg`/`AnimatedMark`. `MarkSvg` itself is unchanged (it stays hook-free for ImageResponse).
+- `src/components/auth/auth-shell.tsx`: removed the redundant wrapper link; `<Logo />` already links home with the same accessible name.
+
+### Tests Added/Changed
+- `src/components/brand/__tests__/logo.test.tsx`: new case renders a hidden `Logo`, a visible `Logo` and both motion variants, then asserts gradient ids are unique and each ring references a gradient inside its own `<svg>`. Failed before the fix.
+- `src/components/auth/__tests__/auth-shell.test.tsx` (new): asserts no nested links. Failed before the fix.
+
+### Remaining Concerns
+- PR #101 (npm audit lockfile fixes, opened 2026-11-07) is still open and awaiting review.
+- Main has had no commits since 2026-10-07; the last logged run was 2026-10-05, so there is a gap of about a month in daily runs.
+- Signed-in flows (upload → analysis → reminders) were not exercised in a browser: this environment has no test Supabase project or credentials. They are covered only by unit/route tests. A Playwright smoke test (PROGRESS S06) is still blocked on the owner providing a test account/env.
+- Same longstanding items as earlier entries: reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection disabled.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-tkokc5`
+
+## 2026-11-12
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (658/658, 113 files; 1 new) · E2E: none configured (no Playwright suite)
+
+### Issues Found
+- **P2:** Ask Clausly's chunk-reindex recovery (`reindexDocumentChunksFromStorage`, `src/lib/ai/embeddings/index.ts`) always ran the PDF extractor, whatever the document's type. A ready pasted-text, DOCX, or image document with an empty chunk index (failed embedding pass, or predates indexing) failed recovery, so Ask returned `DOC_NOT_INDEXED` until the user manually re-analyzed. Deferred since 2026-09-28; reproduced today with a route test.
+- Open PRs #101 (npm audit lockfile, 2026-11-07) and #102 (logo ring on mobile, 2026-11-11) are still unreviewed. Main unchanged since 2026-10-07. Today's change does not overlap either.
+
+### Fixes Completed
+- New `src/lib/ai/document-text.ts`: `extractStoredDocumentText` (moved unchanged from `run-analysis.ts`) picks the extractor by mime type / file name. Analysis and reindex recovery now share it.
+- `reindexDocumentChunksFromStorage` takes `file_name`/`mime_type` and uses the shared extractor (still dynamically imported). The Ask route selects and passes both columns.
+
+### Tests Added/Changed
+- `src/app/api/documents/[id]/ask/__tests__/route.test.ts`: a ready pasted-text document with no chunks is reindexed from its stored text, the PDF extractor is not called, and Ask answers 200. Failed before the fix. Existing analysis tests (text/DOCX/image routing) cover the moved function.
+
+### Remaining Concerns
+- No P0/P1 found. Signed-in browser flows still not exercised (no test Supabase account/env in this environment); covered by route/unit tests only.
+- Same longstanding items: no E2E harness, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection disabled, npm audit (PR #101).
+- The routine asks for a long-lived `claude/web-stabilization` branch; this environment only permits pushing to its per-session branch, so each run still produces its own PR.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-zfn34k`
+
+## 2026-11-14
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (657/657, 113 files) · E2E: none configured (no Playwright suite)
+
+### Issues Found
+- **P3 (test-only, would turn CI red):** "/api/reminders/[id] > patches approved reminders" PATCHed an approved reminder to the literal `fire_on: "2026-11-15"`. The route's `REMINDER_PAST` guard rejects past dates for approved reminders, so from 2026-11-16 UTC the test returns 409 and fails on `main` and every open PR. Reproduced by running the suite with the clock faked to 2026-11-16 and 2027-01-15; this was the only date-dependent failure (3 other failures came from the global fake clock clashing with tests' own timers, not from fixture dates). Same bug class as 2026-10-02. Production code is correct.
+- Reviewed with no defect found: reminder PATCH/approve/DELETE ownership and lifecycle guards, share create/revoke/public-token routes (owner checks, revoked/expired handling, 256-bit tokens), auth callback `next` sanitization, document DELETE ownership + storage-path check.
+- Supabase security advisors (`clausly-prod`, read-only): unchanged — `vector` in `public`, `delete_account` SECURITY DEFINER (checks `auth.uid() = target_user_id`), leaked-password protection disabled.
+
+### Fixes Completed
+- The test now uses a date 45 days from now.
+
+### Tests Added/Changed
+- `src/app/api/reminders/[id]/__tests__/route.test.ts` only.
+
+### Remaining Concerns
+- Open PRs #101 (npm audit lockfile), #102 (logo ring on mobile), #103 (Ask reindex by file type) are still unreviewed; `main` unchanged since 2026-10-07. Today's change does not overlap them. Until this merges, CI on any PR will fail from 2026-11-16.
+- Signed-in browser flows still not exercised (no test Supabase account/env here). Same longstanding items: reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection.
+- Minor (P4, not changed): document DELETE returns 404 instead of 500 for a non-PGRST116 read error.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-2dos3e`
+
+## 2026-11-15
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (660/660, 114 files) · E2E: none configured (no Playwright suite)
+- Also ran the full suite with the process clock shifted to 2026-11-16 and 2027-03-01: pass (confirmed the shift is effective — `main`'s reminder PATCH test fails under it).
+
+### Issues Found
+- **P2 (CI would go red):** `main` is unchanged since 2026-10-07 and four daily-run PRs (#101–#104) are still open. From 2026-11-16 the `main` suite fails ("patches approved reminders", fixed in #104).
+- **P3 (test-only, from #102):** the new logo gradient-id test mounts framer-motion marks without unmounting them (this repo has no global testing-library cleanup). React keeps scheduling work after jsdom tears down and throws `window is not defined`, so `npm test` exits 1 even though all 660 tests pass. Fails every run with #102 applied, never on `main`.
+- Upload route re-reviewed (size cap, magic-byte sniffing, storage path built from server UUIDs, rollback on insert failure): no defect.
+
+### Fixes Completed
+- Consolidated #101 (npm audit lockfile), #102 (logo ring on mobile), #103 (Ask reindex by file type), #104 (relative reminder test date) into this branch so they can be reviewed and merged as one candidate. Log conflicts were resolved by keeping every entry in date order.
+- `src/components/brand/__tests__/logo.test.tsx`: `afterEach(cleanup)`.
+
+### Tests Added/Changed
+- `logo.test.tsx` only (3/3 clean runs after the fix, 3/3 failing before).
+
+### Remaining Concerns
+- Signed-in browser flows still not exercised (no test Supabase account here). Same longstanding items: reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, document DELETE 404-vs-500 (P4).
+- Minor (P4, not changed): a real PDF uploaded with a `.txt` name is stored as `application/pdf`, but text extraction checks the `.txt` name first and reads it as text.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-x20n2q` (supersedes #101–#104)

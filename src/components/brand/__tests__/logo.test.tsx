@@ -1,8 +1,8 @@
 import React from "react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { Logo, Logomark } from "../logo";
 import { MarkSvg } from "../mark";
 import { MARK, MARK_SMALL } from "../mark-geometry";
@@ -11,6 +11,10 @@ const publicSvg = (name: string) =>
   readFileSync(path.resolve(__dirname, "../../../../public/brand", name), "utf8");
 
 describe("Clausly mark", () => {
+  // Unmount after each case: the framer-motion marks keep scheduling React work,
+  // which throws "window is not defined" once jsdom is torn down.
+  afterEach(cleanup);
+
   it("renders the full mark with ring, page, highlight and reminder dot", () => {
     const { container } = render(<MarkSvg />);
     expect(container.querySelector(`path[d="${MARK.ring.d}"]`)).not.toBeNull();
@@ -35,6 +39,28 @@ describe("Clausly mark", () => {
     const { container } = render(<Logomark motion={motion} />);
     expect(container.querySelector("svg")).not.toBeNull();
     expect(container.querySelector(`path[d="${MARK.ring.d}"]`)).not.toBeNull();
+  });
+
+  it("gives every in-app mark its own gradient ids so a hidden copy can't blank a visible one", () => {
+    const { container } = render(
+      <>
+        <div style={{ display: "none" }}>
+          <Logo />
+        </div>
+        <Logo />
+        <Logomark motion="loop" />
+        <Logomark motion="draw" />
+      </>,
+    );
+    const ids = [...container.querySelectorAll("linearGradient")].map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Each ring must reference a gradient defined inside its own <svg>.
+    for (const svg of container.querySelectorAll("svg")) {
+      const ref = svg.querySelector(`path[d="${MARK.ring.d}"]`)?.getAttribute("stroke");
+      const id = ref?.match(/^url\(#(.+)\)$/)?.[1];
+      expect(id).toBeTruthy();
+      expect(svg.querySelector(`linearGradient[id="${id}"]`)).not.toBeNull();
+    }
   });
 
   it("keeps the shipped SVG files in sync with the geometry module", () => {

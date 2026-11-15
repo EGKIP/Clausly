@@ -37,6 +37,28 @@ describe("Clausly mark", () => {
     expect(container.querySelector(`path[d="${MARK.ring.d}"]`)).not.toBeNull();
   });
 
+  it("gives every in-app mark its own gradient ids so a hidden copy can't blank a visible one", () => {
+    const { container } = render(
+      <>
+        <div style={{ display: "none" }}>
+          <Logo />
+        </div>
+        <Logo />
+        <Logomark motion="loop" />
+        <Logomark motion="draw" />
+      </>,
+    );
+    const ids = [...container.querySelectorAll("linearGradient")].map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    // Each ring must reference a gradient defined inside its own <svg>.
+    for (const svg of container.querySelectorAll("svg")) {
+      const ref = svg.querySelector(`path[d="${MARK.ring.d}"]`)?.getAttribute("stroke");
+      const id = ref?.match(/^url\(#(.+)\)$/)?.[1];
+      expect(id).toBeTruthy();
+      expect(svg.querySelector(`linearGradient[id="${id}"]`)).not.toBeNull();
+    }
+  });
+
   it("keeps the shipped SVG files in sync with the geometry module", () => {
     for (const file of ["clausly-mark.svg", "clausly-favicon.svg"]) {
       expect(publicSvg(file)).toContain(MARK.ring.d);

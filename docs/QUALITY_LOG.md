@@ -679,6 +679,7 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-mrkp6i`
+
 ## 2026-11-11
 
 ### Quality Gates
@@ -705,6 +706,7 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-tkokc5`
+
 ## 2026-11-12
 
 ### Quality Gates
@@ -728,6 +730,7 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-zfn34k`
+
 ## 2026-11-14
 
 ### Quality Gates
@@ -751,3 +754,28 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-2dos3e`
+
+## 2026-11-15
+
+### Quality Gates
+- Build: pass · Typecheck: pass · Lint: pass · Unit tests: pass (660/660, 114 files) · E2E: none configured (no Playwright suite)
+- Also ran the full suite with the process clock shifted to 2026-11-16 and 2027-03-01: pass (confirmed the shift is effective — `main`'s reminder PATCH test fails under it).
+
+### Issues Found
+- **P2 (CI would go red):** `main` is unchanged since 2026-10-07 and four daily-run PRs (#101–#104) are still open. From 2026-11-16 the `main` suite fails ("patches approved reminders", fixed in #104).
+- **P3 (test-only, from #102):** the new logo gradient-id test mounts framer-motion marks without unmounting them (this repo has no global testing-library cleanup). React keeps scheduling work after jsdom tears down and throws `window is not defined`, so `npm test` exits 1 even though all 660 tests pass. Fails every run with #102 applied, never on `main`.
+- Upload route re-reviewed (size cap, magic-byte sniffing, storage path built from server UUIDs, rollback on insert failure): no defect.
+
+### Fixes Completed
+- Consolidated #101 (npm audit lockfile), #102 (logo ring on mobile), #103 (Ask reindex by file type), #104 (relative reminder test date) into this branch so they can be reviewed and merged as one candidate. Log conflicts were resolved by keeping every entry in date order.
+- `src/components/brand/__tests__/logo.test.tsx`: `afterEach(cleanup)`.
+
+### Tests Added/Changed
+- `logo.test.tsx` only (3/3 clean runs after the fix, 3/3 failing before).
+
+### Remaining Concerns
+- Signed-in browser flows still not exercised (no test Supabase account here). Same longstanding items: reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, document DELETE 404-vs-500 (P4).
+- Minor (P4, not changed): a real PDF uploaded with a `.txt` name is stored as `application/pdf`, but text extraction checks the `.txt` name first and reads it as text.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-x20n2q` (supersedes #101–#104)

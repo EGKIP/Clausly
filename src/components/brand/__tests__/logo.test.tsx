@@ -1,8 +1,8 @@
 import React from "react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { Logo, Logomark } from "../logo";
 import { MarkSvg } from "../mark";
 import { MARK, MARK_SMALL } from "../mark-geometry";
@@ -11,6 +11,10 @@ const publicSvg = (name: string) =>
   readFileSync(path.resolve(__dirname, "../../../../public/brand", name), "utf8");
 
 describe("Clausly mark", () => {
+  // Unmount after each case: the framer-motion marks keep scheduling React work,
+  // which throws "window is not defined" once jsdom is torn down.
+  afterEach(cleanup);
+
   it("renders the full mark with ring, page, highlight and reminder dot", () => {
     const { container } = render(<MarkSvg />);
     expect(container.querySelector(`path[d="${MARK.ring.d}"]`)).not.toBeNull();

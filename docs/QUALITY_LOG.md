@@ -779,3 +779,27 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-x20n2q` (supersedes #101–#104)
+
+## 2026-11-16
+
+### Quality Gates
+- `main`: Build pass · Typecheck pass · Lint pass · **Unit tests FAIL (656/657)** — "patches approved reminders" aged out today, exactly as predicted in #104. CI on `main` will be red on its next run.
+- This branch (on top of #105): Build pass · Typecheck pass · Lint pass · Unit tests pass (661/661, 114 files) · E2E: none configured
+
+### Issues Found
+- **P2 (CI red):** `main` test suite fails from today. Fixed in #104 / #105, both still unmerged; `main` unchanged since 2026-10-07.
+- **P4:** `DELETE /api/documents/[id]` returned 404 "not found" when the ownership lookup failed for a non-not-found reason (e.g. DB error), hiding real failures from the client and logs. Carried as a known item since 2026-11-15.
+- Re-reviewed reminder approve/PATCH/DELETE (ownership, past-date guard, validation) and public share-token access (revoked/expired checks, field selection): no defect.
+
+### Fixes Completed
+- `src/app/api/documents/[id]/route.ts`: non-PGRST116 read errors on delete now return 500.
+
+### Tests Added/Changed
+- `src/app/api/documents/[id]/__tests__/route.test.ts`: forced select error → 500, row and storage untouched (fails before the fix).
+
+### Remaining Concerns
+- Merge #105 (or this branch) soon; every day `main` stays as-is, CI is red.
+- Same longstanding items: no E2E harness / no signed-in browser flows (no test account), reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, `.txt`-named PDF extraction (P4).
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-222c8e` (contains #105 + today's fix)

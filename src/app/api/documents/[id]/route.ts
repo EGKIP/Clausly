@@ -98,7 +98,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   if (readError?.code === "PGRST116") {
     return NextResponse.json({ error: "Document not found." }, { status: 404 });
   }
-  if (readError) return NextResponse.json({ error: readError.message }, { status: 404 });
+  if (readError) return NextResponse.json({ error: readError.message }, { status: 500 });
 
   if (!document.storage_path.startsWith(`${user.id}/`)) {
     console.warn("Rejected document delete due to owner path mismatch.", {

@@ -803,3 +803,27 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-222c8e` (contains #105 + today's fix)
+
+## 2026-11-17
+
+### Quality Gates
+- `main`: Build pass · Typecheck pass · Lint pass · **Unit tests FAIL (656/657)** — same aged-out "patches approved reminders" test as yesterday; `main` still unchanged since 2026-10-07.
+- This branch (on top of #106): Build pass · Typecheck pass · Lint pass · Unit tests pass (666/666, 115 files) · E2E: none configured
+- Browser smoke (production build, 375px): `/`, `/login`, `/signup`, `/dashboard` render with no page errors and no horizontal overflow. No Supabase env in this container, so the dashboard ran in demo passthrough; signed-in flows not exercised.
+
+### Issues Found
+- **P4:** `extractStoredDocumentText` (`src/lib/ai/document-text.ts`) chose the extractor by file name before the stored mime type. `/api/upload` sets `mime_type` from magic bytes, so a real PDF named `contract.txt` or `contract.docx` (possible when a client sends `type: application/pdf`, e.g. a script or future native client) was stored as a PDF but read as plain text or DOCX, producing garbled analysis or a failed DOCX parse. This was the open `.txt`-named PDF item from 2026-11-15.
+- Re-checked `safeNextPath` and its use in login/OAuth callback (open-redirect guard): no defect.
+
+### Fixes Completed
+- `src/lib/ai/document-text.ts`: a known, server-verified mime type now picks the extractor. The file extension is only a fallback for legacy rows with an unknown/empty mime type. Applies to both analysis and the Ask reindex path.
+
+### Tests Added/Changed
+- `src/lib/ai/__tests__/document-text.test.ts` (new, 5 cases): PDF named `.txt` / `.docx` goes to the PDF extractor (both fail before the fix), each known mime routes correctly, extension fallback for unknown mime, empty text still rejected.
+
+### Remaining Concerns
+- `main` CI stays red until #104/#105/#106 (or this branch) merge. This branch contains all of them.
+- Same longstanding items: no E2E harness / no signed-in browser flows (no test account), reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-bncfbo` (contains #106 → #105 → #101–#104, plus today's fix)

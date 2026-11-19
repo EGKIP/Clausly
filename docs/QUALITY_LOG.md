@@ -827,3 +827,31 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-bncfbo` (contains #106 → #105 → #101–#104, plus today's fix)
+
+## 2026-11-19
+
+### Quality Gates
+- `main`: Build pass · Typecheck pass · Lint pass · **Unit tests FAIL (656/657)**: the same aged-out "patches approved reminders" test. `main` is still unchanged since 2026-10-07, and #101–#107 are still open.
+- This branch (on top of #107): Build pass · Typecheck pass · Lint pass · Unit tests pass (670/670) · E2E: none configured
+- Browser smoke (production build, 375px, demo mode): `/dashboard/clauses` and `/dashboard` return 200 with no page errors and no horizontal overflow. Signed-in flows not exercised because there is no test account.
+
+### Issues Found
+- **P2:** Clause Library "Load more" (`/api/clauses` and the first page in `dashboard/clauses/page.tsx`) paginated with `created_at < cursor` only. `persistClauses` inserts all of a document's clauses in one statement, so they share one `now()` timestamp. When a 50-row page boundary fell inside one document's batch, the rest of that document's clauses were skipped silently. Any user with more than 50 clauses (about 3+ analyzed contracts) could lose clauses from the library and never know.
+- **P3:** Clause Library search put the user's text unquoted inside a PostgREST `or()` filter and stripped only `%` and `,`. Parentheses, double quotes, and backslashes are logic-tree syntax there, so a search like `rent (monthly)` produced a filter PostgREST cannot parse. Verified against the mock, which now models that rule, not against live PostgREST.
+
+### Fixes Completed
+- `src/lib/db/clause-cursor.ts` (new): keyset cursor on `(created_at, id)` with a strict timestamp/uuid check, because cursor values go into the filter string. Cursors issued before this change, which carry only `createdAt`, still use the old `lt` behavior.
+- `src/app/api/clauses/route.ts`, `src/app/dashboard/clauses/page.tsx`: order by `created_at desc, id desc` and use the shared cursor.
+- `src/app/api/clauses/route.ts`: search swaps `( ) " \` for the LIKE `_` wildcard, so the search still matches the original text.
+
+### Tests Added/Changed
+- `src/app/api/clauses/__tests__/route.test.ts`: four new cases. Paging walks a same-timestamp batch with nothing skipped, a legacy cursor still works, forged cursor values return 400, and a search with parens or quotes returns 200 with a match. Three of them fail against the old route.
+- `tests/helpers/supabase.ts`: the mock now supports multi-column `order()`, nested `or()`/`and()` with `eq`/`lt`/`ilike`, LIKE wildcards, and rejects unquoted reserved characters the way PostgREST does.
+
+### Remaining Concerns
+- `main` CI stays red until the open stack merges. This branch contains #101–#107 plus today's fix.
+- The audit-log cursor (`/api/audit`) has the same `created_at`-only shape. It is low risk because events are inserted one per request, so it was left as is.
+- Same longstanding items: no E2E harness or test account, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, unsubscribe link returns raw JSON.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-66882e` (on top of `claude/upbeat-newton-bncfbo` / #107)

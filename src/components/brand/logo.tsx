@@ -1,3 +1,4 @@
+import * as React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { AnimatedMark, type MarkMotion } from "./animated-mark";
@@ -8,11 +9,16 @@ import { MarkSvg } from "./mark";
  * use <MarkSvg tile /> where a fixed navy tile is needed (icons, OG image).
  *
  * `motion` is opt-in and reserved for moments that earn it: "draw" for first-run reveals,
- * "loop" for working states. Navigation and chrome stay static. */
+ * "loop" for working states. Navigation and chrome stay static.
+ *
+ * Each instance gets its own gradient ids. Pages often render two marks (e.g. a desktop panel and a
+ * mobile header); with shared ids, url(#…) resolves to the first one, and when that copy is
+ * display:none the browser paints the visible ring with no stroke at all. */
 export function Logomark({ className, motion }: { className?: string; motion?: MarkMotion }) {
+  const idPrefix = `clm${React.useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const cls = cn("size-8", className);
-  if (motion) return <AnimatedMark mode={motion} className={cls} />;
-  return <MarkSvg theme="adaptive" className={cls} />;
+  if (motion) return <AnimatedMark mode={motion} className={cls} idPrefix={idPrefix} />;
+  return <MarkSvg theme="adaptive" className={cls} idPrefix={idPrefix} />;
 }
 
 export function Logo({

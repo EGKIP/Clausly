@@ -98,6 +98,66 @@ describe("GET /api/clauses", () => {
     expect(secondPayload.nextCursor).toBeNull();
   });
 
+  it("does not skip clauses that share a created_at across a page boundary", async () => {
+    // One analysis inserts all of a document's clauses in a single statement,
+    // so they share one created_at. The page boundary falls inside that batch.
+    const document = seedDocument(userA);
+    const batchAt = "2026-06-02T10:00:00.123456+00:00";
+    for (const title of ["A", "B", "C", "D", "E"]) {
+      seedClause(document.id, userA, { title, created_at: batchAt });
+    }
+    seedClause(document.id, userA, { title: "Older", created_at: "2026-06-01T00:00:00.000000+00:00" });
+
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < 10; page += 1) {
+      const url: string = `http://localhost.test/api/clauses?limit=2${cursor ? `&cursor=${cursor}` : ""}`;
+      const payload = await (await GET(new Request(url))).json();
+      seen.push(...payload.clauses.map((clause: { title: string }) => clause.title));
+      cursor = payload.nextCursor;
+      if (!cursor) break;
+    }
+
+    expect(seen).toHaveLength(6);
+    expect(new Set(seen)).toEqual(new Set(["A", "B", "C", "D", "E", "Older"]));
+    expect(seen[seen.length - 1]).toBe("Older");
+  });
+
+  it("still accepts a cursor issued before the id tiebreaker", async () => {
+    const document = seedDocument(userA);
+    seedClause(document.id, userA, { title: "Newer", created_at: "2026-06-02T00:00:00.000Z" });
+    seedClause(document.id, userA, { title: "Older", created_at: "2026-06-01T00:00:00.000Z" });
+    const legacy = Buffer.from(JSON.stringify({ createdAt: "2026-06-02T00:00:00.000Z" })).toString("base64url");
+
+    const payload = await (await GET(new Request(`http://localhost.test/api/clauses?cursor=${legacy}`))).json();
+
+    expect(payload.clauses.map((clause: { title: string }) => clause.title)).toEqual(["Older"]);
+  });
+
+  it("rejects a cursor whose values could alter the filter", async () => {
+    const forged = Buffer.from(JSON.stringify({
+      createdAt: "2026-06-01T00:00:00Z\",user_id.neq.x",
+      id: "00000000-0000-0000-0000-000000000000",
+    })).toString("base64url");
+    const badId = Buffer.from(JSON.stringify({ createdAt: "2026-06-01T00:00:00Z", id: "x),or(id.neq.y" })).toString("base64url");
+
+    expect((await GET(new Request(`http://localhost.test/api/clauses?cursor=${forged}`))).status).toBe(400);
+    expect((await GET(new Request(`http://localhost.test/api/clauses?cursor=${badId}`))).status).toBe(400);
+  });
+
+  it("searches text containing parentheses and quotes", async () => {
+    const document = seedDocument(userA);
+    seedClause(document.id, userA, { title: "Rent (monthly)", plain_english: "Pay rent.", source_quote: "Rent." });
+    seedClause(document.id, userA, { title: "Deposit", plain_english: "Deposit.", source_quote: "Deposit." });
+
+    const response = await GET(new Request(`http://localhost.test/api/clauses?q=${encodeURIComponent('rent (monthly)')}`));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.clauses.map((clause: { title: string }) => clause.title)).toEqual(["Rent (monthly)"]);
+    expect((await GET(new Request(`http://localhost.test/api/clauses?q=${encodeURIComponent('"rent"')}`))).status).toBe(200);
+  });
+
   it("does not leak clauses from another user", async () => {
     const owned = seedDocument(userA, { title: "Owned Lease" });
     const other = seedDocument(userB, { title: "Other Lease" });

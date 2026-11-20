@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { clauses as mockClauses } from "@/lib/mock-clauses";
+import { applyClauseCursor, decodeClauseCursor, encodeClauseCursor, type ClauseCursor } from "@/lib/db/clause-cursor";
 import { apiRiskToUi, type ClauseRow, type DocumentRow } from "@/lib/db/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -73,10 +74,11 @@ export async function GET(request: Request) {
   if (params.categories.length > 0) query = query.in("category", params.categories);
   if (params.risks.length > 0) query = query.in("risk_level", params.risks);
   if (params.documentId) query = query.eq("document_id", params.documentId);
-  if (params.cursor) query = query.lt("created_at", params.cursor.createdAt);
+  if (params.cursor) query = applyClauseCursor(query, params.cursor);
 
   const { data, error } = await query
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(params.limit + 1);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -89,7 +91,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     clauses: rows.map((row) => toClauseLibraryItem(row, documentTitles.get(row.document_id))),
-    nextCursor: hasNextPage && cursorRow ? encodeCursor({ createdAt: cursorRow.created_at }) : null,
+    nextCursor: hasNextPage && cursorRow ? encodeClauseCursor(cursorRow) : null,
     totalCount: count ?? 0,
   });
 }
@@ -136,7 +138,7 @@ type ParsedClauseQuery = {
   risks: ClauseRow["risk_level"][];
   documentId: string | null;
   limit: number;
-  cursor: { createdAt: string } | null;
+  cursor: ClauseCursor | null;
 };
 
 function parseClauseQuery(searchParams: URLSearchParams): ParsedClauseQuery | { error: string } {
@@ -144,7 +146,7 @@ function parseClauseQuery(searchParams: URLSearchParams): ParsedClauseQuery | { 
   if (!Number.isFinite(limitValue) || limitValue < 1) return { error: "Invalid limit." };
 
   const cursorValue = searchParams.get("cursor");
-  const cursor = cursorValue ? decodeCursor(cursorValue) : null;
+  const cursor = cursorValue ? decodeClauseCursor(cursorValue) : null;
   if (cursorValue && !cursor) return { error: "Invalid cursor." };
 
   return {
@@ -179,22 +181,12 @@ function toClauseCategory(value: string) {
     .join(" ");
 }
 
+// Parens, quotes, and backslashes are PostgREST logic-tree syntax inside
+// or(), so an unquoted one (e.g. "rent (monthly)") makes the filter
+// unparseable. Swap them for `_`, LIKE's single-character wildcard, so the
+// search still matches the original text.
 function escapeIlikeTerm(value: string) {
-  return value.replace(/[%,]/g, " ").trim();
-}
-
-function encodeCursor(cursor: { createdAt: string }) {
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
-}
-
-function decodeCursor(value: string): { createdAt: string } | null {
-  try {
-    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { createdAt?: unknown };
-    if (typeof parsed.createdAt !== "string") return null;
-    return { createdAt: parsed.createdAt };
-  } catch {
-    return null;
-  }
+  return value.replace(/[%,]/g, " ").replace(/[()"\\]/g, "_").trim();
 }
 
 function uiRiskToApi(risk: string): ClauseRow["risk_level"] {

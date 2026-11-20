@@ -118,7 +118,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { data: document, error: documentError } = await supabase
     .from("documents")
-    .select("id, user_id, status, storage_path")
+    .select("id, user_id, status, storage_path, file_name, mime_type")
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
@@ -187,6 +187,8 @@ export async function POST(request: Request, context: RouteContext) {
       id: document.id,
       user_id: document.user_id,
       storage_path: document.storage_path,
+      file_name: document.file_name,
+      mime_type: document.mime_type,
     });
 
     if (recovery.indexed > 0) {

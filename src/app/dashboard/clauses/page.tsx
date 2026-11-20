@@ -6,6 +6,7 @@ import { PortfolioEmptyState } from "@/components/dashboard/empty-states/portfol
 import { Button } from "@/components/ui/button";
 import { clauses as mockClauses } from "@/lib/mock-clauses";
 import { documents as mockDocuments } from "@/lib/mock-data";
+import { encodeClauseCursor } from "@/lib/db/clause-cursor";
 import { apiRiskToUi, type ClauseRow, type DocumentRow } from "@/lib/db/types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -83,6 +84,7 @@ async function getInitialClauseLibrary(documentId: string | null) {
 
   const { data: clauseRows, error: clauseError } = await clauseQuery
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(FIRST_PAGE_LIMIT + 1);
   if (clauseError) throw clauseError;
 
@@ -101,7 +103,7 @@ async function getInitialClauseLibrary(documentId: string | null) {
     documentCount,
     clauses: rows.map((row) => toClauseLibraryItem(row, documentTitles.get(row.document_id))),
     nextCursor: (clauseRows ?? []).length > FIRST_PAGE_LIMIT && rows.length > 0
-      ? encodeCursor({ createdAt: rows[rows.length - 1].created_at })
+      ? encodeClauseCursor(rows[rows.length - 1])
       : null,
     totalCount: (facetRows ?? []).length,
     categoryFacets: buildCategoryFacets(facetRows ?? []),
@@ -150,7 +152,9 @@ function getMockClauseLibrary(documentId: string | null) {
       plainEnglish: clause.plainEnglish,
       createdAt: "2026-06-01T00:00:00.000Z",
     })),
-    nextCursor: filtered.length > FIRST_PAGE_LIMIT ? encodeCursor({ createdAt: "2026-06-01T00:00:00.000Z" }) : null,
+    nextCursor: filtered.length > FIRST_PAGE_LIMIT
+      ? encodeClauseCursor({ created_at: "2026-06-01T00:00:00.000Z", id: filtered[FIRST_PAGE_LIMIT - 1].id })
+      : null,
     totalCount: filtered.length,
     categoryFacets: buildCategoryFacets(filtered.map((clause) => ({ category: clause.category }))),
     riskFacets: buildRiskFacets(filtered.map((clause) => ({ risk_level: uiRiskToApi(clause.risk) }))),
@@ -199,10 +203,6 @@ function buildRiskFacets(rows: Array<{ risk_level: ClauseRiskLevel }>) {
   return order
     .filter((value) => counts.has(value))
     .map((value) => ({ value, label: apiRiskToUi[value], count: counts.get(value) ?? 0 }));
-}
-
-function encodeCursor(cursor: { createdAt: string }) {
-  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 }
 
 function uiRiskToApi(risk: string): ClauseRiskLevel {

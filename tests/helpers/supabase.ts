@@ -527,8 +527,8 @@ function createSupabaseClientForRole(bypassRls: boolean) {
 
 class Query {
   private filters: { column: string; value: unknown; op: "eq" | "neq" | "in" | "gte" | "lt" }[] = [];
-  private orFilters: { column: string; term: string; op: "ilike" }[] = [];
-  private orderBy: { column: string; ascending: boolean } | null = null;
+  private orFilters: ((row: Row) => boolean)[] = [];
+  private orderBy: { column: string; ascending: boolean }[] = [];
   private limitCount: number | null = null;
   private head = false;
   private wantsCount = false;
@@ -588,19 +588,13 @@ class Query {
   }
 
   or(query: string) {
-    this.orFilters.push(...query
-      .split(",")
-      .map((part) => {
-        const match = part.match(/^([a-zA-Z0-9_]+)\.ilike\.%(.*)%$/);
-        if (!match) return null;
-        return { column: match[1], term: match[2].toLowerCase(), op: "ilike" as const };
-      })
-      .filter((filter): filter is { column: string; term: string; op: "ilike" } => Boolean(filter)));
+    // Each .or() call is one group; PostgREST ANDs separate groups together.
+    this.orFilters.push(parseOrGroup(query));
     return this;
   }
 
   order(column: string, options?: { ascending?: boolean }) {
-    this.orderBy = { column, ascending: options?.ascending ?? true };
+    this.orderBy.push({ column, ascending: options?.ascending ?? true });
     return this;
   }
 
@@ -683,28 +677,79 @@ class Query {
       if (filter.op === "gte") rows = rows.filter((row) => String(row[filter.column]) >= String(filter.value));
       if (filter.op === "lt") rows = rows.filter((row) => String(row[filter.column]) < String(filter.value));
     }
-    if (this.orFilters.length > 0) {
-      rows = rows.filter((row) => this.orFilters.some((filter) =>
-        String(row[filter.column] ?? "").toLowerCase().includes(filter.term)
-      ));
-    }
+    for (const group of this.orFilters) rows = rows.filter(group);
     return rows;
   }
 
   private orderedAndLimitedRows(rows: Row[]) {
     let nextRows = rows;
-    if (this.orderBy) {
-      const { column, ascending } = this.orderBy;
+    if (this.orderBy.length > 0) {
       nextRows = [...nextRows].sort((a, b) => {
-        if (a[column] === b[column]) return 0;
-        if (a[column] == null) return ascending ? -1 : 1;
-        if (b[column] == null) return ascending ? 1 : -1;
-        return a[column] > b[column] ? (ascending ? 1 : -1) : (ascending ? -1 : 1);
+        for (const { column, ascending } of this.orderBy) {
+          if (a[column] === b[column]) continue;
+          if (a[column] == null) return ascending ? -1 : 1;
+          if (b[column] == null) return ascending ? 1 : -1;
+          return a[column] > b[column] ? (ascending ? 1 : -1) : (ascending ? -1 : 1);
+        }
+        return 0;
       });
     }
     if (this.limitCount !== null) return nextRows.slice(0, this.limitCount);
     return nextRows;
   }
+}
+
+// Minimal PostgREST logic-tree parser: `a.ilike.%x%,b.lt."v",and(c.eq.v,d.lt.v)`.
+function parseOrGroup(query: string): (row: Row) => boolean {
+  const terms = splitTopLevel(query).map(parseLogicTerm);
+  return (row) => terms.some((term) => term(row));
+}
+
+function parseLogicTerm(term: string): (row: Row) => boolean {
+  const nested = term.match(/^(and|or)\((.*)\)$/);
+  if (nested) {
+    const parts = splitTopLevel(nested[2]).map(parseLogicTerm);
+    return nested[1] === "and"
+      ? (row) => parts.every((part) => part(row))
+      : (row) => parts.some((part) => part(row));
+  }
+  const match = term.match(/^([a-zA-Z0-9_]+)\.(ilike|eq|lt)\.(.*)$/);
+  if (!match) throw new Error(`Unsupported or() term in Supabase mock: ${term}`);
+  const [, column, op, raw] = match;
+  const quoted = raw.startsWith('"') && raw.endsWith('"');
+  // Real PostgREST rejects reserved characters in an unquoted value.
+  if (!quoted && /[()"\\]/.test(raw)) throw new Error(`PostgREST could not parse or() value: ${raw}`);
+  const value = quoted ? raw.slice(1, -1) : raw;
+  if (op === "ilike") {
+    const pattern = value
+      .split("")
+      .map((char) => (char === "%" ? ".*" : char === "_" ? "." : char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")))
+      .join("");
+    const re = new RegExp(`^${pattern}$`, "is");
+    return (row) => re.test(String(row[column] ?? ""));
+  }
+  if (op === "eq") return (row) => String(row[column]) === value;
+  return (row) => String(row[column]) < value;
+}
+
+function splitTopLevel(input: string) {
+  const parts: string[] = [];
+  let depth = 0;
+  let quoted = false;
+  let current = "";
+  for (const char of input) {
+    if (char === '"') quoted = !quoted;
+    if (!quoted && char === "(") depth += 1;
+    if (!quoted && char === ")") depth -= 1;
+    if (!quoted && depth === 0 && char === ",") {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current) parts.push(current);
+  return parts;
 }
 
 function isVisible(table: TableName, row: Row, bypassRls = false) {

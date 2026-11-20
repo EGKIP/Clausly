@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSupabaseClient,
   db,
+  failNext,
   failNextStorageRemove,
   resetSupabaseMock,
   routeContext,
@@ -131,6 +132,17 @@ describe("/api/documents/[id]", () => {
     expect(response.status).toBe(200);
     expect(db().documents).toHaveLength(0);
     warn.mockRestore();
+  });
+
+  it("returns 500, not 404, when the ownership lookup fails for another reason", async () => {
+    const document = seedDocument(userA);
+    failNext("select", "documents", "connection reset");
+
+    const response = await DELETE(new Request("http://localhost.test", { method: "DELETE" }), routeContext(document.id));
+
+    expect(response.status).toBe(500);
+    expect(db().documents).toHaveLength(1);
+    expect(storageCalls().removed).toEqual([]);
   });
 
   it("returns 403 when the storage path does not belong to the user", async () => {

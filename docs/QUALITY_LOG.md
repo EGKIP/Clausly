@@ -855,3 +855,31 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-66882e` (on top of `claude/upbeat-newton-bncfbo` / #107)
+
+## 2026-11-20
+
+### Quality Gates
+- `main`: Build pass · Typecheck pass · Lint pass · **Unit tests FAIL (656/657)**: the same aged-out "patches approved reminders" test. `main` is still unchanged since 2026-10-07, and #101–#108 are still open.
+- This branch (on top of #108): Build pass · Typecheck pass · Lint pass · Unit tests pass (680/680, 117 files) · E2E: none configured
+- Clock check: ran the whole suite with `Date` shifted +45, +90, +200 and +420 days. All 670 pre-existing tests still pass, so no more fixtures are about to age out the way the reminder tests did. The harness was confirmed to catch the aged-out test on `main`.
+- Browser smoke (production build, 375px, light and dark): `/unsubscribed` in all three states renders with no page errors and no horizontal overflow. Following an unsubscribe link lands on the page. No Supabase env in this container, so the real token path was covered by unit tests only.
+
+### Issues Found
+- **P3:** The unsubscribe link in reminder and weekly digest emails (`/api/notifications/unsubscribe`) showed people raw JSON (`{"ok":true}` or an error object) in the browser.
+- **P3 (privacy):** The same route returned 404 with the database error text for an unknown or malformed `user_id`, and 400 for a bad token. Anyone could use that difference to check whether a user id exists, and Postgres error strings were sent to unauthenticated callers.
+
+### Fixes Completed
+- `src/app/api/notifications/unsubscribe/route.ts`: redirects (303) to `/unsubscribed?status=done|invalid|error`. An unknown user and a bad token both read as `invalid`. Update failures, thrown errors, and missing config read as `error` and are logged server-side only. The token check and preference update are unchanged.
+- `src/app/unsubscribed/page.tsx` (new, `noindex`): short confirmation, invalid-link, or error message naming the list (email reminders or weekly digest), with a link to Settings.
+
+### Tests Added/Changed
+- `src/app/api/notifications/unsubscribe/__tests__/route.test.ts` (new, 6 cases): redirect on success, digest type kept, unknown user and bad token look the same with no DB text, missing params, update failure or throw, missing config. All 6 fail against the old route.
+- `src/app/unsubscribed/__tests__/page.test.tsx` (new, 4 cases): copy for each state and the Settings link.
+
+### Remaining Concerns
+- `main` CI stays red until the open stack merges. This branch contains #101–#108 plus today's fix, so it supersedes them.
+- The unsubscribe link still acts on a plain GET, so an email security scanner that prefetches links could unsubscribe someone. This was already true before today. It only turns emails off and can be undone in Settings. Moving to a confirm button or RFC 8058 one-click POST is a product decision.
+- Same longstanding items: no E2E harness or test account, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, audit-log cursor uses `created_at` only.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-96jspd` (on top of `claude/upbeat-newton-66882e` / #108)

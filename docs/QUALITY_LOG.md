@@ -883,3 +883,27 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-96jspd` (on top of `claude/upbeat-newton-66882e` / #108)
+
+## 2026-11-21
+
+### Quality Gates
+- `main`: Lint pass · Typecheck pass · **Unit tests FAIL (656/657)**: the same aged-out "patches approved reminders" test. `main` is unchanged since 2026-10-07.
+- This branch (on top of #109): Build pass · Typecheck pass · Lint pass · Unit tests pass (680/680, 117 files) · E2E: none configured
+
+### Issues Found
+- No new defects. I wrote a fix for the red `main` test before seeing it was already in #104 (and carried into #109), so I threw mine away.
+- Looked at the audit-log cursor (`/api/audit`, `created_at` only). Audit rows are written one insert per request, so two rows for the same user with the exact same microsecond timestamp aren't realistic. Not changing it.
+- Checked the OAuth callback and `safeNextPath`: off-site `next` targets (`//host`, `/\host`, tab tricks) all fall back to `/dashboard`. The service-role client is only used server-side (welcome email, billing checkout, notifications).
+
+### Fixes Completed
+- None needed.
+
+### Tests Added/Changed
+- None.
+
+### Remaining Concerns
+- **Nine stacked PRs (#101–#109) are open; #109 contains all of them.** Merging #109 fixes `main`'s red CI. #101–#108 can be closed after that.
+- Same longstanding items: no E2E harness or test account, reminder Time field vs daily cron, upload-cap TOCTOU, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, unsubscribe on plain GET.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-4lv2j3` (= #109 + this entry). No new PR, so the stack doesn't grow.

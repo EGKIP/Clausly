@@ -883,3 +883,28 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-96jspd` (on top of `claude/upbeat-newton-66882e` / #108)
+
+## 2026-11-22
+
+### Quality Gates
+- `main`: Build pass · Typecheck pass · Lint pass · **Unit tests FAIL (656/657)**: the same aged-out "patches approved reminders" test (fixed in #104). `main` is still unchanged since 2026-10-07, and #101–#109 are still open.
+- This branch (on top of #109): Build pass · Typecheck pass · Lint pass · Unit tests pass (685/685, 118 files) · E2E: none configured
+- No browser pass this run: the change is a server-only admin route.
+
+### Issues Found
+- **P3:** `POST /api/admin/backfill-chunks` ran every ready document through the PDF extractor. #103 fixed this for Ask's reindex path but missed this route. DOCX, pasted-text, and image documents failed the backfill or got garbage chunks. It only runs when an operator calls it with the admin secret.
+- **P3:** In the same route, the per-document chunk-count lookup ran outside the `try`. One failed lookup threw out of the loop, so the whole backfill returned 500 partway through. An embedding error was also counted as neither processed nor failed.
+- Ran a sweep of every API route for an auth check: all have one (user session, cron/admin secret, share token, or Stripe signature). Service-role clients are server-only.
+
+### Fixes Completed
+- `src/app/api/admin/backfill-chunks/route.ts`: now selects `file_name`/`mime_type` and calls the shared `reindexDocumentChunksFromStorage`, which picks the extractor by stored type. Each document's lookup, download, extraction, and embedding runs inside the `try`, so one failure counts as `failed` and the loop keeps going. Auth is unchanged.
+
+### Tests Added/Changed
+- `src/app/api/admin/backfill-chunks/__tests__/route.test.ts` (new, 5 cases): missing secret gets 401; a text document is indexed without the PDF extractor; PDFs still use it; a chunk-lookup error counts as one failure and the next document still gets processed; a missing stored file counts as a failure. The text-document and lookup-error cases fail against the old route.
+
+### Remaining Concerns
+- The open stack (#101–#109, plus this PR) still needs review. Merging the newest PR covers all of them, and `main` CI stays red until that happens.
+- Same longstanding items as before: no E2E harness or test account, the reminder Time field vs the daily cron, the upload-cap TOCTOU race, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, the audit-log cursor, and unsubscribe-on-GET.
+
+### PR/Branch
+- Branch: `claude/upbeat-newton-1f12u7` (on top of `claude/upbeat-newton-96jspd` / #109)

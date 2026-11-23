@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { embedDocumentChunks } from "@/lib/ai/embeddings";
-import { extractPdfTextWithOcr } from "@/lib/ai/pdf-text";
+import { reindexDocumentChunksFromStorage } from "@/lib/ai/embeddings";
 import {
   createServiceSupabaseClient,
   hasServiceSupabaseEnv,
@@ -11,6 +10,8 @@ type BackfillDocument = {
   id: string;
   user_id: string;
   storage_path: string;
+  file_name: string;
+  mime_type: string;
 };
 
 export async function POST(request: Request) {
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
   const supabase = createServiceSupabaseClient();
   const { data: documents, error } = await supabase
     .from("documents")
-    .select("id, user_id, storage_path")
+    .select("id, user_id, storage_path, file_name, mime_type")
     .eq("status", "ready");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -39,18 +40,15 @@ export async function POST(request: Request) {
   let failed = 0;
 
   for (const document of (documents ?? []) as BackfillDocument[]) {
-    const hasChunks = await documentHasChunks(supabase, document.id);
-    if (hasChunks) continue;
-
+    // One document's failure (chunk lookup, download, extraction, embedding)
+    // must not abort the rest of the backfill.
     try {
-      const { data: file, error: downloadError } = await supabase.storage
-        .from("documents")
-        .download(document.storage_path);
-      if (downloadError) throw new Error(downloadError.message);
-      if (!file) throw new Error("Document file could not be downloaded.");
+      if (await documentHasChunks(supabase, document.id)) continue;
 
-      const text = await extractPdfTextWithOcr(file);
-      const result = await embedDocumentChunks(supabase, document.id, document.user_id, text);
+      // Shared with Ask's recovery path: picks the extractor by the stored
+      // mime type, so DOCX/TXT/image documents aren't parsed as PDFs.
+      const result = await reindexDocumentChunksFromStorage(supabase, document);
+      if (result.error) throw new Error(result.error);
       processed += result.indexed > 0 ? 1 : 0;
     } catch (backfillError) {
       failed += 1;

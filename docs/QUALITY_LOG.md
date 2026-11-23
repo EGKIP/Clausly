@@ -934,3 +934,8 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/web-stabilization`
+
+## 2026-11-23 (follow-up)
+
+- The owner approved merging. PR #111 (`claude/web-stabilization`, which contains all of #101–#110) was squash-merged to `main` as `ddee0be`. #101–#110 were closed as superseded. `main` unit tests pass again (685/685). The Vercel production deploy of `ddee0be` is Ready, with no runtime errors in the hour after it.
+- `claude/web-stabilization` was reset to the new `main`.

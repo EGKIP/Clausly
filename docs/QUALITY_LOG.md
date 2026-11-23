@@ -908,3 +908,29 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/upbeat-newton-1f12u7` (on top of `claude/upbeat-newton-96jspd` / #109)
+
+## 2026-11-23
+
+### Quality Gates
+- `main`: Lint pass · Typecheck pass · **Unit tests FAIL (656/657)**, the same aged-out reminder PATCH test fixed in #104. `main` is unchanged since 2026-10-07.
+- `claude/web-stabilization` (new; starts at #110's head, which already contains #101–#109 and `main`): Build pass · Typecheck pass · Lint pass · Unit tests pass (685/685, 118 files) · E2E: none configured
+- Time-bomb sweep: ran the full suite with the clock moved forward 45, 120 and 365 days (a Node preload that shifts `Date`, checked with a probe test). All 685 pass at every offset, so no fixture dates age out within a year.
+- Browser pass (`next start`, no Supabase env, 375px, light and dark): crawled 30 linked pages. No horizontal overflow, no runtime errors, no broken internal links. The only error was `/reset-password` throwing "Missing NEXT_PUBLIC_SUPABASE_URL" with no env. That only happens locally; production has the env.
+
+### Issues Found
+- No new P0–P2 defects. Reviewed by hand: the conversations and messages routes, the public share digest and share revoke (token, revoked and expiry checks; owner-scoped revoke), and reminder PATCH/DELETE (ownership, sent/dismissed guards, past-date guard).
+- P4, not fixed: `GET /api/conversations/[id]/messages` returns the raw DB error text on a 500 (for example, a malformed id). It is owner-scoped, so nothing leaks across users. This is cosmetic.
+
+### Fixes Completed
+- None in code. Created the long-lived `claude/web-stabilization` branch the routine asks for, at #110's head, so one PR now covers the whole open stack (#101–#110).
+
+### Tests Added/Changed
+- None.
+
+### Remaining Concerns
+- `main` CI stays red until the stack merges. Merging `claude/web-stabilization` (or #110) covers all of #101–#110.
+- Core flows (sign-in, upload, analysis, reminder approval) are still not exercised end to end: there is no Playwright harness, test account or staging env (mobile S06, blocked on the owner).
+- Same longstanding items as before: the reminder Time field vs the daily cron, the upload-cap TOCTOU race, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, the audit-log cursor, and unsubscribe-on-GET.
+
+### PR/Branch
+- Branch: `claude/web-stabilization`

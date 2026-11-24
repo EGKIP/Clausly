@@ -939,3 +939,26 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 - The owner approved merging. PR #111 (`claude/web-stabilization`, which contains all of #101–#110) was squash-merged to `main` as `ddee0be`. #101–#110 were closed as superseded. `main` unit tests pass again (685/685). The Vercel production deploy of `ddee0be` is Ready, with no runtime errors in the hour after it.
 - `claude/web-stabilization` was reset to the new `main`.
+
+## 2026-11-24
+
+### Quality Gates
+- `main` (`8de92f0`): Build pass · Typecheck pass · Lint pass · Unit tests pass (685/685, 118 files) · E2E: none configured
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (688/688, 118 files) · E2E: none configured
+- No browser pass this run: the change is server-only.
+
+### Issues Found
+- **P3:** `POST /api/reminders`, `PATCH /api/profile`, and `PATCH /api/settings/notifications` called `request.json()` without a fallback. A body that wasn't valid JSON threw out of the handler, so the caller got Next's generic 500 instead of the 400 validation error every other mutation route returns. Nothing was written in either case. This matters more once a second client (mobile, bearer auth) calls these routes.
+- Also reviewed with no defects found: reminder approve (ownership, status and past-date guards), document PATCH/DELETE (owner path check, row-first delete), share create (Pro gate, ownership), document export (ownership, quota, filename slug), and the Resend webhook (signature verified before any DB work).
+
+### Fixes Completed
+- The three routes now use `request.json().catch(() => null)`, the same pattern as the other routes, so a malformed body fails schema validation with a 400. Auth and validation order are unchanged.
+
+### Tests Added/Changed
+- One malformed-body case each in `src/app/api/reminders/__tests__/route.test.ts`, `src/app/api/profile/__tests__/route.test.ts`, and `src/app/api/settings/notifications/__tests__/route.test.ts`. All three fail against the old routes.
+
+### Remaining Concerns
+- Same longstanding items: no E2E harness, test account or staging env, the reminder Time field vs the daily cron, the upload-cap TOCTOU race, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, the audit-log cursor, and unsubscribe-on-GET.
+
+### PR/Branch
+- Branch: `claude/web-stabilization` (also pushed as `claude/upbeat-newton-n51c5d`)

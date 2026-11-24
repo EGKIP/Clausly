@@ -100,3 +100,23 @@ describe("/api/settings/notifications", () => {
     expect(optInPayload).toMatchObject({ code: "PLAN_REQUIRED" });
   });
 });
+
+describe("PATCH /api/settings/notifications malformed body", () => {
+  beforeEach(() => {
+    resetSupabaseMock(userA);
+    seedUser(userA, { subscription_tier: "pro" });
+  });
+
+  it("returns 400, not a crash, for a body that is not valid JSON", async () => {
+    const before = structuredClone(db().users[0].notification_preferences);
+    const response = await PATCH(new Request("http://localhost.test/api/settings/notifications", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "Invalid notification preferences." });
+    expect(db().users[0].notification_preferences).toEqual(before);
+  });
+});

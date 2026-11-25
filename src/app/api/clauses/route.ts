@@ -151,7 +151,7 @@ function parseClauseQuery(searchParams: URLSearchParams): ParsedClauseQuery | { 
 
   return {
     q: normalizeSearch(searchParams.get("q")),
-    categories: parseList(searchParams.get("category")).map(toClauseCategory),
+    categories: toCategoryFilter(parseList(searchParams.get("category"))),
     risks: parseList(searchParams.get("risk")).filter((risk): risk is ClauseRow["risk_level"] =>
       VALID_RISKS.includes(risk as ClauseRow["risk_level"])
     ),
@@ -171,6 +171,14 @@ function parseList(value: string | null) {
 function normalizeSearch(value: string | null) {
   const next = value?.trim();
   return next && next.length > 0 ? next.slice(0, 120) : null;
+}
+
+// Categories are free text from the analysis model and are stored verbatim
+// (e.g. "Limitation of Liability", "Auto-Renewal"). The library UI sends those
+// stored values back as-is, so match them exactly. Also keep accepting slugs
+// like "renewal" by adding their title-cased form.
+function toCategoryFilter(values: string[]) {
+  return Array.from(new Set(values.flatMap((value) => [value, toClauseCategory(value)])));
 }
 
 function toClauseCategory(value: string) {

@@ -939,3 +939,28 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 - The owner approved merging. PR #111 (`claude/web-stabilization`, which contains all of #101–#110) was squash-merged to `main` as `ddee0be`. #101–#110 were closed as superseded. `main` unit tests pass again (685/685). The Vercel production deploy of `ddee0be` is Ready, with no runtime errors in the hour after it.
 - `claude/web-stabilization` was reset to the new `main`.
+
+## 2026-11-25
+
+### Quality Gates
+- `main` (`8de92f0`, same as `claude/web-stabilization` at the start of the run): Build pass · Typecheck pass · Lint pass · Unit tests pass (685/685, 118 files) · E2E: none configured
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (686/686, 118 files) · E2E: none configured
+- No browser pass this run. The fix is in an API route and is covered by a route test.
+
+### Issues Found
+- **P2:** In the clause library, clicking a category filter returned no clauses when the category had more than one word, a hyphen, or capitals after the first letter (for example "Limitation of Liability", "Auto-Renewal", "IP"). The facets show categories exactly as stored, and the analysis model writes them as free text. `GET /api/clauses` title-cased each filter value ("Limitation Of Liability", "Auto Renewal", "Ip") before matching exactly, so these values never matched. A read-only count on production showed 1 of 40 stored clauses already has a category like this.
+- Reviewed and found no defects: `POST /api/reminders/[id]/approve` (ownership, sent/dismissed guard, past-date guard), `GET/PATCH /api/settings/notifications` and every writer of `notification_preferences` (each stored key is in the PATCH allowlist), and `GET /api/ask/usage`.
+
+### Fixes Completed
+- `src/app/api/clauses/route.ts`: the category filter now matches the stored value exactly. It also still matches the title-cased form, so slug-style values like `category=renewal` keep working.
+
+### Tests Added/Changed
+- `src/app/api/clauses/__tests__/route.test.ts`: new case filtering on "Limitation of Liability", "Auto-Renewal" and "IP". It fails against the old route (0 results instead of 3). The existing slug-style test still passes.
+
+### Remaining Concerns
+- The UI joins selected categories with commas, and the API splits on commas. A stored category that contains a comma still can't be filtered. None exist in production today.
+- P4, not fixed: the settings notifications PATCH returns an unhandled 500 when the request body is not valid JSON. Only hand-made requests can trigger it.
+- Same longstanding items as before: no E2E harness, test account or staging env; the reminder Time field vs the daily cron; the upload-cap TOCTOU race; onboarding steps 3–4; Stripe `past_due`; leaked-password protection; the audit-log cursor; unsubscribe-on-GET.
+
+### PR/Branch
+- Branch: `claude/web-stabilization`

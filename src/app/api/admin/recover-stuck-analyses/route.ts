@@ -56,6 +56,19 @@ async function handle(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // Uploads whose background analysis never claimed the document stay
+  // 'pending' with no analysis_started_at, so the query above never sees
+  // them and the detail page would show "Analyzing" forever.
+  const { data: stalePending, error: pendingError } = await supabase
+    .from("documents")
+    .select("id, user_id, analysis_attempts")
+    .eq("status", "pending")
+    .lt("created_at", cutoffIso)
+    .order("created_at", { ascending: true })
+    .limit(BATCH_SIZE);
+
+  if (pendingError) return NextResponse.json({ error: pendingError.message }, { status: 500 });
+
   let retried = 0;
   let gaveUp = 0;
   let skipped = 0;
@@ -103,7 +116,32 @@ async function handle(request: Request) {
     gaveUp += 1;
   }
 
-  return NextResponse.json({ found: stuck?.length ?? 0, retried, gaveUp, skipped });
+  for (const document of (stalePending ?? []) as StuckDocument[]) {
+    const claim = await claimAnalysisAttempt(supabase, document.id, document.user_id, {
+      requirePending: true,
+    });
+    if (!claim.claimed) {
+      skipped += 1;
+      continue;
+    }
+
+    retried += 1;
+    try {
+      await runClaimedAnalysis(supabase, document.user_id, claim.document, claim.attemptToken);
+    } catch (recoveryError) {
+      console.warn("Pending-analysis retry failed.", {
+        documentId: document.id,
+        message: recoveryError instanceof Error ? recoveryError.message : "Unknown recovery error.",
+      });
+    }
+  }
+
+  return NextResponse.json({
+    found: (stuck?.length ?? 0) + (stalePending?.length ?? 0),
+    retried,
+    gaveUp,
+    skipped,
+  });
 }
 
 export async function POST(request: Request) {

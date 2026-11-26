@@ -985,3 +985,32 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/web-stabilization`
+
+## 2026-11-26
+
+### Quality Gates
+- `main` (`8de92f0`) is unchanged since the last run.
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (692/692, 118 files) · E2E: none configured
+- No browser pass this run. The fix is a server-only cron route, covered by route tests.
+
+### Issues Found
+- **P2:** Uploads could get stuck in `pending` forever. The upload route inserts the document as `pending` and starts analysis in an `after()` callback. If that callback died before it claimed the document (a killed instance, or a transient Supabase error on the first read or claim), nothing ever picked the document up again. `recover-stuck-analyses` only looked at `analyzing` rows with an old `analysis_started_at`, and Re-analyze only works on `failed` documents. The detail page would show "Analyzing" forever, even though its copy says the recovery job requeues stuck documents. A read-only check on production found no `pending` documents today, so this is a latent bug, not an active one.
+- Reviewed with no defects found: `GET /api/compare` (owner-scoped on both documents and their clauses, with the Q&A quota checked first), `POST /api/documents/[id]/reanalyze` and `/analyze` (status guards, `AlreadyAnalyzingError` mapped to 409), and `/api/onboarding/complete` and `/api/onboarding/tour`.
+
+### Fixes Completed
+- `src/lib/ai/run-analysis.ts`: `claimAnalysisAttempt` takes a new `requirePending` option. The claim only succeeds while the row is still `pending`, so it can't race an upload callback that has already started.
+- `src/app/api/admin/recover-stuck-analyses/route.ts`: the sweep now also picks up `pending` documents created more than 10 minutes ago (up to 20 per run), claims them that way, and runs the analysis. From there the existing attempt cap and `stuck_timeout` handling apply. Auth is unchanged.
+
+### Tests Added/Changed
+- `src/app/api/admin/recover-stuck-analyses/__tests__/route.test.ts`: 3 new cases.
+  - A stale `pending` upload is analyzed and ends up `ready`.
+  - A fresh `pending` upload is left alone.
+  - A `pending` candidate that started analyzing after it was listed is skipped, not claimed again.
+  - Two of these fail against the old route.
+
+### Remaining Concerns
+- Each sweep now handles up to 40 documents in one 300s function. That is fine at today's volume, but it is worth splitting if many uploads ever stall at once.
+- Same longstanding items as before: no E2E harness, test account or staging env; the reminder Time field vs the daily cron; the upload-cap TOCTOU race; onboarding steps 3–4; Stripe `past_due`; leaked-password protection; the audit-log cursor; unsubscribe-on-GET; comma-containing clause categories.
+
+### PR/Branch
+- Branch: `claude/web-stabilization` (PR #113)

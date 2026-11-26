@@ -169,6 +169,50 @@ describe("/api/admin/recover-stuck-analyses", () => {
     expect(db().documents[0]).toMatchObject({ id: document.id, status: "analyzing", analysis_attempts: 1 });
   });
 
+  it("starts analysis for an upload left pending past the threshold", async () => {
+    const document = seedDocument(userA, {
+      status: "pending",
+      analysis_attempts: 0,
+      created_at: STALE_STARTED_AT,
+    });
+    seedStoredPdf(document.storage_path);
+    extractPdfTextMock.mockResolvedValue("Lease text with enough content.");
+    analyzeDocumentMock.mockResolvedValue(analysisResult());
+
+    const response = await POST(request());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ found: 1, retried: 1, gaveUp: 0, skipped: 0 });
+    expect(db().documents[0]).toMatchObject({ status: "ready", analysis_attempts: 1 });
+  });
+
+  it("leaves a freshly uploaded pending document to its own background job", async () => {
+    seedDocument(userA, { status: "pending", created_at: FRESH_STARTED_AT });
+
+    const response = await POST(request());
+    const body = await response.json();
+
+    expect(body).toEqual({ found: 0, retried: 0, gaveUp: 0, skipped: 0 });
+    expect(db().documents[0]).toMatchObject({ status: "pending", analysis_attempts: 0 });
+    expect(claimAnalysisAttemptMock).not.toHaveBeenCalled();
+  });
+
+  it("does not claim a pending candidate that started analyzing after it was listed", async () => {
+    const document = seedDocument(userA, { status: "pending", created_at: STALE_STARTED_AT });
+    claimAnalysisAttemptMock.mockImplementationOnce(async (client, id, userId, options) => {
+      db().documents[0].status = "analyzing";
+      const actual = await vi.importActual<typeof import("@/lib/ai/run-analysis")>("@/lib/ai/run-analysis");
+      return actual.claimAnalysisAttempt(client, id, userId, options);
+    });
+
+    const response = await POST(request());
+    const body = await response.json();
+
+    expect(body).toEqual({ found: 1, retried: 0, gaveUp: 0, skipped: 1 });
+    expect(db().documents[0]).toMatchObject({ id: document.id, status: "analyzing", analysis_attempts: 0 });
+  });
+
   it("responds to GET the same way, for Vercel Cron", async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);

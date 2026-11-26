@@ -69,12 +69,16 @@ export async function getAnalysisDocument(
  * Returns `{claimed: false}` (not an error) when the predicate doesn't
  * match — that's the expected outcome when something else currently holds
  * the claim.
+ *
+ * With `requirePending`, the predicate is instead "still 'pending'" — used
+ * by the same sweep for an upload whose background analysis never got as far
+ * as claiming the document (e.g. the after() callback died first).
  */
 export async function claimAnalysisAttempt(
   supabase: AnyClient,
   documentId: string,
   userId: string,
-  options?: { requireStaleSince?: string },
+  options?: { requireStaleSince?: string; requirePending?: boolean },
 ): Promise<ClaimResult> {
   const { document: current, error } = await getAnalysisDocument(supabase, documentId, userId);
   if (error || !current) {
@@ -95,9 +99,13 @@ export async function claimAnalysisAttempt(
     .eq("id", documentId)
     .eq("user_id", userId);
 
-  query = options?.requireStaleSince
-    ? query.eq("status", "analyzing").lt("analysis_started_at", options.requireStaleSince)
-    : query.neq("status", "analyzing");
+  if (options?.requirePending) {
+    query = query.eq("status", "pending");
+  } else if (options?.requireStaleSince) {
+    query = query.eq("status", "analyzing").lt("analysis_started_at", options.requireStaleSince);
+  } else {
+    query = query.neq("status", "analyzing");
+  }
 
   const { data, error: claimError } = await query.select(ANALYSIS_DOCUMENT_COLUMNS).maybeSingle();
   if (claimError) throw claimError;

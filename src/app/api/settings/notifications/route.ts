@@ -34,7 +34,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   }
 
-  const parsed = patchSchema.safeParse(await request.json());
+  const parsed = patchSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid notification preferences.", issues: validationIssues(parsed.error) },

@@ -78,6 +78,22 @@ describe("GET /api/clauses", () => {
     expect(payload.clauses[0]).toMatchObject({ title: "Auto-renewal", riskLevel: "high" });
   });
 
+  it("matches facet categories exactly as stored, including multi-word and hyphenated ones", async () => {
+    const document = seedDocument(userA, { title: "MSA" });
+    seedClause(document.id, userA, { title: "Cap", category: "Limitation of Liability" });
+    seedClause(document.id, userA, { title: "Renewal", category: "Auto-Renewal" });
+    seedClause(document.id, userA, { title: "IP", category: "IP" });
+    seedClause(document.id, userA, { title: "Fee", category: "Payment" });
+
+    const params = new URLSearchParams({ category: "Limitation of Liability,Auto-Renewal,IP" });
+    const response = await GET(new Request(`http://localhost.test/api/clauses?${params.toString()}`));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.totalCount).toBe(3);
+    expect(payload.clauses.map((clause: { title: string }) => clause.title).sort()).toEqual(["Cap", "IP", "Renewal"]);
+  });
+
   it("paginates with an opaque created_at cursor", async () => {
     const document = seedDocument(userA);
     seedClause(document.id, userA, { title: "Newest", created_at: "2026-06-03T00:00:00.000Z" });

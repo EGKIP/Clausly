@@ -268,3 +268,18 @@ function stripeSubscriptionsMock(subscriptions: Array<{ id: string; status: stri
     },
   };
 }
+
+describe("PATCH /api/profile malformed body", () => {
+  beforeEach(() => resetSupabaseMock(userA));
+
+  it("returns 400, not a crash, for a body that is not valid JSON", async () => {
+    const response = await PATCH(new Request("http://localhost.test/api/profile", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "Invalid profile update." });
+  });
+});

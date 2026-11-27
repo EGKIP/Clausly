@@ -120,57 +120,72 @@ export function useReminders(filters: ReminderFilters = {}): State {
       return dropIfStatusChanged(next, status);
     });
 
-    return withPending(id, async () => {
-      const response = await fetch(`/api/reminders/${encodeURIComponent(id)}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(overrides),
-      });
-
-      if (!response.ok) {
-        const message = await responseError(response, "Unable to approve reminder.");
-        if (!mountedRef.current) return null;
-        setReminders((current) => restoreReminder(current, original));
-        setError(message);
-        return null;
-      }
-
-      const payload = (await response.json()) as ReminderPayload;
+    const fail = (message: string) => {
       if (!mountedRef.current) return null;
-      if (payload.reminder) {
-        const nextReminder = normalizeReminder(payload.reminder);
-        setReminders((current) => dropIfStatusChanged(replaceReminder(current, nextReminder), status));
-        return nextReminder;
-      }
+      setReminders((current) => restoreReminder(current, original));
+      setError(message);
       return null;
+    };
+
+    return withPending(id, async () => {
+      try {
+        const response = await fetch(`/api/reminders/${encodeURIComponent(id)}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(overrides),
+        });
+
+        if (!response.ok) {
+          return fail(await responseError(response, "Unable to approve reminder."));
+        }
+
+        const payload = (await response.json()) as ReminderPayload;
+        if (!mountedRef.current) return null;
+        if (payload.reminder) {
+          const nextReminder = normalizeReminder(payload.reminder);
+          setReminders((current) => dropIfStatusChanged(replaceReminder(current, nextReminder), status));
+          return nextReminder;
+        }
+        return null;
+      } catch {
+        // Network failure: nothing was saved, so undo the optimistic approval.
+        return fail("Unable to approve reminder.");
+      }
     });
   }, [reminders, withPending, status]);
 
   const update = React.useCallback((id: string, patch: ReminderMutationPatch) => {
     setError(null);
 
-    return withPending(id, async () => {
-      const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-
-      if (!response.ok) {
-        const message = await responseError(response, "Unable to update reminder.");
-        if (!mountedRef.current) return null;
-        setError(message);
-        return null;
-      }
-
-      const payload = (await response.json()) as ReminderPayload;
+    const fail = (message: string) => {
       if (!mountedRef.current) return null;
-      if (payload.reminder) {
-        const nextReminder = normalizeReminder(payload.reminder);
-        setReminders((current) => replaceReminder(current, nextReminder));
-        return nextReminder;
-      }
+      setError(message);
       return null;
+    };
+
+    return withPending(id, async () => {
+      try {
+        const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+
+        if (!response.ok) {
+          return fail(await responseError(response, "Unable to update reminder."));
+        }
+
+        const payload = (await response.json()) as ReminderPayload;
+        if (!mountedRef.current) return null;
+        if (payload.reminder) {
+          const nextReminder = normalizeReminder(payload.reminder);
+          setReminders((current) => replaceReminder(current, nextReminder));
+          return nextReminder;
+        }
+        return null;
+      } catch {
+        return fail("Unable to update reminder.");
+      }
     });
   }, [withPending]);
 
@@ -179,16 +194,24 @@ export function useReminders(filters: ReminderFilters = {}): State {
     setError(null);
     setReminders((current) => current.filter((reminder) => reminder.id !== id));
 
+    const fail = (message: string) => {
+      if (!mountedRef.current) return false;
+      setReminders((current) => restoreReminder(current, original));
+      setError(message);
+      return false;
+    };
+
     return withPending(id, async () => {
-      const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
-      if (!response.ok) {
-        const message = await responseError(response, "Unable to ignore reminder.");
-        if (!mountedRef.current) return false;
-        setReminders((current) => restoreReminder(current, original));
-        setError(message);
-        return false;
+      try {
+        const response = await fetch(`/api/reminders/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (!response.ok) {
+          return fail(await responseError(response, "Unable to ignore reminder."));
+        }
+        return true;
+      } catch {
+        // Network failure: nothing was deleted, so put the reminder back.
+        return fail("Unable to ignore reminder.");
       }
-      return true;
     });
   }, [reminders, withPending]);
 

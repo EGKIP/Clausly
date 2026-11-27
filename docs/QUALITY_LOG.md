@@ -939,3 +939,103 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 - The owner approved merging. PR #111 (`claude/web-stabilization`, which contains all of #101–#110) was squash-merged to `main` as `ddee0be`. #101–#110 were closed as superseded. `main` unit tests pass again (685/685). The Vercel production deploy of `ddee0be` is Ready, with no runtime errors in the hour after it.
 - `claude/web-stabilization` was reset to the new `main`.
+
+## 2026-11-24
+
+### Quality Gates
+- `main` (`8de92f0`): Build pass · Typecheck pass · Lint pass · Unit tests pass (685/685, 118 files) · E2E: none configured
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (688/688, 118 files) · E2E: none configured
+- No browser pass this run: the change is server-only.
+
+### Issues Found
+- **P3:** `POST /api/reminders`, `PATCH /api/profile`, and `PATCH /api/settings/notifications` called `request.json()` without a fallback. A body that wasn't valid JSON threw out of the handler, so the caller got Next's generic 500 instead of the 400 validation error every other mutation route returns. Nothing was written in either case. This matters more once a second client (mobile, bearer auth) calls these routes.
+- Also reviewed with no defects found: reminder approve (ownership, status and past-date guards), document PATCH/DELETE (owner path check, row-first delete), share create (Pro gate, ownership), document export (ownership, quota, filename slug), and the Resend webhook (signature verified before any DB work).
+
+### Fixes Completed
+- The three routes now use `request.json().catch(() => null)`, the same pattern as the other routes, so a malformed body fails schema validation with a 400. Auth and validation order are unchanged.
+
+### Tests Added/Changed
+- One malformed-body case each in `src/app/api/reminders/__tests__/route.test.ts`, `src/app/api/profile/__tests__/route.test.ts`, and `src/app/api/settings/notifications/__tests__/route.test.ts`. All three fail against the old routes.
+
+### Remaining Concerns
+- Same longstanding items: no E2E harness, test account or staging env, the reminder Time field vs the daily cron, the upload-cap TOCTOU race, onboarding steps 3–4, Stripe `past_due`, leaked-password protection, the audit-log cursor, and unsubscribe-on-GET.
+
+### PR/Branch
+- Branch: `claude/web-stabilization` (also pushed as `claude/upbeat-newton-n51c5d`)
+## 2026-11-25
+
+### Quality Gates
+- `main` (`8de92f0`): Build pass · Typecheck pass · Lint pass · Unit tests pass (685/685, 118 files) · E2E: none configured
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (689/689, 118 files, after merging the 2026-11-24 commit) · E2E: none configured
+- No browser pass this run. The fix is in an API route and is covered by a route test.
+
+### Issues Found
+- **P2:** In the clause library, clicking a category filter returned no clauses when the category had more than one word, a hyphen, or capitals after the first letter (for example "Limitation of Liability", "Auto-Renewal", "IP"). The facets show categories exactly as stored, and the analysis model writes them as free text. `GET /api/clauses` title-cased each filter value ("Limitation Of Liability", "Auto Renewal", "Ip") before matching exactly, so these values never matched. A read-only count on production showed 1 of 40 stored clauses already has a category like this.
+- Reviewed and found no defects: `POST /api/reminders/[id]/approve` (ownership, sent/dismissed guard, past-date guard), `GET/PATCH /api/settings/notifications` and every writer of `notification_preferences` (each stored key is in the PATCH allowlist), and `GET /api/ask/usage`.
+
+### Fixes Completed
+- `src/app/api/clauses/route.ts`: the category filter now matches the stored value exactly. It also still matches the title-cased form, so slug-style values like `category=renewal` keep working.
+
+### Tests Added/Changed
+- `src/app/api/clauses/__tests__/route.test.ts`: new case filtering on "Limitation of Liability", "Auto-Renewal" and "IP". It fails against the old route (0 results instead of 3). The existing slug-style test still passes.
+
+### Remaining Concerns
+- The UI joins selected categories with commas, and the API splits on commas. A stored category that contains a comma still can't be filtered. None exist in production today.
+- Same longstanding items as before: no E2E harness, test account or staging env; the reminder Time field vs the daily cron; the upload-cap TOCTOU race; onboarding steps 3–4; Stripe `past_due`; leaked-password protection; the audit-log cursor; unsubscribe-on-GET.
+
+### PR/Branch
+- Branch: `claude/web-stabilization`
+
+## 2026-11-26
+
+### Quality Gates
+- `main` (`8de92f0`) is unchanged since the last run.
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (692/692, 118 files) · E2E: none configured
+- No browser pass this run. The fix is a server-only cron route, covered by route tests.
+
+### Issues Found
+- **P2:** Uploads could get stuck in `pending` forever. The upload route inserts the document as `pending` and starts analysis in an `after()` callback. If that callback died before it claimed the document (a killed instance, or a transient Supabase error on the first read or claim), nothing ever picked the document up again. `recover-stuck-analyses` only looked at `analyzing` rows with an old `analysis_started_at`, and Re-analyze only works on `failed` documents. The detail page would show "Analyzing" forever, even though its copy says the recovery job requeues stuck documents. A read-only check on production found no `pending` documents today, so this is a latent bug, not an active one.
+- Reviewed with no defects found: `GET /api/compare` (owner-scoped on both documents and their clauses, with the Q&A quota checked first), `POST /api/documents/[id]/reanalyze` and `/analyze` (status guards, `AlreadyAnalyzingError` mapped to 409), and `/api/onboarding/complete` and `/api/onboarding/tour`.
+
+### Fixes Completed
+- `src/lib/ai/run-analysis.ts`: `claimAnalysisAttempt` takes a new `requirePending` option. The claim only succeeds while the row is still `pending`, so it can't race an upload callback that has already started.
+- `src/app/api/admin/recover-stuck-analyses/route.ts`: the sweep now also picks up `pending` documents created more than 10 minutes ago (up to 20 per run), claims them that way, and runs the analysis. From there the existing attempt cap and `stuck_timeout` handling apply. Auth is unchanged.
+
+### Tests Added/Changed
+- `src/app/api/admin/recover-stuck-analyses/__tests__/route.test.ts`: 3 new cases.
+  - A stale `pending` upload is analyzed and ends up `ready`.
+  - A fresh `pending` upload is left alone.
+  - A `pending` candidate that started analyzing after it was listed is skipped, not claimed again.
+  - Two of these fail against the old route.
+
+### Remaining Concerns
+- Each sweep now handles up to 40 documents in one 300s function. That is fine at today's volume, but it is worth splitting if many uploads ever stall at once.
+- Same longstanding items as before: no E2E harness, test account or staging env; the reminder Time field vs the daily cron; the upload-cap TOCTOU race; onboarding steps 3–4; Stripe `past_due`; leaked-password protection; the audit-log cursor; unsubscribe-on-GET; comma-containing clause categories.
+
+### PR/Branch
+- Branch: `claude/web-stabilization` (PR #113)
+
+## 2026-11-27
+
+### Quality Gates
+- `main` (`8de92f0`) is unchanged since the last run.
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (695/695, 118 files) · E2E: none configured
+- No browser pass this run. The fix is in a client hook and is covered by hook tests.
+
+### Issues Found
+- **P2:** In `useReminders`, approve, ignore and edit only handled non-OK responses. If the request itself failed (offline, dropped connection), the optimistic change stayed on screen: a suggested reminder disappeared or showed as approved even though nothing was saved. No error was shown, and the promise rejected unhandled. For an edit, the modal just stayed open with no message. Affects the Reminders page and the document Reminders section.
+- Reviewed with no defects found: `POST /api/reminders/[id]/approve` and the reminder email dispatcher (`/api/notifications/dispatch`).
+- Latent, not fixed: the dispatcher re-selects reminders it skips (email turned off, no address) or fails to send, oldest first, with a cap of 100. If more than 100 of these build up, newer due reminders would never be reached. A read-only check on production found 0 due unsent reminders, so this isn't happening. A fix would mean deciding what status a skipped reminder gets, which is a product decision.
+
+### Fixes Completed
+- `src/lib/hooks/use-reminders.ts`: each mutation's request is now inside `try/catch`. A network failure rolls back the optimistic change the same way a server error does, sets the usual "Unable to approve/ignore/update reminder." message, and returns `null`/`false` instead of throwing.
+
+### Tests Added/Changed
+- `src/lib/hooks/__tests__/use-reminders.test.ts`: 3 new cases, one each for approve, dismiss and update when `fetch` rejects. All 3 fail against the old hook.
+
+### Remaining Concerns
+- The dispatcher backlog item above.
+- Same longstanding items as before: no E2E harness, test account or staging env; the reminder Time field vs the daily cron; the upload-cap TOCTOU race; onboarding steps 3–4; Stripe `past_due`; leaked-password protection; the audit-log cursor; unsubscribe-on-GET; comma-containing clause categories.
+
+### PR/Branch
+- Branch: `claude/web-stabilization` (PR #113)

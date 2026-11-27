@@ -59,7 +59,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 503 });
   }
 
-  const parsed = profileSchema.safeParse(await request.json());
+  const parsed = profileSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(
       {

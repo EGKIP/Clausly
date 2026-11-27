@@ -83,3 +83,19 @@ describe("/api/reminders", () => {
     });
   });
 });
+
+describe("POST /api/reminders malformed body", () => {
+  beforeEach(() => resetSupabaseMock(userA));
+
+  it("returns 400, not a crash, for a body that is not valid JSON", async () => {
+    const response = await POST(new Request("http://localhost.test/api/reminders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not json",
+    }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "Invalid reminder." });
+    expect(db().reminders).toHaveLength(0);
+  });
+});

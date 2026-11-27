@@ -319,6 +319,58 @@ describe("useReminders", () => {
     expect(result.current.reminders.map((item) => item.id)).toEqual([reminderTwo.id]);
   });
 
+  it("rolls back an optimistic approval and shows an error when the request never reaches the server", async () => {
+    const fetchMock = mockFetch(jsonResponse({ reminders: [reminder] }));
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const { result } = renderHook(() => useReminders({ status: "suggested" }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let approved: Reminder | null = reminder;
+    await act(async () => {
+      approved = await result.current.approve(reminder.id);
+    });
+
+    expect(approved).toBeNull();
+    expect(result.current.reminders).toEqual([reminder]);
+    expect(result.current.error).toBe("Unable to approve reminder.");
+    expect(result.current.pendingIds.size).toBe(0);
+  });
+
+  it("restores a dismissed reminder and shows an error when the request never reaches the server", async () => {
+    const fetchMock = mockFetch(jsonResponse({ reminders: [reminder] }));
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const { result } = renderHook(() => useReminders({ status: "suggested" }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.dismiss(reminder.id);
+    });
+
+    expect(ok).toBe(false);
+    expect(result.current.reminders).toEqual([reminder]);
+    expect(result.current.error).toBe("Unable to ignore reminder.");
+  });
+
+  it("returns null with an error when an edit never reaches the server", async () => {
+    const fetchMock = mockFetch(jsonResponse({ reminders: [reminder] }));
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const { result } = renderHook(() => useReminders());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let saved: Reminder | null = reminder;
+    await act(async () => {
+      saved = await result.current.update(reminder.id, { title: "New title" });
+    });
+
+    expect(saved).toBeNull();
+    expect(result.current.reminders).toEqual([reminder]);
+    expect(result.current.error).toBe("Unable to update reminder.");
+  });
+
   it("does not throw when the initial fetch resolves after the component has unmounted", async () => {
     const fetchResponse = deferred<Response>();
     mockFetch(fetchResponse.promise);

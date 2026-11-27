@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rawBody = await request.json();
+  const rawBody = await request.json().catch(() => null);
   const parsed = reminderCreateSchema.safeParse(rawBody);
 
   if (!parsed.success) {

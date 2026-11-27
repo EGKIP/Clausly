@@ -1014,3 +1014,28 @@ Daily autonomous quality/maintenance runs for Clausly. Newest entries at the bot
 
 ### PR/Branch
 - Branch: `claude/web-stabilization` (PR #113)
+
+## 2026-11-27
+
+### Quality Gates
+- `main` (`8de92f0`) is unchanged since the last run.
+- This branch: Build pass · Typecheck pass · Lint pass · Unit tests pass (695/695, 118 files) · E2E: none configured
+- No browser pass this run. The fix is in a client hook and is covered by hook tests.
+
+### Issues Found
+- **P2:** In `useReminders`, approve, ignore and edit only handled non-OK responses. If the request itself failed (offline, dropped connection), the optimistic change stayed on screen: a suggested reminder disappeared or showed as approved even though nothing was saved. No error was shown, and the promise rejected unhandled. For an edit, the modal just stayed open with no message. Affects the Reminders page and the document Reminders section.
+- Reviewed with no defects found: `POST /api/reminders/[id]/approve` and the reminder email dispatcher (`/api/notifications/dispatch`).
+- Latent, not fixed: the dispatcher re-selects reminders it skips (email turned off, no address) or fails to send, oldest first, with a cap of 100. If more than 100 of these build up, newer due reminders would never be reached. A read-only check on production found 0 due unsent reminders, so this isn't happening. A fix would mean deciding what status a skipped reminder gets, which is a product decision.
+
+### Fixes Completed
+- `src/lib/hooks/use-reminders.ts`: each mutation's request is now inside `try/catch`. A network failure rolls back the optimistic change the same way a server error does, sets the usual "Unable to approve/ignore/update reminder." message, and returns `null`/`false` instead of throwing.
+
+### Tests Added/Changed
+- `src/lib/hooks/__tests__/use-reminders.test.ts`: 3 new cases, one each for approve, dismiss and update when `fetch` rejects. All 3 fail against the old hook.
+
+### Remaining Concerns
+- The dispatcher backlog item above.
+- Same longstanding items as before: no E2E harness, test account or staging env; the reminder Time field vs the daily cron; the upload-cap TOCTOU race; onboarding steps 3–4; Stripe `past_due`; leaked-password protection; the audit-log cursor; unsubscribe-on-GET; comma-containing clause categories.
+
+### PR/Branch
+- Branch: `claude/web-stabilization` (PR #113)
